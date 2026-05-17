@@ -1,0 +1,141 @@
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from typing import Optional
+from app.database import get_db
+from app.models.user import User, UserRole
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.core.security import hash_password
+from app.dependencies import get_current_user, require_admin
+
+
+router = APIRouter(prefix="/api/users", tags=["Users"])
+
+
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin)  # admin เท่านั้นที่สร้าง user ได้
+):
+    """create new user (admin only)"""
+    # ตรวจว่าเลขประจำตัวซ้ำหรือไม่
+    if db.query(User).filter(User.employee_id == user_data.employee_id).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"เลขประจำตัว {user_data.employee_id} มีอยู่ในระบบแล้ว"
+        )
+    
+    # ตรวจว่าอีเมลซ้ำหรือไม่
+    if db.query(User).filter(User.email == user_data.email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="อีเมลนี้มีอยู่ในระบบแล้ว"
+        )
+    
+    new_user = User(
+        employee_id=user_data.employee_id,
+        email=user_data.email,
+        full_name=user_data.full_name,
+        hashed_password=hash_password(user_data.password),
+        role=user_data.role,
+        department=user_data.department,
+        position=user_data.position,
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@router.get("", response_model=list[UserResponse])
+def list_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    search: Optional[str] = Query(None, description="ค้นหาจากชื่อ เลขประจำตัว หรืออีเมล"),
+    role: Optional[UserRole] = None,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin)
+):
+    """list all users (admin only) with pagination and search"""
+    query = db.query(User)
+    
+    if search:
+        query = query.filter(or_(
+            User.full_name.ilike(f"%{search}%"),
+            User.employee_id.ilike(f"%{search}%"),
+            User.email.ilike(f"%{search}%"),
+        ))
+    
+    if role:
+        query = query.filter(User.role == role)
+    
+    return query.offset(skip).limit(limit).all()
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """get user information — can only view own information, except admin can view all"""
+    if current_user.id != user_id and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ไม่มีสิทธิ์ดูข้อมูลผู้ใช้คนอื่น"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ไม่พบผู้ใช้"
+        )
+    return user
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin)
+):
+    """update user information (admin only)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    
+    # อัปเดตเฉพาะ field ที่ส่งมา
+    update_data = user_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK)
+def deactivate_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """deactivate user (soft delete) — admin only"""
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ไม่สามารถระงับบัญชีของตัวเองได้"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    
+    user.is_active = 0
+    db.commit()
+    
+    return {"message": f"ระงับบัญชี {user.full_name} เรียบร้อย"}
