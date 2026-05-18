@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import UsersListPage from './pages/admin/UsersListPage'
 import UserFormPage from './pages/admin/UserFormPage'
+import CoursesPage from './pages/CoursesPage'
 
 function App() {
   return (
@@ -17,7 +18,7 @@ function App() {
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-
+          
           {/* User pages */}
           <Route
             path="/"
@@ -32,6 +33,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/courses" 
+            element={
+              <ProtectedRoute>
+              <CoursesPage />
               </ProtectedRoute>
             }
           />

@@ -1,7 +1,6 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, Token
@@ -17,17 +16,23 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(data: UserRegister, db: Session = Depends(get_db)):
     """
-    สมัครสมาชิกสำหรับบุคคลทั่วไป
+    สมัครสมาชิกสำหรับเจ้าหน้าที่กรมป่าไม้
     
-    - ไม่ต้องมีเลขประจำตัวเจ้าหน้าที่
-    - role = public (ดูได้เฉพาะหลักสูตรที่เปิดสาธารณะ)
-    - login ด้วยอีเมลและรหัสผ่าน
+    ต้องกรอก: username, ชื่อ-นามสกุล, อีเมล, รหัสผ่าน, หน่วยงาน, ตำแหน่ง
+    บทบาทเริ่มต้น: learner (admin สามารถเปลี่ยนได้ภายหลัง)
     """
     # ตรวจรหัสผ่านตรงกัน
     if data.password != data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"
+        )
+    
+    # ตรวจ username ซ้ำ
+    if db.query(User).filter(User.username == data.username).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"ชื่อผู้ใช้ '{data.username}' มีอยู่ในระบบแล้ว"
         )
     
     # ตรวจอีเมลซ้ำ
@@ -38,11 +43,11 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         )
     
     new_user = User(
-        employee_id=None,  # บุคคลทั่วไปไม่มีเลขประจำตัว
+        username=data.username,
         email=data.email,
         full_name=data.full_name,
         hashed_password=hash_password(data.password),
-        role=UserRole.PUBLIC,
+        role=UserRole.LEARNER,
         department=data.department,
         position=data.position,
     )
@@ -55,19 +60,13 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    """
-    เข้าสู่ระบบด้วยเลขประจำตัว (เจ้าหน้าที่) หรืออีเมล (บุคคลทั่วไป)
-    """
-    # ค้นหา user จาก employee_id หรือ email
-    user = db.query(User).filter(or_(
-        User.employee_id == credentials.identifier,
-        User.email == credentials.identifier,
-    )).first()
+    """เข้าสู่ระบบด้วย username และรหัสผ่าน"""
+    user = db.query(User).filter(User.username == credentials.username).first()
     
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ข้อมูลเข้าสู่ระบบไม่ถูกต้อง",
+            detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
         )
     
     if not user.is_active:
@@ -99,7 +98,6 @@ def change_password(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """เปลี่ยนรหัสผ่านของตัวเอง"""
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -20,7 +20,6 @@ class Course(Base):
     description = Column(Text, nullable=True)
     category = Column(Enum(CourseCategory), nullable=False)
     is_mandatory = Column(Boolean, default=False)
-    is_staff_only = Column(Boolean, default=False)
     cover_image = Column(String(500), nullable=True)
     estimated_hours = Column(Integer, nullable=True)
     is_published = Column(Boolean, default=False)

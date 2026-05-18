@@ -1,5 +1,5 @@
-import { useAuth } from '../contexts/AuthContext'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
@@ -12,8 +12,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-forest-700">ระบบ e-Learning กรมป่าไม้</h1>
@@ -33,9 +32,9 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-xl shadow-sm p-8">
+        {/* Welcome card */}
+        <div className="bg-white rounded-xl shadow-sm p-8 mb-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-2">
             สวัสดี, {user?.full_name}
           </h2>
@@ -43,41 +42,50 @@ export default function DashboardPage() {
             ยินดีต้อนรับเข้าสู่ระบบ e-Learning ของกรมป่าไม้
           </p>
 
-          {/* User info card */}
           <div className="bg-forest-50 rounded-lg p-6 grid grid-cols-2 gap-4">
             <div>
-              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">
-                เลขประจำตัว
-              </div>
-              <div className="font-medium">{user?.employee_id}</div>
+              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">Username</div>
+              <div className="font-medium">{user?.username}</div>
             </div>
             <div>
-              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">
-                บทบาท
-              </div>
+              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">บทบาท</div>
               <div className="font-medium">{roleLabels[user?.role]}</div>
             </div>
             <div>
-              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">
-                อีเมล
-              </div>
+              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">อีเมล</div>
               <div className="font-medium">{user?.email}</div>
             </div>
             <div>
-              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">
-                หน่วยงาน
-              </div>
+              <div className="text-xs text-forest-700 uppercase tracking-wider mb-1">หน่วยงาน</div>
               <div className="font-medium">{user?.department || '-'}</div>
             </div>
           </div>
+        </div>
 
-          {/* Status */}
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center gap-2 text-green-700">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-              </svg>
-              <span className="font-medium">เชื่อมต่อกับ Backend สำเร็จ!</span>
+        {/* Action cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Link
+            to="/courses"
+            className="bg-gradient-to-br from-forest-500 to-forest-700 rounded-xl shadow-md p-8 text-white hover:shadow-xl transition transform hover:-translate-y-1"
+          >
+            <div className="text-5xl mb-4">📚</div>
+            <h3 className="text-xl font-bold mb-2">หลักสูตรทั้งหมด</h3>
+            <p className="text-forest-50 text-sm">
+              เริ่มต้นเรียนรู้กับหลักสูตรของกรมป่าไม้
+            </p>
+            <div className="mt-4 text-sm font-medium">
+              ดูหลักสูตร →
+            </div>
+          </Link>
+
+          <div className="bg-white rounded-xl shadow-sm p-8 border-2 border-dashed border-gray-200">
+            <div className="text-5xl mb-4 opacity-50">🎓</div>
+            <h3 className="text-xl font-bold text-gray-400 mb-2">ใบรับรองของฉัน</h3>
+            <p className="text-gray-400 text-sm">
+              ใบรับรองที่ได้รับจากการเรียนจบหลักสูตร
+            </p>
+            <div className="mt-4 text-sm text-gray-400">
+              (test)
             </div>
           </div>
         </div>

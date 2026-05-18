@@ -4,7 +4,6 @@ import { usersApi } from '../../api/users'
 import AdminLayout from '../../components/AdminLayout'
 
 const roleLabels = {
-  public: { label: 'บุคคลทั่วไป', color: 'bg-gray-100 text-gray-700' },
   learner: { label: 'เจ้าหน้าที่ผู้เรียน', color: 'bg-blue-100 text-blue-700' },
   manager: { label: 'หัวหน้างาน', color: 'bg-purple-100 text-purple-700' },
   instructor: { label: 'วิทยากร', color: 'bg-amber-100 text-amber-700' },
@@ -73,7 +72,7 @@ export default function UsersListPage() {
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex gap-3">
           <input
             type="text"
-            placeholder="🔍 ค้นหาชื่อ เลขประจำตัว หรืออีเมล..."
+            placeholder="🔍 ค้นหาชื่อ username หรืออีเมล..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 focus:border-transparent outline-none"
@@ -102,7 +101,7 @@ export default function UsersListPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เลขประจำตัว</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">username</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">อีเมล</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">บทบาท</th>

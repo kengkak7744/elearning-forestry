@@ -1,8 +1,8 @@
-"""create initial tables
+"""initial schema
 
-Revision ID: 5518aefdb897
+Revision ID: 76063cfe4705
 Revises: 
-Create Date: 2026-05-09 18:11:06.312601
+Create Date: 2026-05-18 13:45:26.002317
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '5518aefdb897'
+revision: str = '76063cfe4705'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -34,33 +34,23 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_courses_id'), 'courses', ['id'], unique=False)
-    op.create_table('modules',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('course_id', sa.Integer(), nullable=False),
-    sa.Column('title', sa.String(length=200), nullable=False),
-    sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('order_index', sa.Integer(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_modules_course_id'), 'modules', ['course_id'], unique=False)
-    op.create_index(op.f('ix_modules_id'), 'modules', ['id'], unique=False)
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('employee_id', sa.String(length=20), nullable=False),
+    sa.Column('username', sa.String(length=50), nullable=False),
     sa.Column('email', sa.String(length=100), nullable=False),
     sa.Column('full_name', sa.String(length=150), nullable=False),
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
     sa.Column('role', sa.Enum('LEARNER', 'MANAGER', 'INSTRUCTOR', 'ADMIN', name='userrole'), nullable=False),
-    sa.Column('department', sa.String(length=150), nullable=True),
-    sa.Column('position', sa.String(length=100), nullable=True),
+    sa.Column('department', sa.String(length=150), nullable=False),
+    sa.Column('position', sa.String(length=100), nullable=False),
     sa.Column('is_active', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
-    op.create_index(op.f('ix_users_employee_id'), 'users', ['employee_id'], unique=True)
     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+    op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
     op.create_table('certificates',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -77,6 +67,17 @@ def upgrade() -> None:
     op.create_index(op.f('ix_certificates_course_id'), 'certificates', ['course_id'], unique=False)
     op.create_index(op.f('ix_certificates_id'), 'certificates', ['id'], unique=False)
     op.create_index(op.f('ix_certificates_user_id'), 'certificates', ['user_id'], unique=False)
+    op.create_table('modules',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('course_id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=200), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('order_index', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['course_id'], ['courses.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_modules_course_id'), 'modules', ['course_id'], unique=False)
+    op.create_index(op.f('ix_modules_id'), 'modules', ['id'], unique=False)
     op.create_table('lessons',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('module_id', sa.Integer(), nullable=False),
@@ -175,17 +176,17 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_lessons_module_id'), table_name='lessons')
     op.drop_index(op.f('ix_lessons_id'), table_name='lessons')
     op.drop_table('lessons')
+    op.drop_index(op.f('ix_modules_id'), table_name='modules')
+    op.drop_index(op.f('ix_modules_course_id'), table_name='modules')
+    op.drop_table('modules')
     op.drop_index(op.f('ix_certificates_user_id'), table_name='certificates')
     op.drop_index(op.f('ix_certificates_id'), table_name='certificates')
     op.drop_index(op.f('ix_certificates_course_id'), table_name='certificates')
     op.drop_table('certificates')
+    op.drop_index(op.f('ix_users_username'), table_name='users')
     op.drop_index(op.f('ix_users_id'), table_name='users')
-    op.drop_index(op.f('ix_users_employee_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
-    op.drop_index(op.f('ix_modules_id'), table_name='modules')
-    op.drop_index(op.f('ix_modules_course_id'), table_name='modules')
-    op.drop_table('modules')
     op.drop_index(op.f('ix_courses_id'), table_name='courses')
     op.drop_table('courses')
     # ### end Alembic commands ###

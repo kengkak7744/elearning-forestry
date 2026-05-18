@@ -16,17 +16,15 @@ router = APIRouter(prefix="/api/users", tags=["Users"])
 def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin)  # admin เท่านั้นที่สร้าง user ได้
+    _admin: User = Depends(require_admin)
 ):
-    """create new user (admin only)"""
-    # ตรวจว่าเลขประจำตัวซ้ำหรือไม่
-    if db.query(User).filter(User.employee_id == user_data.employee_id).first():
+    """สร้างผู้ใช้ใหม่ (admin only)"""
+    if db.query(User).filter(User.username == user_data.username).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"เลขประจำตัว {user_data.employee_id} มีอยู่ในระบบแล้ว"
+            detail=f"ชื่อผู้ใช้ '{user_data.username}' มีอยู่ในระบบแล้ว"
         )
     
-    # ตรวจว่าอีเมลซ้ำหรือไม่
     if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -34,7 +32,7 @@ def create_user(
         )
     
     new_user = User(
-        employee_id=user_data.employee_id,
+        username=user_data.username,
         email=user_data.email,
         full_name=user_data.full_name,
         hashed_password=hash_password(user_data.password),
@@ -53,18 +51,17 @@ def create_user(
 def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    search: Optional[str] = Query(None, description="ค้นหาจากชื่อ เลขประจำตัว หรืออีเมล"),
+    search: Optional[str] = Query(None, description="ค้นหาจากชื่อ username หรืออีเมล"),
     role: Optional[UserRole] = None,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin)
 ):
-    """list all users (admin only) with pagination and search"""
     query = db.query(User)
     
     if search:
         query = query.filter(or_(
             User.full_name.ilike(f"%{search}%"),
-            User.employee_id.ilike(f"%{search}%"),
+            User.username.ilike(f"%{search}%"),
             User.email.ilike(f"%{search}%"),
         ))
     
@@ -80,7 +77,6 @@ def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """get user information — can only view own information, except admin can view all"""
     if current_user.id != user_id and current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -89,10 +85,7 @@ def get_user(
     
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="ไม่พบผู้ใช้"
-        )
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
     return user
 
 
@@ -103,12 +96,10 @@ def update_user(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin)
 ):
-    """update user information (admin only)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
     
-    # อัปเดตเฉพาะ field ที่ส่งมา
     update_data = user_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(user, field, value)
@@ -124,7 +115,6 @@ def deactivate_user(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """deactivate user (soft delete) — admin only"""
     if user_id == admin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

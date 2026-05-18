@@ -82,10 +82,10 @@ export default function ProfilePage() {
               <div className="text-xs text-gray-500 uppercase mb-1">บทบาท</div>
               <div className="font-medium">{roleLabels[user?.role]}</div>
             </div>
-            {user?.employee_id && (
+            {user?.username && (
               <div>
                 <div className="text-xs text-gray-500 uppercase mb-1">เลขประจำตัว</div>
-                <div className="font-medium font-mono">{user.employee_id}</div>
+                <div className="font-medium font-mono">{user?.username}</div>
               </div>
             )}
             <div>

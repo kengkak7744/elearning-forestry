@@ -7,21 +7,20 @@ from app.models.user import UserRole
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=2, max_length=150)
-    department: Optional[str] = None
-    position: Optional[str] = None
-
-
-class UserCreate(UserBase):
-    """สำหรับ admin สร้าง user (มี employee_id)"""
-    employee_id: str = Field(..., min_length=3, max_length=20)
-    password: str = Field(..., min_length=6, max_length=100)
-    role: UserRole = UserRole.LEARNER
+    department: str = Field(..., min_length=2, max_length=150)
+    position: str = Field(..., min_length=2, max_length=100)
 
 
 class UserRegister(UserBase):
-    """สำหรับบุคคลทั่วไปสมัครเอง — ไม่มี employee_id, ไม่เลือก role ได้"""
+    username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
     password: str = Field(..., min_length=6, max_length=100)
     confirm_password: str = Field(..., min_length=6, max_length=100)
+
+
+class UserCreate(UserBase):
+    username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
+    password: str = Field(..., min_length=6, max_length=100)
+    role: UserRole = UserRole.LEARNER
 
 
 class UserUpdate(BaseModel):
@@ -34,7 +33,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: int
-    employee_id: Optional[str] = None
+    username: str
     role: UserRole
     is_active: int
     created_at: datetime

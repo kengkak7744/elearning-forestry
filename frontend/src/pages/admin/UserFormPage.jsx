@@ -9,7 +9,7 @@ export default function UserFormPage() {
   const navigate = useNavigate()
 
   const [formData, setFormData] = useState({
-    employee_id: '',
+    username: '',
     email: '',
     full_name: '',
     password: '',
@@ -84,15 +84,15 @@ export default function UserFormPage() {
         </h1>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-8 space-y-5">
-          {/* เลขประจำตัว */}
+          {/* username */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              เลขประจำตัว <span className="text-red-500">*</span>
+              Username <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              name="employee_id"
-              value={formData.employee_id}
+              name="username"
+              value={formData.username}
               onChange={handleChange}
               required
               disabled={isEdit}
@@ -102,7 +102,7 @@ export default function UserFormPage() {
               placeholder="เช่น EMP001"
             />
             {isEdit && (
-              <p className="text-xs text-gray-500 mt-1">เลขประจำตัวไม่สามารถแก้ไขได้</p>
+              <p className="text-xs text-gray-500 mt-1">username ไม่สามารถแก้ไขได้</p>
             )}
           </div>
 
@@ -174,11 +174,10 @@ export default function UserFormPage() {
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
             >
-                <option value="public">บุคคลทั่วไป</option>
-                <option value="learner">เจ้าหน้าที่ผู้เรียน</option>
-                <option value="manager">หัวหน้างาน</option>
-                <option value="instructor">วิทยากร</option>
-                <option value="admin">ผู้ดูแลระบบ</option>
+              <option value="learner">เจ้าหน้าที่ผู้เรียน</option>
+              <option value="manager">หัวหน้างาน</option>
+              <option value="instructor">วิทยากร</option>
+              <option value="admin">ผู้ดูแลระบบ</option>
             </select>
           </div>
 

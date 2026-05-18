@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
+    username: '',
     full_name: '',
     email: '',
     password: '',
@@ -26,27 +27,32 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
 
-    // ตรวจรหัสผ่านตรงกันที่ฝั่ง client ก่อน
     if (formData.password !== formData.confirm_password) {
       setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน')
       return
     }
 
+    if (!/^[a-zA-Z0-9_.-]+$/.test(formData.username)) {
+      setError('Username ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข และ _ . - เท่านั้น')
+      return
+    }
+
     setLoading(true)
     try {
-      // ส่งข้อมูลที่ไม่ว่างเท่านั้น
-      const payload = { ...formData }
-      if (!payload.department) delete payload.department
-      if (!payload.position) delete payload.position
-
-      await authApi.register(payload)
-
-      // สมัครเสร็จ login ให้อัตโนมัติ
-      await login(formData.email, formData.password)
+      await authApi.register(formData)
+      await login(formData.username, formData.password)
       navigate('/', { replace: true })
     } catch (err) {
-      const message = err.response?.data?.detail || 'สมัครสมาชิกไม่สำเร็จ'
-      setError(typeof message === 'string' ? message : 'ข้อมูลไม่ถูกต้อง')
+      const detail = err.response?.data?.detail
+      // FastAPI validation error เป็น array ของ object
+      if (Array.isArray(detail)) {
+        const messages = detail.map(d => `${d.loc[1]}: ${d.msg}`).join(', ')
+        setError(messages)
+      } else if (typeof detail === 'string') {
+        setError(detail)
+      } else {
+        setError('สมัครสมาชิกไม่สำเร็จ')
+      }
     } finally {
       setLoading(false)
     }
@@ -60,10 +66,30 @@ export default function RegisterPage() {
             🌳
           </div>
           <h1 className="text-2xl font-bold text-forest-700">สมัครสมาชิก</h1>
-          <p className="text-gray-600 text-sm mt-1">สำหรับบุคคลทั่วไป</p>
+          <p className="text-gray-600 text-sm mt-1">สำหรับเจ้าหน้าที่กรมป่าไม้</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ชื่อผู้ใช้ (Username) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+              minLength={3}
+              maxLength={50}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
+              placeholder="เช่น somchai.j"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              ตัวอักษรอังกฤษ ตัวเลข และ _ . - (3-50 ตัวอักษร)
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               ชื่อ-นามสกุล <span className="text-red-500">*</span>
@@ -92,9 +118,42 @@ export default function RegisterPage() {
               onChange={handleChange}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-              placeholder="user@email.com"
+              placeholder="somchai@forest.go.th"
             />
-            <p className="text-xs text-gray-500 mt-1">ใช้สำหรับเข้าสู่ระบบ</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              หน่วยงาน/สังกัด <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="department"
+              value={formData.department}
+              onChange={handleChange}
+              required
+              minLength={2}
+              maxLength={150}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
+              placeholder="เช่น สำนักจัดการป่าไม้ภาคที่ 1"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ตำแหน่ง <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="position"
+              value={formData.position}
+              onChange={handleChange}
+              required
+              minLength={2}
+              maxLength={100}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
+              placeholder="เช่น เจ้าพนักงานป่าไม้ปฏิบัติงาน"
+            />
           </div>
 
           <div>
@@ -129,40 +188,6 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <p className="text-xs text-gray-500 mb-3">ข้อมูลเพิ่มเติม (ไม่บังคับ)</p>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  หน่วยงาน/องค์กร
-                </label>
-                <input
-                  type="text"
-                  name="department"
-                  value={formData.department}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  placeholder="เช่น มหาวิทยาลัย หรือ บริษัท"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  อาชีพ/ตำแหน่ง
-                </label>
-                <input
-                  type="text"
-                  name="position"
-                  value={formData.position}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  placeholder="เช่น นักศึกษา หรือ นักวิจัย"
-                />
-              </div>
-            </div>
-          </div>
-
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
               {error}
@@ -184,9 +209,6 @@ export default function RegisterPage() {
             <Link to="/login" className="text-forest-600 hover:text-forest-700 font-medium">
               เข้าสู่ระบบ
             </Link>
-          </p>
-          <p className="text-xs text-gray-500 mt-3">
-            ⚠️ บุคคลทั่วไปจะเห็นเฉพาะหลักสูตรที่เปิดสาธารณะ
           </p>
         </div>
       </div>
