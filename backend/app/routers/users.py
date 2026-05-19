@@ -39,6 +39,9 @@ def create_user(
         role=user_data.role,
         department=user_data.department,
         position=user_data.position,
+        phone=user_data.phone,                          
+        responsibility=user_data.responsibility,        
+        motivation=user_data.motivation,                
     )
     
     db.add(new_user)

@@ -16,6 +16,9 @@ export default function UserFormPage() {
     role: 'learner',
     department: '',
     position: '',
+    phone: '',              
+    responsibility: '',    
+    motivation: '',        
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -27,13 +30,16 @@ export default function UserFormPage() {
         try {
           const data = await usersApi.getById(id)
           setFormData({
-            employee_id: data.employee_id,
+            username: data.username,
             email: data.email,
             full_name: data.full_name,
-            password: '', // ไม่โชว์รหัสเดิม
+            password: '',
             role: data.role,
             department: data.department || '',
             position: data.position || '',
+            phone: data.phone || '',                       
+            responsibility: data.responsibility || '',      
+            motivation: data.motivation || '',              
           })
         } catch (err) {
           setError('ไม่พบข้อมูลผู้ใช้')
@@ -180,6 +186,24 @@ export default function UserFormPage() {
               <option value="admin">ผู้ดูแลระบบ</option>
             </select>
           </div>
+          
+          {/* เบอร์โทรศัพท์ */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              เบอร์โทรศัพท์ <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              minLength={9}
+              maxLength={20}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
+              placeholder="081-234-5678"
+            />
+          </div>
 
           {/* หน่วยงาน */}
           <div>
@@ -208,6 +232,40 @@ export default function UserFormPage() {
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
               placeholder="เช่น เจ้าพนักงานป่าไม้"
+            />
+          </div>
+          
+          {/* หน้าที่รับผิดชอบ */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              หน้าที่รับผิดชอบ <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              name="responsibility"
+              value={formData.responsibility}
+              onChange={handleChange}
+              required
+              minLength={5}
+              maxLength={1000}
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none resize-none"
+            />
+          </div>
+
+          {/* เหตุผลในการเรียน */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              เหตุผลในการเรียน <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              name="motivation"
+              value={formData.motivation}
+              onChange={handleChange}
+              required
+              minLength={5}
+              maxLength={1000}
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none resize-none"
             />
           </div>
 

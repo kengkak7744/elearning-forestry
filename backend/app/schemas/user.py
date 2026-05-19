@@ -9,6 +9,9 @@ class UserBase(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=150)
     department: str = Field(..., min_length=2, max_length=150)
     position: str = Field(..., min_length=2, max_length=100)
+    phone: str = Field(..., min_length=9, max_length=20)              
+    responsibility: str = Field(..., min_length=5, max_length=1000)    
+    motivation: str = Field(..., min_length=5, max_length=1000)        
 
 
 class UserRegister(UserBase):
@@ -28,6 +31,9 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     department: Optional[str] = None
     position: Optional[str] = None
+    phone: Optional[str] = None          
+    responsibility: Optional[str] = None    
+    motivation: Optional[str] = None         
     role: Optional[UserRole] = None
 
 

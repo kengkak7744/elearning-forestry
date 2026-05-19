@@ -50,6 +50,9 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         role=UserRole.LEARNER,
         department=data.department,
         position=data.position,
+        phone=data.phone,                          
+        responsibility=data.responsibility,        
+        motivation=data.motivation,                
     )
     
     db.add(new_user)

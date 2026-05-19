@@ -95,7 +95,7 @@ export default function LoginPage() {
             </Link>
           </p>
           <p className="text-xs text-gray-500 mt-3">
-            สำหรับเจ้าหน้าที่กรมป่าไม้เท่านั้น
+            สำหรับเจ้าหน้าที่กรมป่าไม้
           </p>
         </div>
       </div>

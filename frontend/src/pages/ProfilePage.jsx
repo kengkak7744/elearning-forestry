@@ -89,6 +89,10 @@ export default function ProfilePage() {
               </div>
             )}
             <div>
+              <div className="text-xs text-gray-500 uppercase mb-1">เบอร์โทรศัพท์</div>
+              <div className="font-medium">{user?.phone || '-'}</div>
+            </div>
+            <div> 
               <div className="text-xs text-gray-500 uppercase mb-1">อีเมล</div>
               <div className="font-medium">{user?.email}</div>
             </div>
@@ -99,6 +103,14 @@ export default function ProfilePage() {
             <div>
               <div className="text-xs text-gray-500 uppercase mb-1">ตำแหน่ง</div>
               <div className="font-medium">{user?.position || '-'}</div>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-xs text-gray-500 uppercase mb-1">หน้าที่รับผิดชอบ</div>
+              <div className="font-medium whitespace-pre-wrap">{user?.responsibility || '-'}</div>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-xs text-gray-500 uppercase mb-1">เหตุผลในการเรียน</div>
+              <div className="font-medium whitespace-pre-wrap">{user?.motivation || '-'}</div>
             </div>
           </div>
         </div>

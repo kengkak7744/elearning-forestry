@@ -72,7 +72,7 @@ export default function UsersListPage() {
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex gap-3">
           <input
             type="text"
-            placeholder="🔍 ค้นหาชื่อ username หรืออีเมล..."
+            placeholder="ค้นหาชื่อ username หรืออีเมล..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 focus:border-transparent outline-none"
