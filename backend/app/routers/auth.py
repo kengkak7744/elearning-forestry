@@ -1,6 +1,7 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, Token
@@ -63,8 +64,11 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    """เข้าสู่ระบบด้วย username และรหัสผ่าน"""
-    user = db.query(User).filter(User.username == credentials.username).first()
+    """เข้าสู่ระบบด้วย username หรือ email และรหัสผ่าน"""
+    user = db.query(User).filter(or_(
+        User.username == credentials.identifier,
+        User.email == credentials.identifier,
+    )).first()
     
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(

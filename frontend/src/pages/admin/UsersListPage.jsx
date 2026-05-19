@@ -15,6 +15,13 @@ export default function UsersListPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  
+  // State สำหรับ modal reset password
+  const [resetTarget, setResetTarget] = useState(null)  // user object
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
 
   const loadUsers = async () => {
     setLoading(true)
@@ -33,7 +40,6 @@ export default function UsersListPage() {
     // eslint-disable-next-line
   }, [roleFilter])
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => loadUsers(), 400)
     return () => clearTimeout(timer)
@@ -50,10 +56,52 @@ export default function UsersListPage() {
     }
   }
 
+  // เปิด modal
+  const openResetModal = (user) => {
+    setResetTarget(user)
+    setNewPassword('')
+    setConfirmPassword('')
+    setResetError('')
+  }
+
+  // ปิด modal
+  const closeResetModal = () => {
+    setResetTarget(null)
+    setNewPassword('')
+    setConfirmPassword('')
+    setResetError('')
+  }
+
+  // ส่งคำขอ reset password
+  const handleResetPassword = async (e) => {
+    e.preventDefault()
+    setResetError('')
+
+    if (newPassword !== confirmPassword) {
+      setResetError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setResetError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร')
+      return
+    }
+
+    setResetLoading(true)
+    try {
+      await usersApi.resetPassword(resetTarget.id, newPassword)
+      alert(`รีเซ็ตรหัสผ่านของ ${resetTarget.full_name} สำเร็จ`)
+      closeResetModal()
+    } catch (err) {
+      setResetError(err.response?.data?.detail || 'เกิดข้อผิดพลาด')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="p-8 max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">จัดการผู้ใช้</h1>
@@ -68,14 +116,13 @@ export default function UsersListPage() {
           </Link>
         </div>
 
-        {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex gap-3">
           <input
             type="text"
             placeholder="ค้นหาชื่อ username หรืออีเมล..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 focus:border-transparent outline-none"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
           />
           <select
             value={roleFilter}
@@ -83,7 +130,6 @@ export default function UsersListPage() {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
           >
             <option value="">ทุกบทบาท</option>
-            <option value="public">บุคคลทั่วไป</option>
             <option value="learner">เจ้าหน้าที่ผู้เรียน</option>
             <option value="manager">หัวหน้างาน</option>
             <option value="instructor">วิทยากร</option>
@@ -91,7 +137,6 @@ export default function UsersListPage() {
           </select>
         </div>
 
-        {/* Table */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {loading ? (
             <div className="p-12 text-center text-gray-500">กำลังโหลด...</div>
@@ -101,7 +146,7 @@ export default function UsersListPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">username</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">อีเมล</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">บทบาท</th>
@@ -115,7 +160,7 @@ export default function UsersListPage() {
                   const role = roleLabels[u.role] || { label: u.role, color: 'bg-gray-100' }
                   return (
                     <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-mono">{u.employee_id}</td>
+                      <td className="px-6 py-4 text-sm font-mono">{u.username}</td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-800">{u.full_name}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
                       <td className="px-6 py-4">
@@ -131,13 +176,19 @@ export default function UsersListPage() {
                           <span className="text-gray-400 text-sm">● ระงับ</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right text-sm">
+                      <td className="px-6 py-4 text-right text-sm whitespace-nowrap">
                         <Link
                           to={`/admin/users/${u.id}/edit`}
                           className="text-forest-600 hover:text-forest-700 mr-3"
                         >
                           แก้ไข
                         </Link>
+                        <button
+                          onClick={() => openResetModal(u)}
+                          className="text-amber-600 hover:text-amber-700 mr-3"
+                        >
+                          รีเซ็ตรหัส
+                        </button>
                         {u.is_active && (
                           <button
                             onClick={() => handleDeactivate(u.id, u.full_name)}
@@ -155,11 +206,97 @@ export default function UsersListPage() {
           )}
         </div>
 
-        {/* Stats */}
         <div className="mt-4 text-sm text-gray-500">
           แสดง {users.length} รายการ
         </div>
       </div>
+
+      {/* Modal Reset Password */}
+      {resetTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">รีเซ็ตรหัสผ่าน</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  สำหรับ <span className="font-medium text-gray-700">{resetTarget.full_name}</span>
+                  <br />
+                  <span className="font-mono text-xs">@{resetTarget.username}</span>
+                </p>
+              </div>
+              <button
+                onClick={closeResetModal}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm mb-4">
+              การกระทำนี้จะเปลี่ยนรหัสผ่านทันที กรุณาแจ้งรหัสใหม่ให้ผู้ใช้
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  รหัสผ่านใหม่ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  autoFocus
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none font-mono"
+                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  เห็นเป็นข้อความเพื่อให้คัดลอกแจ้งผู้ใช้ได้
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ยืนยันรหัสผ่าน <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none font-mono"
+                  placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+                />
+              </div>
+
+              {resetError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                  {resetError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="flex-1 bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 rounded-lg transition disabled:opacity-50"
+                >
+                  {resetLoading ? 'กำลังบันทึก...' : 'รีเซ็ตรหัสผ่าน'}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeResetModal}
+                  className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg transition"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }

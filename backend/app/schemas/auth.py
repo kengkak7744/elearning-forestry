@@ -3,8 +3,8 @@ from app.schemas.user import UserResponse
 
 
 class LoginRequest(BaseModel):
-    """เข้าสู่ระบบด้วย username"""
-    username: str
+    """เข้าสู่ระบบด้วย username หรือ email"""
+    identifier: str
     password: str
 
 

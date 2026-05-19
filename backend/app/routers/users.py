@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from typing import Optional
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, AdminResetPassword
 from app.core.security import hash_password
 from app.dependencies import get_current_user, require_admin
 
@@ -132,3 +132,29 @@ def deactivate_user(
     db.commit()
     
     return {"message": f"ระงับบัญชี {user.full_name} เรียบร้อย"}
+
+@router.post("/{user_id}/reset-password", status_code=status.HTTP_200_OK)
+def reset_user_password(
+    user_id: int,
+    data: AdminResetPassword,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """รีเซ็ตรหัสผ่านของผู้ใช้ (admin only)"""
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ไม่สามารถรีเซ็ตรหัสผ่านของตัวเองได้ ใช้หน้า Profile แทน"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    
+    return {
+        "message": f"รีเซ็ตรหัสผ่านของ {user.full_name} สำเร็จ",
+        "username": user.username
+    }

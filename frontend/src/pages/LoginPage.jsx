@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await login(username, password)
+      await login(identifier, password)
       navigate(from, { replace: true })
     } catch (err) {
       const message = err.response?.data?.detail || 'เข้าสู่ระบบไม่สำเร็จ'
@@ -43,17 +43,17 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              ชื่อผู้ใช้ (Username)
+              ชื่อผู้ใช้ หรือ อีเมล
             </label>
             <input
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               autoFocus
               autoComplete="username"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-              placeholder="username"
+              placeholder="username หรือ email@example.com"
             />
           </div>
 

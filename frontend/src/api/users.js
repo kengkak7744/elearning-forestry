@@ -34,4 +34,12 @@ export const usersApi = {
     const response = await apiClient.delete(`/users/${userId}`)
     return response.data
   },
+
+  /** รีเซ็ตรหัสผ่านผู้ใช้ (admin) */
+  resetPassword: async (userId, newPassword) => {
+    const response = await apiClient.post(`/users/${userId}/reset-password`, {
+      new_password: newPassword,
+    })
+    return response.data
+  },
 }
