@@ -62,8 +62,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-forest-50 to-forest-100 flex items-center justify-center p-4 py-8">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl">
+    <div className="min-h-screen bg-gradient-to-br from-forest-50 to-forest-100 flex items-center justify-center p-3 sm:p-4 sm:py-8">
+      <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 w-full max-w-2xl">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-forest-500 rounded-full mb-3 text-2xl">
             logo

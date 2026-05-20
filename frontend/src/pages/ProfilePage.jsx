@@ -126,23 +126,22 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-forest-700">โปรไฟล์ของฉัน</h1>
-          <Link to="/" className="text-sm text-forest-600 hover:text-forest-700 font-medium">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <h1 className="text-base sm:text-xl font-bold text-forest-700">โปรไฟล์ของฉัน</h1>
+          <Link to="/" className="text-xs sm:text-sm text-forest-600 hover:text-forest-700 font-medium">
             ← กลับหน้าหลัก
           </Link>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        {/* ข้อมูลส่วนตัว */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
             <h2 className="text-lg font-bold text-gray-800">ข้อมูลส่วนตัว</h2>
             {!isEditing && (
               <button
                 onClick={startEdit}
-                className="bg-forest-500 hover:bg-forest-600 text-white px-4 py-2 rounded-lg font-medium text-sm transition"
+                className="bg-forest-500 hover:bg-forest-600 text-white px-4 py-2 rounded-lg font-medium text-sm transition w-full sm:w-auto"
               >
                 แก้ไขข้อมูล
               </button>
@@ -152,7 +151,7 @@ export default function ProfilePage() {
           {/* แสดงผลแบบ readonly */}
           {!isEditing && (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <div className="text-xs text-gray-500 uppercase mb-1">ชื่อผู้ใช้</div>
                   <div className="font-medium font-mono">{user?.username}</div>
@@ -346,7 +345,7 @@ export default function ProfilePage() {
         </div>
 
         {/* เปลี่ยนรหัสผ่าน */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">เปลี่ยนรหัสผ่าน</h2>
           
           <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-md">
@@ -408,7 +407,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={passwordLoading}
-              className="bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 px-6 rounded-lg transition disabled:opacity-50"
+              className="w-full sm:w-auto bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 px-6 rounded-lg transition disabled:opacity-50"
             >
               {passwordLoading ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}
             </button>

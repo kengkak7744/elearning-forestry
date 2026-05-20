@@ -77,7 +77,7 @@ export default function UserFormPage() {
 
   return (
     <AdminLayout>
-      <div className="p-8 max-w-3xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-3xl mx-auto">
         {/* Breadcrumb */}
         <div className="text-sm text-gray-500 mb-4">
           <Link to="/admin/users" className="hover:text-forest-600">จัดการผู้ใช้</Link>
@@ -85,11 +85,11 @@ export default function UserFormPage() {
           <span>{isEdit ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}</span>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">
           {isEdit ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}
         </h1>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-4 sm:p-8 space-y-5">
           {/* username */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -277,7 +277,7 @@ export default function UserFormPage() {
           )}
 
           {/* Buttons */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
             <button
               type="submit"
               disabled={loading}
@@ -287,7 +287,7 @@ export default function UserFormPage() {
             </button>
             <Link
               to="/admin/users"
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2.5 rounded-lg font-medium transition"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2.5 rounded-lg font-medium transition text-center"
             >
               ยกเลิก
             </Link>

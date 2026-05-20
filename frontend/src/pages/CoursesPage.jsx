@@ -57,29 +57,33 @@ export default function CoursesPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🌳</span>
-            <div>
-              <h1 className="text-lg font-bold text-forest-700">ระบบ e-Learning</h1>
-              <p className="text-xs text-gray-500">กรมป่าไม้</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="text-xl sm:text-2xl flex-shrink-0">🌳</span>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-lg font-bold text-forest-700 truncate">ระบบ e-Learning</h1>
+              <p className="text-xs text-gray-500 hidden sm:block">กรมป่าไม้</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <Link to="/" className="text-sm text-gray-600 hover:text-forest-600 font-medium">
-              🏠 หน้าหลัก
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+            <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
+              <span className="hidden sm:inline">หน้าหลัก</span>
+              <span className="sm:hidden">🏠</span>
             </Link>
-            <Link to="/profile" className="text-sm text-gray-600 hover:text-forest-600 font-medium">
-              👤 โปรไฟล์
+            <Link to="/profile" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
+              <span className="hidden sm:inline">โปรไฟล์</span>
+              <span className="sm:hidden">👤</span>
             </Link>
             {user?.role === 'admin' && (
-              <Link to="/admin/users" className="text-sm text-forest-600 hover:text-forest-700 font-medium">
-                ⚙️ จัดการระบบ
+              <Link to="/admin/users" className="text-xs sm:text-sm text-forest-600 font-medium">
+                <span className="hidden sm:inline">จัดการระบบ</span>
+                <span className="sm:hidden">⚙️</span>
               </Link>
             )}
-            <button onClick={logout} className="text-sm text-gray-600 hover:text-forest-600 transition">
-              ออกจากระบบ
+            <button onClick={logout} className="text-xs sm:text-sm text-gray-600">
+              <span className="hidden sm:inline">ออกจากระบบ</span>
+              <span className="sm:hidden">🚪</span>
             </button>
           </div>
         </div>
@@ -87,19 +91,18 @@ export default function CoursesPage() {
 
       {/* Page header */}
       <div className="bg-gradient-to-br from-forest-500 to-forest-700 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <h2 className="text-3xl font-bold mb-2">หลักสูตรทั้งหมด</h2>
-          <p className="text-forest-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2">หลักสูตรทั้งหมด</h2>
+          <p className="text-sm sm:text-base text-forest-50">
             สวัสดี {user?.full_name} เริ่มต้นเรียนรู้กับหลักสูตรของกรมป่าไม้
           </p>
         </div>
       </div>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               placeholder="🔍 ค้นหาหลักสูตร..."
@@ -125,9 +128,9 @@ export default function CoursesPage() {
                 type="checkbox"
                 checked={mandatoryOnly}
                 onChange={(e) => setMandatoryOnly(e.target.checked)}
-                className="w-4 h-4 text-forest-500 rounded focus:ring-forest-500"
+                className="w-4 h-4 text-forest-500 rounded"
               />
-              <span className="text-sm text-gray-700">เฉพาะหลักสูตรบังคับ</span>
+              <span className="text-sm text-gray-700 whitespace-nowrap">เฉพาะหลักสูตรบังคับ</span>
             </label>
           </div>
         </div>
@@ -146,7 +149,7 @@ export default function CoursesPage() {
               พบ {courses.length} หลักสูตร
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {courses.map((course) => {
                 const cat = categoryLabels[course.category] || { label: course.category, color: 'bg-gray-100' }
                 const icon = categoryIcons[course.category] || 'รูป'
