@@ -13,7 +13,7 @@ import CoursesPage from './pages/CoursesPage'
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/elearning">
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
