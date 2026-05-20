@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, Token
-from app.schemas.user import UserResponse, UserRegister, PasswordChange
+from app.schemas.user import UserResponse, UserRegister, PasswordChange, UserSelfUpdate
 from app.core.security import verify_password, hash_password, create_access_token
 from app.config import settings
 from app.dependencies import get_current_user
@@ -96,6 +96,22 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    data: UserSelfUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    update_data = data.model_dump(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+    
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

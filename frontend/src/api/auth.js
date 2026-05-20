@@ -20,6 +20,11 @@ export const authApi = {
     return response.data
   },
 
+  upadateMe: async (userData) => {
+    const response = await apiClient.put('/auth/me', userData)
+    return response.data
+  },
+  
   changePassword: async (currentPassword, newPassword) => {
     const response = await apiClient.post('/auth/change-password', {
       current_password: currentPassword,

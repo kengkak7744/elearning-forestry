@@ -36,6 +36,13 @@ class UserUpdate(BaseModel):
     motivation: Optional[str] = None         
     role: Optional[UserRole] = None
 
+class UserSelfUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2, max_length=150)
+    department: Optional[str] = Field(None, min_length=2, max_length=150)
+    position: Optional[str] = Field(None, min_length=2, max_length=100)
+    phone: Optional[str] = Field(None, min_length=9, max_length=20)
+    responsibility: Optional[str] = Field(None, min_length=5, max_length=1000)
+    motivation: Optional[str] = Field(None, min_length=5, max_length=1000)
 
 class UserResponse(UserBase):
     id: int

@@ -5,7 +5,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuth()
 
   const roleLabels = {
-    learner: 'เจ้าหน้าที่ผู้เรียน',
+    learner: 'ผู้เรียน',
     manager: 'หัวหน้างาน',
     instructor: 'วิทยากร',
     admin: 'ผู้ดูแลระบบ',

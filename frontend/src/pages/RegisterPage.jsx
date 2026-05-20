@@ -93,7 +93,7 @@ export default function RegisterPage() {
                   minLength={3}
                   maxLength={50}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  placeholder="เช่น somchai.j"
+                  placeholder="เช่น suphadej.a (กรอกเบอร์โทรศัพท์ได้)"
                 />
               </div>
 
@@ -108,7 +108,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  placeholder="somchai@forest.go.th"
+                  placeholder="suphadej.a@forest.go.th"
                 />
               </div>
 
@@ -166,7 +166,7 @@ export default function RegisterPage() {
                   minLength={2}
                   maxLength={150}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  placeholder="นายสมชาย ใจดี"
+                  placeholder="นายสุภเดช อนุพันธ์"
                 />
               </div>
 
@@ -224,15 +224,11 @@ export default function RegisterPage() {
           </div>
 
           {/* Section 3: ข้อมูลการเรียน */}
-          <div>
-            <h2 className="text-sm font-semibold text-forest-700 mb-3 pb-2 border-b border-gray-200">
-              ข้อมูลการเรียน
-            </h2>
-            
+          <div>            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ปัจจุบันมีหน้าที่รับผิดชอบอะไร <span className="text-red-500">*</span>
+                  มีหน้าที่รับผิดชอบอะไร <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   name="responsibility"
