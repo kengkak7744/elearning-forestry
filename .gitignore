@@ -4,4 +4,4 @@ __pycache__/
 .env
 .vscode/
 *.log
-frontend/public/forest_logo.png
+public/
