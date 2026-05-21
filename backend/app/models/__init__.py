@@ -4,3 +4,4 @@ from app.models.lesson import Lesson, LessonResource, ContentType
 from app.models.progress import LessonProgress
 from app.models.quiz import Quiz, QuizAttempt, QuizType
 from app.models.certificate import Certificate
+from app.models.enrollment import Enrollment

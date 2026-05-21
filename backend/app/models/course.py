@@ -22,6 +22,7 @@ class Course(Base):
     is_mandatory = Column(Boolean, default=False)
     cover_image = Column(String(500), nullable=True)
     estimated_hours = Column(Integer, nullable=True)
+    instructor_name = Column(String(150), nullable=True)
     is_published = Column(Boolean, default=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -29,6 +30,7 @@ class Course(Base):
     
     modules = relationship("Module", back_populates="course", cascade="all, delete-orphan")
     certificates = relationship("Certificate", back_populates="course")
+    enrollments = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
 
 
 class Module(Base):

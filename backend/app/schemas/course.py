@@ -11,6 +11,7 @@ class CourseBase(BaseModel):
     is_mandatory: bool = False
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = Field(None, ge=0)
+    instructor_name: Optional[str] = Field(None, max_length=150)
 
 
 class CourseCreate(CourseBase):
@@ -24,6 +25,7 @@ class CourseUpdate(BaseModel):
     is_mandatory: Optional[bool] = None
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = Field(None, ge=0)
+    instructor_name: Optional[str] = Field(None, max_length=150)
     is_published: Optional[bool] = None
 
 
@@ -31,13 +33,17 @@ class CourseResponse(CourseBase):
     id: int
     is_published: bool
     created_at: datetime
+    updated_at: Optional[datetime] = None
+    total_lessons: int = 0
+    total_modules: int = 0
+    enrolled_count: int = 0
+    is_enrolled: bool = False
     
     class Config:
         from_attributes = True
 
 
 class CourseListItem(BaseModel):
-    """ข้อมูลย่อสำหรับแสดงในรายการ"""
     id: int
     title: str
     description: Optional[str] = None
@@ -46,6 +52,8 @@ class CourseListItem(BaseModel):
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = None
     is_published: bool
+    instructor_name: Optional[str] = None
+    created_at: datetime
     
     class Config:
         from_attributes = True

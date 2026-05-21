@@ -35,4 +35,16 @@ export const coursesApi = {
     const response = await apiClient.delete(`/courses/${courseId}`)
     return response.data
   },
+
+  // การลงทะเบียนเรียนหลักสูตร
+  enroll: async (courseId) => {
+    const response = await apiClient.post(`/courses/${courseId}/enroll`)
+    return response.data
+  },
+
+  // การยกเลิกการลงทะเบียนเรียนหลักสูตร
+  unenroll: async (courseId) => {
+    const response = await apiClient.delete(`/courses/${courseId}/enroll`)
+    return response.data
+  },
 }

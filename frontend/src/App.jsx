@@ -9,11 +9,14 @@ import ProfilePage from './pages/ProfilePage'
 import UsersListPage from './pages/admin/UsersListPage'
 import UserFormPage from './pages/admin/UserFormPage'
 import CoursesPage from './pages/CoursesPage'
+import CourseDetailPage from './pages/CourseDetailPage'
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename="/elearning">
+      <BrowserRouter>
+      {/* On if deploying to a subdirectory */}
+      {/* <BrowserRouter basename="/elearning"> */}
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
@@ -41,6 +44,14 @@ function App() {
             element={
               <ProtectedRoute>
               <CoursesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/courses/:id"
+            element={
+              <ProtectedRoute>
+                <CourseDetailPage />
               </ProtectedRoute>
             }
           />

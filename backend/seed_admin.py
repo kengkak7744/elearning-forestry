@@ -20,7 +20,7 @@ def create_first_admin():
             role=UserRole.ADMIN,
             department="ฝ่ายเทคโนโลยีสารสนเทศ",
             position="ผู้ดูแลระบบ",
-            phone="092-378-7008",
+            phone="xx-xxxx-xxxx",
             responsibility="ดูแลและพัฒนาระบบสารสนเทศของกรมป่าไม้",
             motivation="ทดสอบและพัฒนาระบบ e-Learning",
         )

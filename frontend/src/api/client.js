@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const apiClient = axios.create({
-  baseURL: '/elearning/api',
+  // If deploying to a subdirectory, set the baseURL accordingly
+  // baseURL: '/elearning/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },

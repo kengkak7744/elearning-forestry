@@ -11,6 +11,7 @@ SAMPLE_COURSES = [
         "is_mandatory": True,
         "estimated_hours": 8,
         "is_published": True,
+        "instructor_name": "ดร. สมศักดิ์ พงษ์พันธ์",
     },
     {
         "title": "การสำรวจและจัดทำข้อมูลทรัพยากรป่าไม้",
@@ -19,6 +20,7 @@ SAMPLE_COURSES = [
         "is_mandatory": False,
         "estimated_hours": 12,
         "is_published": True,
+        "instructor_name": "อ. วันชัย ใจสะอาด",
     },
     {
         "title": "การดับไฟป่าและการป้องกันภัยพิบัติ",
@@ -27,6 +29,7 @@ SAMPLE_COURSES = [
         "is_mandatory": True,
         "estimated_hours": 6,
         "is_published": True,
+        "instructor_name": "นายประวิทย์ ผจญไฟ",
     },
     {
         "title": "การใช้ระบบ GIS เพื่อจัดการป่าไม้",
@@ -35,6 +38,7 @@ SAMPLE_COURSES = [
         "is_mandatory": False,
         "estimated_hours": 16,
         "is_published": True,
+        "instructor_name": "ผศ.ดร. นิภาพร แผนที่ดี",
     },
     {
         "title": "จริยธรรมและธรรมาภิบาลในราชการ",
@@ -43,14 +47,7 @@ SAMPLE_COURSES = [
         "is_mandatory": True,
         "estimated_hours": 4,
         "is_published": True,
-    },
-    {
-        "title": "เทคนิคการเขียนรายงานราชการ",
-        "description": "หลักการเขียนหนังสือราชการ บันทึกข้อความ และรายงานต่าง ๆ",
-        "category": CourseCategory.SKILL,
-        "is_mandatory": False,
-        "estimated_hours": 5,
-        "is_published": False,  # ตัวอย่าง draft ที่ learner ไม่เห็น
+        "instructor_name": "ดร. มานพ ธรรมาภิบาล",
     },
 ]
 

@@ -38,3 +38,4 @@ class User(Base):
     progresses = relationship("LessonProgress", back_populates="user")
     quiz_attempts = relationship("QuizAttempt", back_populates="user")
     certificates = relationship("Certificate", back_populates="user")
+    enrollments = relationship("Enrollment", back_populates="user", cascade="all, delete-orphan")
