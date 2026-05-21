@@ -269,7 +269,85 @@ export default function UsersListPage() {
       {resetTarget && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            {/* เนื้อหา modal เหมือนเดิม */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">รีเซ็ตรหัสผ่าน</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  สำหรับ <span className="font-medium text-gray-700">{resetTarget.full_name}</span>
+                  <br />
+                  <span className="font-mono text-xs">@{resetTarget.username}</span>
+                </p>
+              </div>
+              <button
+                onClick={closeResetModal}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm mb-4">
+              การกระทำนี้จะเปลี่ยนรหัสผ่านทันที กรุณาแจ้งรหัสใหม่ให้ผู้ใช้
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  รหัสผ่านใหม่ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  autoFocus
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none font-mono"
+                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  เห็นเป็นข้อความเพื่อให้คัดลอกแจ้งผู้ใช้ได้
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ยืนยันรหัสผ่าน <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none font-mono"
+                  placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+                />
+              </div>
+
+              {resetError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                  {resetError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="flex-1 bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 rounded-lg transition disabled:opacity-50"
+                >
+                  {resetLoading ? 'กำลังบันทึก...' : 'รีเซ็ตรหัสผ่าน'}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeResetModal}
+                  className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg transition"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
