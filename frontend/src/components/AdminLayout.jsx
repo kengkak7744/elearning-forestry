@@ -40,17 +40,19 @@ export default function AdminLayout({ children }) {
       >
         {/* Logo + Close button on mobile */}
         <div className="p-4 sm:p-6 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-forest-500 rounded-lg flex items-center justify-center">
-              <span className="text-white text-lg">
-                <img src="/forest_logo.png" alt="Logo" className="w-8 h-8" />
-              </span>
+          <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-forest-500 rounded-lg flex items-center justify-center">
+                <span className="text-white text-lg">
+                  <img src="/forest_logo.png" alt="Logo" className="w-8 h-8" />
+                </span>
+              </div>
+              <div>
+                <div className="font-bold text-forest-700 text-sm">e-Learning</div>
+                <div className="text-xs text-gray-500">กรมป่าไม้</div>
+              </div>
             </div>
-            <div>
-              <div className="font-bold text-forest-700 text-sm">e-Learning</div>
-              <div className="text-xs text-gray-500">กรมป่าไม้</div>
-            </div>
-          </div>
+          </Link>
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-gray-400 hover:text-gray-600 text-2xl"
