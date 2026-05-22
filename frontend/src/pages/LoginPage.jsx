@@ -33,8 +33,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-forest-50 to-forest-100 flex items-center justify-center p-3 sm:p-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-forest-500 rounded-full mb-4 text-3xl">
-            🌳
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-forest-500 rounded-full mb-4 text-3xl">
+            <img src="/forest_logo.png" alt="Logo" className="w-20 h-20" />
           </div>
           <h1 className="text-2xl font-bold text-forest-700">ระบบ e-Learning</h1>
           <p className="text-gray-600 mt-1">กรมป่าไม้</p>

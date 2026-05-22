@@ -58,13 +58,17 @@ export default function CoursesPage() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="text-xl sm:text-2xl flex-shrink-0">🌳</span>
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-lg font-bold text-forest-700 truncate">ระบบ e-Learning</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">กรมป่าไม้</p>
+          <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="text-xl sm:text-2xl flex-shrink-0">
+                <img src="/forest_logo.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg font-bold text-forest-700 truncate">ระบบ e-Learning</h1>
+                <p className="text-xs text-gray-500 hidden sm:block">กรมป่าไม้</p>
+              </div>
             </div>
-          </div>
+          </Link>
           
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
@@ -105,7 +109,7 @@ export default function CoursesPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
-              placeholder="🔍 ค้นหาหลักสูตร..."
+              placeholder="ค้นหาหลักสูตร..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"

@@ -42,7 +42,9 @@ export default function AdminLayout({ children }) {
         <div className="p-4 sm:p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-forest-500 rounded-lg flex items-center justify-center">
-              <span className="text-white text-lg">🌳</span>
+              <span className="text-white text-lg">
+                <img src="/forest_logo.png" alt="Logo" className="w-8 h-8" />
+              </span>
             </div>
             <div>
               <div className="font-bold text-forest-700 text-sm">e-Learning</div>
