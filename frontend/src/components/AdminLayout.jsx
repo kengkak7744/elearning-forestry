@@ -20,7 +20,7 @@ export default function AdminLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="h-screen flex bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -32,8 +32,7 @@ export default function AdminLayout({ children }) {
       {/* Sidebar */}
       <aside
         className={`
-          w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0
-          fixed inset-y-0 left-0 z-30 transform transition-transform duration-200
+          w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 fixed inset-y-0 left-0 z-30 transform transition-transform duration-200
           lg:relative lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}

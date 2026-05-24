@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, users, courses
-
+from app.routers import auth, users, courses, modules, lessons
+from fastapi.staticfiles import StaticFiles
+import os
 
 app = FastAPI(
     title="ระบบ e-Learning กรมป่าไม้",
@@ -21,10 +22,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+os.makedirs("/app/videos", exist_ok=True)
+os.makedirs("/app/pdf_documents", exist_ok=True)
+app.mount("/videos", StaticFiles(directory="/app/videos"), name="videos")
+app.mount("/pdfs", StaticFiles(directory="/app/pdf_documents"), name="pdfs")
+
 # รวม routers
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(courses.router)
+app.include_router(modules.router)
+app.include_router(lessons.router)
 
 
 @app.get("/")

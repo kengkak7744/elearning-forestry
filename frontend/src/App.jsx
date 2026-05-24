@@ -10,6 +10,8 @@ import UsersListPage from './pages/admin/UsersListPage'
 import UserFormPage from './pages/admin/UserFormPage'
 import CoursesPage from './pages/CoursesPage'
 import CourseDetailPage from './pages/CourseDetailPage'
+import CoursesListPage from './pages/admin/CoursesListPage'
+import CourseEditPage from './pages/admin/CourseEditPage'
 
 function App() {
   return (
@@ -55,6 +57,12 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/admin/courses" element={
+            <AdminRoute><CoursesListPage /></AdminRoute>
+          } />
+          <Route path="/admin/courses/:id/edit" element={
+            <AdminRoute><CourseEditPage /></AdminRoute>
+          } />
 
           {/* Admin pages */}
           <Route path="/admin/users" element={<AdminRoute><UsersListPage /></AdminRoute>} />

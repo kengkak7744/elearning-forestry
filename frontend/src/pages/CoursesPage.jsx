@@ -196,7 +196,7 @@ export default function CoursesPage() {
                       </h3>
                       
                       {course.description && (
-                        <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                        <p className="text-sm text-gray-600 break-words line-clamp-3 mb-3">
                           {course.description}
                         </p>
                       )}

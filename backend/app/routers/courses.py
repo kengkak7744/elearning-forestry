@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
 from app.database import get_db
@@ -43,47 +43,73 @@ def list_courses(
     return query.order_by(Course.created_at.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/{course_id}", response_model=CourseResponse)
+@router.get("/{course_id}")
 def get_course(
     course_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    course = db.query(Course).filter(Course.id == course_id).first()
+    course = db.query(Course).options(
+        joinedload(Course.modules).joinedload(Module.lessons)
+    ).filter(Course.id == course_id).first()
+    
     if not course:
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
     
     if current_user.role.value in ("learner", "manager") and not course.is_published:
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
     
-    # Count modules and lessons
-    total_modules = db.query(func.count(Module.id)).filter(Module.course_id == course_id).scalar()
-    total_lessons = db.query(func.count(Lesson.id)).join(Module).filter(Module.course_id == course_id).scalar()
+    total_modules = len(course.modules)
+    total_lessons = sum(len(m.lessons) for m in course.modules)
     enrolled_count = db.query(func.count(Enrollment.id)).filter(Enrollment.course_id == course_id).scalar()
     
-    # Check if current user enrolled
     is_enrolled = db.query(Enrollment).filter(
         Enrollment.user_id == current_user.id,
         Enrollment.course_id == course_id
     ).first() is not None
     
-    # Build response manually to include computed fields
-    response_data = {
+    modules_data = []
+    for module in sorted(course.modules, key=lambda m: m.order_index):
+        lessons_data = []
+        for lesson in sorted(module.lessons, key=lambda l: l.order_index):
+            lessons_data.append({
+                "id": lesson.id,
+                "module_id": lesson.module_id,
+                "title": lesson.title,
+                "description": lesson.description,
+                "content_type": lesson.content_type.value if lesson.content_type else None,
+                "content_url": lesson.content_url,
+                "duration_seconds": lesson.duration_seconds,
+                "total_pages": lesson.total_pages,
+                "notes_content": lesson.notes_content,
+                "order_index": lesson.order_index,
+            })
+        modules_data.append({
+            "id": module.id,
+            "course_id": module.course_id,
+            "title": module.title,
+            "description": module.description,
+            "order_index": module.order_index,
+            "lessons": lessons_data,
+        })
+    
+    return {
         "id": course.id,
         "title": course.title,
         "description": course.description,
-        "category": course.category,
+        "category": course.category.value if course.category else None,
         "is_mandatory": course.is_mandatory,
         "cover_image": course.cover_image,
         "estimated_hours": course.estimated_hours,
         "instructor_name": course.instructor_name,
         "is_published": course.is_published,
-        "created_at": course.created_at,
-        "updated_at": course.updated_at,
-        "total_modules": total_modules or 0,
-        "total_lessons": total_lessons or 0,
+        "created_at": course.created_at.isoformat() if course.created_at else None,
+        "updated_at": course.updated_at.isoformat() if course.updated_at else None,
+        "total_modules": total_modules,
+        "total_lessons": total_lessons,
         "enrolled_count": enrolled_count or 0,
         "is_enrolled": is_enrolled,
+        "modules": modules_data,
     }
     return response_data
 

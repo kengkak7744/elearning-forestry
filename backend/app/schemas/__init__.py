@@ -5,3 +5,7 @@ from app.schemas.auth import LoginRequest, Token, TokenData
 from app.schemas.course import (
     CourseBase, CourseCreate, CourseUpdate, CourseResponse, CourseListItem
 )
+from app.schemas.module import ModuleBase, ModuleCreate, ModuleUpdate, ModuleResponse
+from app.schemas.lesson import (
+    LessonBase, LessonCreate, LessonUpdate, LessonResponse, LessonListItem,
+)

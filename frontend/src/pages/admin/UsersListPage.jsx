@@ -162,9 +162,9 @@ export default function UsersListPage() {
                   const role = roleLabels[u.role] || { label: u.role, color: 'bg-gray-100' }
                   return (
                     <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-mono">{u.username}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-800">{u.full_name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
+                      <td className="px-6 py-4 text-sm font-mono max-w-[200px] break-words">{u.username}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-800 max-w-[150px]">{u.full_name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-[150px]">{u.email}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${role.color}`}>
                           {role.label}
@@ -212,8 +212,8 @@ export default function UsersListPage() {
                 <div key={u.id} className="bg-white rounded-xl shadow-sm p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium text-gray-800 truncate">{u.full_name}</div>
-                      <div className="text-sm font-mono text-gray-500">@{u.username}</div>
+                      <div className="font-medium text-gray-800 max-w-[150px] truncate">{u.full_name}</div>
+                      <div className="text-sm font-mono text-gray-500 max-w-[200px] break-words ">@{u.username}</div>
                     </div>
                     <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${role.color}`}>
                       {role.label}
@@ -221,8 +221,8 @@ export default function UsersListPage() {
                   </div>
                   
                   <div className="space-y-1 text-sm mb-3">
-                    <div className="text-gray-600 break-all">{u.email}</div>
-                    <div className="text-gray-500">{u.department || '-'}</div>
+                    <div className="text-gray-600 max-w-[200px] break-all">{u.email}</div>
+                    <div className="text-gray-500 max-w-[200px] break-words">{u.department || '-'}</div>
                     <div>
                       {u.is_active ? (
                         <span className="text-green-600">● ใช้งาน</span>

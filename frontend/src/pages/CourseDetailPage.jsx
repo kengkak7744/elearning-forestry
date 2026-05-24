@@ -194,7 +194,7 @@ export default function CourseDetailPage() {
             <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-4">รายละเอียดหลักสูตร</h2>
               {course.description ? (
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                <p className="text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
                   {course.description}
                 </p>
               ) : (
