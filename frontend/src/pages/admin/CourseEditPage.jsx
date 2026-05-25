@@ -36,6 +36,10 @@ export default function CourseEditPage() {
   const [confirmState, setConfirmState] = useState({ open: false })
   const [promptState, setPromptState] = useState({ open: false })
 
+  const [coverImage, setCoverImage] = useState(null)
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [coverProgress, setCoverProgress] = useState(0)
+
   const [courseData, setCourseData] = useState({
     title: '',
     description: '',
@@ -66,6 +70,7 @@ export default function CourseEditPage() {
         instructor_name: data.instructor_name || '',
         is_published: data.is_published || false,
       })
+      setCoverImage(data.cover_image || null)
       setModules(data.modules || [])
     } catch (err) {
       showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
@@ -101,6 +106,23 @@ export default function CourseEditPage() {
       showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setCoverUploading(true)
+    setCoverProgress(0)
+    try {
+      const result = await coursesApi.uploadCoverImage(id, file, setCoverProgress)
+      setCoverImage(result.cover_image)
+      showToast('อัปโหลดรูปภาพปกสำเร็จ')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
+    } finally {
+      setCoverUploading(false)
+      setCoverProgress(0)
     }
   }
 
@@ -277,6 +299,49 @@ export default function CourseEditPage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none resize-none"
             />
           </div>
+
+          {/* Cover image — only for existing courses */}
+          {!isNew && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                รูปภาพปกหลักสูตร
+              </label>
+              <div className="flex items-start gap-4">
+                {coverImage ? (
+                  <img
+                    src={coverImage}
+                    alt="ปกหลักสูตร"
+                    className="w-32 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-32 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center flex-shrink-0 bg-gray-50">
+                    <span className="text-xs text-gray-400">ไม่มีรูปภาพ</span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverUpload}
+                    disabled={coverUploading}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">รองรับ JPG, PNG, WEBP ขนาดไม่เกิน 10 MB</p>
+                  {coverUploading && (
+                    <div className="mt-2">
+                      <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-forest-500 h-2 transition-all"
+                          style={{ width: `${coverProgress}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">{coverProgress}%</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

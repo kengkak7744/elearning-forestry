@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import os
+import uuid
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
@@ -14,6 +17,11 @@ from app.dependencies import get_current_user, require_instructor_or_admin
 
 
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
+
+IMAGE_DIR = Path("/app/images")
+IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
 @router.get("", response_model=list[CourseListItem])
@@ -167,6 +175,47 @@ def delete_course(
     db.commit()
     
     return {"message": f"ลบหลักสูตร '{course.title}' เรียบร้อย"}
+
+
+@router.post("/{course_id}/upload-cover")
+async def upload_cover_image(
+    course_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin)
+):
+    """อัปโหลดรูปภาพปกหลักสูตร"""
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"รองรับเฉพาะไฟล์ {', '.join(ALLOWED_IMAGE_EXTENSIONS)}"
+        )
+
+    content = await file.read()
+    if len(content) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"ไฟล์ใหญ่เกิน {MAX_IMAGE_SIZE // (1024*1024)} MB"
+        )
+
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    file_path = IMAGE_DIR / unique_name
+    file_path.write_bytes(content)
+
+    if course.cover_image and course.cover_image.startswith("/images/"):
+        old_path = IMAGE_DIR / Path(course.cover_image).name
+        if old_path.exists():
+            old_path.unlink()
+
+    course.cover_image = f"/elearning/images/{unique_name}"
+    db.commit()
+    db.refresh(course)
+    return {"cover_image": course.cover_image}
 
 
 # Enrollment endpoints

@@ -24,8 +24,10 @@ app.add_middleware(
 
 os.makedirs("/app/videos", exist_ok=True)
 os.makedirs("/app/pdf_documents", exist_ok=True)
+os.makedirs("/app/images", exist_ok=True)
 app.mount("/videos", StaticFiles(directory="/app/videos"), name="videos")
 app.mount("/pdfs", StaticFiles(directory="/app/pdf_documents"), name="pdfs")
+app.mount("/images", StaticFiles(directory="/app/images"), name="images")
 
 # รวม routers
 app.include_router(auth.router)

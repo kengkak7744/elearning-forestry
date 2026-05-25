@@ -163,52 +163,55 @@ export default function CoursesPage() {
                   <Link
                     key={course.id}
                     to={`/courses/${course.id}`}
-                    className="bg-white rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden border border-gray-100"
+                    className="relative h-72 rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden border border-gray-100 block"
                   >
-                    {/* Cover */}
-                    <div className="h-32 bg-gradient-to-br from-forest-100 to-forest-200 flex items-center justify-center relative">
-                      <span className="text-5xl">{icon}</span>
-                      
-                      {/* Badges */}
-                      <div className="absolute top-3 left-3 flex gap-1">
-                        {course.is_mandatory && (
-                          <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                            บังคับ
-                          </span>
-                        )}
-                        {!course.is_published && (
-                          <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-medium">
-                            ฉบับร่าง
-                          </span>
-                        )}
+                    {/* Full-card background image */}
+                    {course.cover_image ? (
+                      <img
+                        src={course.cover_image}
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover object-top"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-forest-100 to-forest-200 flex items-center justify-center">
+                        <span className="text-6xl opacity-30">🌲</span>
                       </div>
+                    )}
+
+                    {/* Badges — top left */}
+                    <div className="absolute top-3 left-3 flex gap-1 z-10">
+                      {course.is_mandatory && (
+                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                          บังคับ
+                        </span>
+                      )}
+                      {!course.is_published && (
+                        <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-medium">
+                          ฉบับร่าง
+                        </span>
+                      )}
                     </div>
-                    
-                    {/* Content */}
-                    <div className="p-5">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${cat.color}`}>
+
+                    {/* Content panel — covers bottom half */}
+                    <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-white rounded-t-2xl p-4 flex flex-col justify-between">
+                      <div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-1 ${cat.color}`}>
                           {cat.label}
                         </span>
+                        <h3 className="font-bold text-gray-800 line-clamp-2 text-sm leading-snug">
+                          {course.title}
+                        </h3>
                       </div>
-                      
-                      <h3 className="font-bold text-gray-800 mb-2 line-clamp-2">
-                        {course.title}
-                      </h3>
-                      
                       {course.description && (
                         <p className="text-sm text-gray-600 break-words line-clamp-3 mb-3">
                           {course.description}
                         </p>
                       )}
-                      
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-500">
-                          {course.estimated_hours ? `เวลาที่ใช้ในการเรียน: ${course.estimated_hours} ชั่วโมง` : ''}
+                          {course.estimated_hours ? `${course.estimated_hours} ชั่วโมง` : ''}
                         </span>
-                        <span className="text-sm text-forest-600 font-medium">
-                          เริ่มเรียน →
-                        </span>
+                        <span className="text-xs text-forest-600 font-medium">เริ่มเรียน →</span>
                       </div>
                     </div>
                   </Link>

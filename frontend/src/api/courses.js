@@ -36,6 +36,21 @@ export const coursesApi = {
     return response.data
   },
 
+  /** อัปโหลดรูปภาพปกหลักสูตร */
+  uploadCoverImage: async (courseId, file, onProgress) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post(`/courses/${courseId}/upload-cover`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded * 100) / event.total))
+        }
+      },
+    })
+    return response.data
+  },
+
   // การลงทะเบียนเรียนหลักสูตร
   enroll: async (courseId) => {
     const response = await apiClient.post(`/courses/${courseId}/enroll`)

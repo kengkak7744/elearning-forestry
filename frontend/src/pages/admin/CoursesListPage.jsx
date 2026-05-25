@@ -78,7 +78,23 @@ export default function CoursesListPage() {
             {courses.map(c => {
               const cat = categoryLabels[c.category] || { label: c.category, color: 'bg-gray-100' }
               return (
-                <div key={c.id} className="bg-white rounded-xl shadow-sm p-5">
+                <div key={c.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  {/* Cover image */}
+                  <div className="aspect-square w-full overflow-hidden bg-gray-100">
+                    {c.cover_image ? (
+                      <img
+                        src={c.cover_image}
+                        alt={c.title}
+                        className="w-full h-full object-cover object-top"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">
+                        🖼
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-5">
                   <div className="flex items-start gap-2 mb-3">
                     <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${cat.color}`}>
                       {cat.label}
@@ -115,6 +131,7 @@ export default function CoursesListPage() {
                     >
                       ลบ
                     </button>
+                  </div>
                   </div>
                 </div>
               )
