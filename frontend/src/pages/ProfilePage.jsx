@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../api/auth'
+import Icon from '../components/Icon'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
@@ -191,8 +192,9 @@ export default function ProfilePage() {
               </div>
 
               {profileMessage.text && profileMessage.type === 'success' && (
-                <div className="mt-4 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
-                  ✓ {profileMessage.text}
+                <div className="flex items-center gap-2">
+                  <Icon name="check" className="w-4 h-4 flex-shrink-0" />
+                  <span>{profileMessage.text}</span>
                 </div>
               )}
             </>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { usersApi } from '../../api/users'
 import AdminLayout from '../../components/AdminLayout'
+import Icon from '../../components/Icon'
 
 const roleLabels = {
   learner: { label: 'เจ้าหน้าที่ผู้เรียน', color: 'bg-blue-100 text-blue-700' },
@@ -282,7 +283,7 @@ export default function UsersListPage() {
                 onClick={closeResetModal}
                 className="text-gray-400 hover:text-gray-600 text-xl"
               >
-                ✕
+                <Icon name="close" className="w-5 h-5" />
               </button>
             </div>
 

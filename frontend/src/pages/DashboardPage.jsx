@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Icon from '../components/Icon'
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
@@ -27,17 +28,17 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <Link to="/profile" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
               <span className="hidden sm:inline">โปรไฟล์</span>
-              <span className="sm:hidden">👤</span>
+              <Icon name="user" className="w-5 h-5 sm:hidden" />
             </Link>
             {user?.role === 'admin' && (
               <Link to="/admin/users" className="text-xs sm:text-sm text-forest-600 font-medium">
                 <span className="hidden sm:inline">จัดการระบบ</span>
-                <span className="sm:hidden">⚙️</span>
+                <Icon name="settings" className="w-5 h-5 sm:hidden" />
               </Link>
             )}
             <button onClick={logout} className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 transition">
               <span className="hidden sm:inline">ออกจากระบบ</span>
-              <span className="sm:hidden">🚪</span>
+              <Icon name="logout" className="w-5 h-5 sm:hidden" />
             </button>
           </div>
         </div>
@@ -80,7 +81,7 @@ export default function DashboardPage() {
             to="/courses"
             className="bg-gradient-to-br from-forest-500 to-forest-700 rounded-xl shadow-md p-6 sm:p-8 text-white hover:shadow-xl transition transform hover:-translate-y-1"
           >
-            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">📚</div>
+            <Icon name="book" className="w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4" />
             <h3 className="text-lg sm:text-xl font-bold mb-2">หลักสูตรทั้งหมด</h3>
             <p className="text-forest-50 text-sm">
               เริ่มต้นเรียนรู้กับหลักสูตรของกรมป่าไม้
@@ -91,7 +92,7 @@ export default function DashboardPage() {
           </Link>
 
           <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 border-2 border-dashed border-gray-200">
-            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4 opacity-50">🎓</div>
+            <Icon name="graduation" className="w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4 opacity-50" />
             <h3 className="text-lg sm:text-xl font-bold text-gray-400 mb-2">ใบรับรองของฉัน</h3>
             <p className="text-gray-400 text-sm">
               ใบรับรองที่ได้รับจากการเรียนจบหลักสูตร

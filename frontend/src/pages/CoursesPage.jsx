@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { coursesApi } from '../api/courses'
 import { useAuth } from '../contexts/AuthContext'
+import Icon from '../components/Icon'
 
 const categoryLabels = {
   compliance: { label: 'บังคับตามกฎหมาย', color: 'bg-red-100 text-red-700' },
@@ -61,7 +62,7 @@ export default function CoursesPage() {
           <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <span className="text-xl sm:text-2xl flex-shrink-0">
-                <img src="/forest_logo.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10" />
+                <img src="/elearning/forest_logo.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10" />
               </span>
               <div className="min-w-0">
                 <h1 className="text-sm sm:text-lg font-bold text-forest-700 truncate">ระบบ e-Learning</h1>
@@ -73,21 +74,21 @@ export default function CoursesPage() {
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
               <span className="hidden sm:inline">หน้าหลัก</span>
-              <span className="sm:hidden">🏠</span>
+              <Icon name="home" className="w-5 h-5 sm:hidden" />
             </Link>
             <Link to="/profile" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
               <span className="hidden sm:inline">โปรไฟล์</span>
-              <span className="sm:hidden">👤</span>
+              <Icon name="user" className="w-5 h-5 sm:hidden" />
             </Link>
             {user?.role === 'admin' && (
               <Link to="/admin/users" className="text-xs sm:text-sm text-forest-600 font-medium">
                 <span className="hidden sm:inline">จัดการระบบ</span>
-                <span className="sm:hidden">⚙️</span>
+                <Icon name="settings" className="w-5 h-5 sm:hidden" />
               </Link>
             )}
             <button onClick={logout} className="text-xs sm:text-sm text-gray-600">
               <span className="hidden sm:inline">ออกจากระบบ</span>
-              <span className="sm:hidden">🚪</span>
+              <Icon name="logout" className="w-5 h-5 sm:hidden" />
             </button>
           </div>
         </div>
@@ -144,7 +145,7 @@ export default function CoursesPage() {
           <div className="text-center py-16 text-gray-500">กำลังโหลด...</div>
         ) : courses.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-            <div className="text-5xl mb-4">📚</div>
+            <Icon name="book" className="w-16 h-16 mx-auto mb-4 text-gray-400" />
             <p className="text-gray-500">ไม่พบหลักสูตร</p>
           </div>
         ) : (
