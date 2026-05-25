@@ -4,6 +4,9 @@ import AdminLayout from '../../components/AdminLayout'
 import { coursesApi } from '../../api/courses'
 import { modulesApi } from '../../api/modules'
 import { lessonsApi } from '../../api/lessons'
+import Toast from '../../components/Toast'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import PromptDialog from '../../components/PromptDialog'
 
 const categoryOptions = [
   { value: 'compliance', label: 'บังคับตามกฎหมาย' },
@@ -25,7 +28,13 @@ export default function CourseEditPage() {
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
+
+  // Toast state for module/lesson actions
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const showToast = (message, type = 'success') => setToast({ message, type })
+  const closeToast = () => setToast({ message: '', type: 'success' })
+  const [confirmState, setConfirmState] = useState({ open: false })
+  const [promptState, setPromptState] = useState({ open: false })
 
   const [courseData, setCourseData] = useState({
     title: '',
@@ -59,7 +68,7 @@ export default function CourseEditPage() {
       })
       setModules(data.modules || [])
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ' })
+      showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
     } finally {
       setLoading(false)
     }
@@ -73,7 +82,6 @@ export default function CourseEditPage() {
   const handleSaveCourse = async (e) => {
     e.preventDefault()
     setSaving(true)
-    setMessage({ type: '', text: '' })
 
     const payload = {
       ...courseData,
@@ -83,33 +91,40 @@ export default function CourseEditPage() {
     try {
       if (isNew) {
         const created = await coursesApi.create(payload)
-        setMessage({ type: 'success', text: 'สร้างหลักสูตรสำเร็จ' })
+        showToast('สร้างหลักสูตรสำเร็จ')
         navigate(`/admin/courses/${created.id}/edit`, { replace: true })
       } else {
         await coursesApi.update(id, payload)
-        setMessage({ type: 'success', text: 'บันทึกหลักสูตรสำเร็จ' })
+        showToast('บันทึกหลักสูตรสำเร็จ')
       }
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'บันทึกไม่สำเร็จ' })
+      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleAddModule = async () => {
-    const title = prompt('ชื่อโมดูล:')
-    if (!title) return
-
-    try {
-      const newModule = await modulesApi.create({
-        course_id: parseInt(id),
-        title,
-        order_index: modules.length,
-      })
-      setModules([...modules, { ...newModule, lessons: [] }])
-    } catch (err) {
-      alert(err.response?.data?.detail || 'เพิ่มโมดูลไม่สำเร็จ')
-    }
+  const handleAddModule = () => {
+    setPromptState({
+      open: true,
+      title: 'เพิ่มโมดูลใหม่',
+      label: 'ชื่อโมดูล',
+      placeholder: 'เช่น บทที่ 1 บทนำ',
+      onConfirm: async (title) => {
+        try {
+          const newModule = await modulesApi.create({
+            course_id: parseInt(id),
+            title,
+            order_index: modules.length,
+          })
+          setModules([...modules, { ...newModule, lessons: [] }])
+          showToast('เพิ่มโมดูลสำเร็จ')
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'เพิ่มโมดูลไม่สำเร็จ', 'error')
+        }
+        setPromptState({ open: false })
+      },
+    })
   }
 
   const handleUpdateModule = async (moduleId, updates) => {
@@ -117,40 +132,55 @@ export default function CourseEditPage() {
       await modulesApi.update(moduleId, updates)
       setModules(modules.map(m => m.id === moduleId ? { ...m, ...updates } : m))
     } catch (err) {
-      alert(err.response?.data?.detail || 'แก้ไขไม่สำเร็จ')
+      showToast(err.response?.data?.detail || 'แก้ไขไม่สำเร็จ', 'error')
     }
   }
 
-  const handleDeleteModule = async (moduleId) => {
-    if (!confirm('ลบโมดูลนี้และบทเรียนทั้งหมดในโมดูล?')) return
-    try {
-      await modulesApi.delete(moduleId)
-      setModules(modules.filter(m => m.id !== moduleId))
-    } catch (err) {
-      alert(err.response?.data?.detail || 'ลบไม่สำเร็จ')
-    }
+  const handleDeleteModule = (moduleId) => {
+    setConfirmState({
+      open: true,
+      title: 'ลบโมดูล',
+      message: 'ต้องการลบโมดูลนี้และบทเรียนทั้งหมดในโมดูล?',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await modulesApi.delete(moduleId)
+          setModules(modules.filter(m => m.id !== moduleId))
+          showToast('ลบโมดูลเรียบร้อย')
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+        }
+        setConfirmState({ open: false })
+      },
+    })
   }
 
   const handleAddLesson = async (moduleId) => {
-    const title = prompt('ชื่อบทเรียน:')
-    if (!title) return
-
-    const module = modules.find(m => m.id === moduleId)
-    try {
-      const newLesson = await lessonsApi.create({
-        module_id: moduleId,
-        title,
-        content_type: 'video_youtube',
-        order_index: module.lessons.length,
-      })
-      setModules(modules.map(m =>
-        m.id === moduleId
-          ? { ...m, lessons: [...m.lessons, newLesson] }
-          : m
-      ))
-    } catch (err) {
-      alert(err.response?.data?.detail || 'เพิ่มบทเรียนไม่สำเร็จ')
-    }
+    setPromptState({
+      open: true,
+      title: 'เพิ่มบทเรียนใหม่',
+      label: 'ชื่อบทเรียน',
+      placeholder: 'เช่น บทที่ 1: ความสำคัญของการอนุรักษ์ป่าไม้',
+      onConfirm: async (title) => {
+        const module = modules.find(m => m.id === moduleId)
+        try {
+          const newLesson = await lessonsApi.create({
+            module_id: moduleId,
+            title,
+            content_type: 'video_youtube',
+            order_index: module.lessons.length,
+          })
+          setModules(modules.map(m =>
+            m.id === moduleId
+              ? { ...m, lessons: [...m.lessons, newLesson] }
+              : m
+          ))
+          showToast('เพิ่มบทเรียนสำเร็จ')
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'เพิ่มบทเรียนไม่สำเร็จ', 'error')
+        }
+      },
+    })
   }
 
   const handleUpdateLesson = (moduleId, lessonId, updates) => {
@@ -164,24 +194,33 @@ export default function CourseEditPage() {
   const handleSaveLesson = async (lesson) => {
     try {
       await lessonsApi.update(lesson.id, lesson)
-      alert('บันทึกบทเรียนสำเร็จ')
+      showToast('บันทึกบทเรียนสำเร็จ', 'success')
     } catch (err) {
-      alert(err.response?.data?.detail || 'บันทึกไม่สำเร็จ')
+      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
     }
   }
 
-  const handleDeleteLesson = async (moduleId, lessonId) => {
-    if (!confirm('ลบบทเรียนนี้?')) return
-    try {
-      await lessonsApi.delete(lessonId)
-      setModules(modules.map(m =>
-        m.id === moduleId
-          ? { ...m, lessons: m.lessons.filter(l => l.id !== lessonId) }
-          : m
-      ))
-    } catch (err) {
-      alert(err.response?.data?.detail || 'ลบไม่สำเร็จ')
-    }
+  const handleDeleteLesson = (moduleId, lessonId) => {
+    setConfirmState({
+      open: true,
+      title: 'ลบบทเรียน',
+      message: 'ต้องการลบบทเรียนนี้หรือไม่?',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await lessonsApi.delete(lessonId)
+          setModules(modules.map(m =>
+            m.id === moduleId
+              ? { ...m, lessons: m.lessons.filter(l => l.id !== lessonId) }
+              : m
+          ))
+          showToast('ลบบทเรียนเรียบร้อย')
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+        }
+        setConfirmState({ open: false })
+      },
+    })      
   }
 
   if (loading) {
@@ -191,6 +230,7 @@ export default function CourseEditPage() {
       </AdminLayout>
     )
   }
+
 
   return (
     <AdminLayout>
@@ -204,16 +244,6 @@ export default function CourseEditPage() {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">
           {isNew ? 'สร้างหลักสูตรใหม่' : 'แก้ไขหลักสูตร'}
         </h1>
-
-        {message.text && (
-          <div className={`mb-4 px-4 py-3 rounded-lg text-sm border ${
-            message.type === 'success'
-              ? 'bg-green-50 border-green-200 text-green-700'
-              : 'bg-red-50 border-red-200 text-red-700'
-          }`}>
-            {message.text}
-          </div>
-        )}
 
         {/* Course meta form */}
         <form onSubmit={handleSaveCourse} className="bg-white rounded-xl shadow-sm p-5 sm:p-6 mb-6 space-y-4">
@@ -366,6 +396,7 @@ export default function CourseEditPage() {
                     onUpdateLesson={(lessonId, updates) => handleUpdateLesson(module.id, lessonId, updates)}
                     onSaveLesson={handleSaveLesson}
                     onDeleteLesson={(lessonId) => handleDeleteLesson(module.id, lessonId)}
+                    showToast={showToast}
                   />
                 ))}
               </div>
@@ -373,11 +404,38 @@ export default function CourseEditPage() {
           </div>
         )}
       </div>
+      
+      {/* Toast */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={closeToast}
+      />
+      
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState({ open: false })}
+      />
+      
+      {/* Prompt dialog */}
+      <PromptDialog
+        open={promptState.open}
+        title={promptState.title}
+        label={promptState.label}
+        placeholder={promptState.placeholder}
+        onConfirm={promptState.onConfirm}
+        onCancel={() => setPromptState({ open: false })}
+      />
     </AdminLayout>
   )
 }
 
-function ModuleEditor({ module, index, onUpdate, onDelete, onAddLesson, onUpdateLesson, onSaveLesson, onDeleteLesson }) {
+function ModuleEditor({ module, index, onUpdate, onDelete, onAddLesson, onUpdateLesson, onSaveLesson, onDeleteLesson, showToast }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(module.title)
   const [expanded, setExpanded] = useState(true)
@@ -449,6 +507,7 @@ function ModuleEditor({ module, index, onUpdate, onDelete, onAddLesson, onUpdate
                 onUpdate={(updates) => onUpdateLesson(lesson.id, updates)}
                 onSave={() => onSaveLesson(lesson)}
                 onDelete={() => onDeleteLesson(lesson.id)}
+                showToast={showToast}
               />
             ))
           )}
@@ -458,7 +517,7 @@ function ModuleEditor({ module, index, onUpdate, onDelete, onAddLesson, onUpdate
   )
 }
 
-function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
+function LessonEditor({ lesson, index, onUpdate, onSave, onDelete, showToast }) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [expanded, setExpanded] = useState(false)
@@ -477,9 +536,9 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
     try {
       const updated = await lessonsApi.uploadVideo(lesson.id, file, setUploadProgress)
       onUpdate(updated)
-      alert('อัปโหลดวิดีโอสำเร็จ')
+      showToast('อัปโหลดวิดีโอสำเร็จ', 'success')
     } catch (err) {
-      alert(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ')
+      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
     } finally {
       setUploading(false)
       setUploadProgress(0)
@@ -495,9 +554,9 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
     try {
       const updated = await lessonsApi.uploadPdf(lesson.id, file, setUploadProgress)
       onUpdate(updated)
-      alert('อัปโหลด PDF สำเร็จ')
+      showToast('อัปโหลด PDF สำเร็จ', 'success')
     } catch (err) {
-      alert(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ')
+      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
     } finally {
       setUploading(false)
       setUploadProgress(0)

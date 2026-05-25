@@ -4,6 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes slide-in-top {
+  from { transform: translate(-50%, -100%); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.animate-slide-in-top {
+  animation: slide-in-top 0.2s ease-out;
+}
+
 body {
   font-family: 'Sarabun', system-ui, sans-serif;
   margin: 0;

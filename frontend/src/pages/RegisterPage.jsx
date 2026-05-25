@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi } from '../api/auth'
 import { useAuth } from '../contexts/AuthContext'
+import Toast from '../components/Toast'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -22,6 +23,11 @@ export default function RegisterPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
+  //Toast state
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const showToast = (message, type = 'success') => setToast({ message, type })
+  const closeToast = () => setToast({ message: '', type: 'success' })
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
@@ -31,31 +37,22 @@ export default function RegisterPage() {
     setError('')
 
     if (formData.password !== formData.confirm_password) {
-      setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน')
+      showToast('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน', 'error')
       return
     }
 
     if (!/^[a-zA-Z0-9_.-]+$/.test(formData.username)) {
-      setError('Username ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข และ _ . - เท่านั้น')
+      showToast('Username ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข และ _ . - เท่านั้น', 'error')
       return
     }
 
     setLoading(true)
     try {
       await authApi.register(formData)
-      await login(formData.username, formData.password)
-      navigate('/', { replace: true })
+      showToast('สมัครสมาชิกสำเร็จ กำลังพาไปหน้าเข้าสู่ระบบ')
+      setTimeout(() => navigate('/login'), 1500)
     } catch (err) {
-      const detail = err.response?.data?.detail
-      // FastAPI validation error เป็น array ของ object
-      if (Array.isArray(detail)) {
-        const messages = detail.map(d => `${d.loc[1]}: ${d.msg}`).join(', ')
-        setError(messages)
-      } else if (typeof detail === 'string') {
-        setError(detail)
-      } else {
-        setError('สมัครสมาชิกไม่สำเร็จ')
-      }
+      showToast(err.response?.data?.detail || 'สมัครสมาชิกไม่สำเร็จ', 'error')
     } finally {
       setLoading(false)
     }
@@ -65,8 +62,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-forest-50 to-forest-100 flex items-center justify-center p-3 sm:p-4 sm:py-8">
       <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 w-full max-w-2xl">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-forest-500 rounded-full mb-3 text-2xl">
-            logo
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-forest-500 rounded-full mb-3 text-2xl">
+            <img src="/forest_logo.png" alt="Logo" className="w-20 h-20" />
           </div>
           <h1 className="text-2xl font-bold text-forest-700">สมัครสมาชิก</h1>
           <p className="text-gray-600 text-sm mt-1">สำหรับเจ้าหน้าที่กรมป่าไม้</p>
@@ -292,6 +289,7 @@ export default function RegisterPage() {
           </p>
         </div>
       </div>
+      <Toast message={toast.message} type={toast.type} onClose={closeToast} />
     </div>
   )
 }

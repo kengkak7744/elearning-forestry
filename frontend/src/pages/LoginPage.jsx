@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Toast from '../components/Toast'
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('')
@@ -13,6 +14,11 @@ export default function LoginPage() {
   const location = useLocation()
   const from = location.state?.from?.pathname || '/'
 
+  // Toast state
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const showToast = (message, type = 'success') => setToast({ message, type })
+  const closeToast = () => setToast({ message: '', type: 'success' })
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -20,10 +26,10 @@ export default function LoginPage() {
 
     try {
       await login(identifier, password)
-      navigate(from, { replace: true })
+      showToast('เข้าสู่ระบบสำเร็จ')
+      setTimeout(() => navigate(from, { replace: true }), 800)
     } catch (err) {
-      const message = err.response?.data?.detail || 'เข้าสู่ระบบไม่สำเร็จ'
-      setError(message)
+      showToast(err.response?.data?.detail || 'เข้าสู่ระบบไม่สำเร็จ', 'error')
     } finally {
       setLoading(false)
     }
@@ -72,12 +78,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
@@ -99,6 +99,7 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+      <Toast message={toast.message} type={toast.type} onClose={closeToast} />
     </div>
   )
 }
