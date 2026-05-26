@@ -21,6 +21,7 @@ export default function CourseViewerPage() {
   const [expandedModules, setExpandedModules] = useState(new Set())
   const [quizzes, setQuizzes] = useState([])  // all course quizzes with is_passed status
   const [viewingFinal, setViewingFinal] = useState(false)
+  const [progressLoaded, setProgressLoaded] = useState(false)
 
   const [toast, setToast] = useState({ message: '', type: 'success' })
   const showToast = (m, t = 'success') => setToast({ message: m, type: t })
@@ -54,31 +55,41 @@ export default function CourseViewerPage() {
     // eslint-disable-next-line
   }, [id])
 
-  // Switch lesson when URL changes
+  // Switch lesson when URL changes; on first entry without lessonId, resume where the user left off
   useEffect(() => {
     if (!course) return
     const allLessons = course.modules.flatMap(m => m.lessons)
-    
-    let lesson
+
+    // If URL specifies a lesson, use it
     if (lessonId) {
-      lesson = allLessons.find(l => l.id === parseInt(lessonId))
+      const lesson = allLessons.find(l => l.id === parseInt(lessonId))
+      setCurrentLesson(lesson)
+      if (lesson) {
+        const mod = course.modules.find(m => m.lessons.some(l => l.id === lesson.id))
+        if (mod) setExpandedModules(prev => new Set([...prev, mod.id]))
+      }
+      return
     }
-    if (!lesson && allLessons.length > 0) {
-      lesson = allLessons[0]
-      // Update URL to first lesson
-      navigate(`/courses/${id}/learn/${lesson.id}`, { replace: true })
-    }
-    setCurrentLesson(lesson)
-    
-    // Expand the module containing this lesson
-    if (lesson) {
-      const mod = course.modules.find(m => m.lessons.some(l => l.id === lesson.id))
-      if (mod) setExpandedModules(prev => new Set([...prev, mod.id]))
-    }
-  }, [course, lessonId, id, navigate])
+
+    // No lessonId — wait for progress, then pick resume lesson
+    if (!progressLoaded) return
+    if (allLessons.length === 0) return
+
+    // 1. A lesson actively in progress (has position but not completed) — most recent
+    const inProgress = allLessons.find(l => {
+      const p = progress[l.id]
+      return p && !p.is_completed && p.current_position > 0
+    })
+    // 2. The first lesson that's not yet completed
+    const firstIncomplete = allLessons.find(l => !progress[l.id]?.is_completed)
+    // 3. Fall back to first lesson
+    const resume = inProgress || firstIncomplete || allLessons[0]
+    navigate(`/courses/${id}/learn/${resume.id}`, { replace: true })
+  }, [course, lessonId, id, navigate, progressLoaded, progress])
 
   const loadCourse = async () => {
     setLoading(true)
+    setProgressLoaded(false)
     try {
       const data = await coursesApi.getById(id)
       setCourse(data)
@@ -89,6 +100,7 @@ export default function CourseViewerPage() {
         progressList.forEach(p => { progressMap[p.lesson_id] = p })
         setProgress(progressMap)
       } catch (e) {}
+      setProgressLoaded(true)
 
       try {
         const quizList = await quizzesApi.getCourseAll(id)
@@ -221,6 +233,7 @@ export default function CourseViewerPage() {
       showToast('ต้องทำแบบทดสอบของโมดูลก่อนหน้าให้ผ่านก่อน', 'error')
       return
     }
+    markPdfCompleteIfApplicable()
     setViewingFinal(false)
     navigate(`/courses/${id}/learn/${lesson.id}`)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -231,6 +244,7 @@ export default function CourseViewerPage() {
       showToast('ต้องผ่านแบบทดสอบในทุกโมดูลก่อน', 'error')
       return
     }
+    markPdfCompleteIfApplicable()
     setViewingFinal(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -243,17 +257,30 @@ export default function CourseViewerPage() {
     return () => clearInterval(iv)
   }, [currentLesson?.id, viewingFinal])
 
-  // PDF: save elapsed view time as current_position every 10s
+  // PDF: save elapsed view time every 10s; mark complete once time gate is met (or after 30s default)
   useEffect(() => {
     if (!currentLesson || currentLesson.content_type !== 'pdf' || viewingFinal) return
     if (elapsedSeconds === 0 || elapsedSeconds % 10 !== 0) return
+    const completeAt = minSeconds > 0 ? minSeconds : 30
+    const isCompleted = elapsedSeconds >= completeAt
     progressApi.update({
       lesson_id: currentLesson.id,
       current_position: elapsedSeconds,
-      is_completed: false,
+      is_completed: isCompleted,
     }).then(p => setProgress(prev => ({ ...prev, [currentLesson.id]: p }))).catch(() => {})
     // eslint-disable-next-line
   }, [elapsedSeconds])
+
+  // Mark current PDF lesson as complete when navigating away (best-effort)
+  const markPdfCompleteIfApplicable = () => {
+    if (!currentLesson || currentLesson.content_type !== 'pdf') return
+    if (elapsedSeconds < 5) return
+    progressApi.update({
+      lesson_id: currentLesson.id,
+      current_position: Math.max(elapsedSeconds, progress[currentLesson.id]?.current_position || 0),
+      is_completed: true,
+    }).then(p => setProgress(prev => ({ ...prev, [currentLesson.id]: p }))).catch(() => {})
+  }
 
   const minSeconds = currentLesson?.min_view_seconds || 0
   const timeGateMet = minSeconds === 0 || elapsedSeconds >= minSeconds
@@ -333,13 +360,14 @@ export default function CourseViewerPage() {
       return
     }
     if (dest.type === 'lesson') {
+      markPdfCompleteIfApplicable()
       setViewingFinal(false)
       navigate(`/courses/${id}/learn/${dest.lesson.id}`)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
-  // Overall course progress
+  // Overall course progress (lessons + final quiz)
   const totalLessons = useMemo(
     () => course ? course.modules.reduce((sum, m) => sum + m.lessons.length, 0) : 0,
     [course]
@@ -348,7 +376,9 @@ export default function CourseViewerPage() {
     () => Object.values(progress).filter(p => p?.is_completed).length,
     [progress]
   )
-  const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+  const totalItems = totalLessons + (finalQuiz ? 1 : 0)
+  const completedItems = completedLessons + (finalQuiz?.is_passed ? 1 : 0)
+  const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
 
   // === Mid-video quiz triggering ===
 
@@ -539,9 +569,14 @@ export default function CourseViewerPage() {
         /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^?&"'>]+)/,
     ]
     
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
     for (const pattern of patterns) {
         const match = url.match(pattern)
-        if (match) return `https://www.youtube.com/embed/${match[1]}?enablejsapi=1`
+        if (match) {
+          const params = new URLSearchParams({ enablejsapi: '1' })
+          if (origin) params.set('origin', origin)
+          return `https://www.youtube.com/embed/${match[1]}?${params.toString()}`
+        }
     }
 
     return url  // fallback: try as-is
@@ -578,12 +613,12 @@ export default function CourseViewerPage() {
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-forest-400 to-forest-600 h-1.5 transition-all"
+                className="bg-gradient-to-r from-forest-500 to-forest-700 h-1.5 transition-all"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
             <span className="text-xs text-gray-500 font-medium tabular-nums flex-shrink-0">
-              {completedLessons}/{totalLessons} ({progressPercent}%)
+              {completedItems}/{totalItems} ({progressPercent}%)
             </span>
           </div>
         </div>
