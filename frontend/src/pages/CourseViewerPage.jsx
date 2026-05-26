@@ -34,6 +34,9 @@ export default function CourseViewerPage() {
   const ytIframeRef = useRef(null)
   const ytPlayerRef = useRef(null)
   const ytPollRef = useRef(null)
+  const lastYtSavedRef = useRef(0)
+  const progressRef = useRef(progress)
+  useEffect(() => { progressRef.current = progress }, [progress])
 
   // Time-on-page gate (per lesson)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -239,6 +242,18 @@ export default function CourseViewerPage() {
     const iv = setInterval(() => setElapsedSeconds(s => s + 1), 1000)
     return () => clearInterval(iv)
   }, [currentLesson?.id, viewingFinal])
+
+  // PDF: save elapsed view time as current_position every 10s
+  useEffect(() => {
+    if (!currentLesson || currentLesson.content_type !== 'pdf' || viewingFinal) return
+    if (elapsedSeconds === 0 || elapsedSeconds % 10 !== 0) return
+    progressApi.update({
+      lesson_id: currentLesson.id,
+      current_position: elapsedSeconds,
+      is_completed: false,
+    }).then(p => setProgress(prev => ({ ...prev, [currentLesson.id]: p }))).catch(() => {})
+    // eslint-disable-next-line
+  }, [elapsedSeconds])
 
   const minSeconds = currentLesson?.min_view_seconds || 0
   const timeGateMet = minSeconds === 0 || elapsedSeconds >= minSeconds
@@ -449,19 +464,46 @@ export default function CourseViewerPage() {
     }
 
     let cancelled = false
+    lastYtSavedRef.current = 0
     loadYTApi().then(YT => {
       if (cancelled || !ytIframeRef.current) return
       try {
         ytPlayerRef.current = new YT.Player(ytIframeRef.current, {
           events: {
             onReady: () => {
+              // Restore saved position
+              const cl = currentLessonRef.current
+              const saved = cl ? progressRef.current[cl.id] : null
+              if (saved?.current_position > 0 && !saved.is_completed) {
+                try { ytPlayerRef.current.seekTo(saved.current_position, true) } catch {}
+                lastYtSavedRef.current = saved.current_position
+              }
+
               if (ytPollRef.current) clearInterval(ytPollRef.current)
               ytPollRef.current = setInterval(() => {
                 if (!ytPlayerRef.current?.getCurrentTime) return
                 let t = 0
                 try { t = ytPlayerRef.current.getCurrentTime() } catch { return }
-                const due = findDueMidQuiz(Math.floor(t))
+                const tFloor = Math.floor(t)
+
+                const due = findDueMidQuiz(tFloor)
                 if (due) triggerMidQuiz(due)
+
+                // Save progress every 10s
+                if (tFloor - lastYtSavedRef.current >= 10) {
+                  lastYtSavedRef.current = tFloor
+                  let duration = 0
+                  try { duration = ytPlayerRef.current.getDuration() || 0 } catch {}
+                  const isCompleted = duration > 0 && tFloor >= duration * 0.9
+                  const lid = currentLessonRef.current?.id
+                  if (lid) {
+                    progressApi.update({
+                      lesson_id: lid,
+                      current_position: tFloor,
+                      is_completed: isCompleted,
+                    }).then(p => setProgress(prev => ({ ...prev, [lid]: p }))).catch(() => {})
+                  }
+                }
               }, 1000)
             },
           },
@@ -547,7 +589,7 @@ export default function CourseViewerPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 pb-28 sm:pb-32">
         {/* Final quiz view */}
         {viewingFinal && finalQuiz && (
           <>
@@ -561,14 +603,6 @@ export default function CourseViewerPage() {
                 showToast={showToast}
                 onAttempted={refreshQuizzes}
               />
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5 mb-4">
-              <button
-                onClick={goPrev}
-                className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
-              >
-                ← กลับไปบทเรียน
-              </button>
             </div>
           </>
         )}
@@ -664,7 +698,7 @@ export default function CourseViewerPage() {
         </div>
         )}
 
-        {/* Lesson quizzes — show below the player */}
+        {/* Lesson quizzes — Prev/Next moved to fixed bottom bar */}
         {!viewingFinal && currentLesson && (lessonQuizzes[currentLesson.id] || []).length > 0 && (
           <div className="space-y-3 mb-4">
             {lessonQuizzes[currentLesson.id].map(quiz => (
@@ -675,59 +709,6 @@ export default function CourseViewerPage() {
                 onAttempted={refreshQuizzes}
               />
             ))}
-          </div>
-        )}
-
-        {/* Prev / Next action bar */}
-        {!viewingFinal && currentLesson && (
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-5 mb-4">
-            {/* Time gate progress */}
-            {minSeconds > 0 && !timeGateMet && (
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-amber-700 font-medium">
-                    ⏳ ต้องอยู่บนหน้านี้อีก {fmtTime(remainingSeconds)}
-                  </span>
-                  <span className="text-gray-500 tabular-nums">
-                    {fmtTime(elapsedSeconds)} / {fmtTime(minSeconds)}
-                  </span>
-                </div>
-                <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-amber-400 to-amber-500 h-2 transition-all"
-                    style={{ width: `${Math.min(100, (elapsedSeconds / minSeconds) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            {minSeconds > 0 && timeGateMet && (
-              <div className="mb-3 text-xs text-green-700 font-medium">
-                ✓ ครบเวลาขั้นต่ำแล้ว
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3">
-              <button
-                onClick={goPrev}
-                disabled={!findPrevDest()}
-                className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                ← ก่อนหน้า
-              </button>
-              {(() => {
-                const dest = findNextDest()
-                const label = dest?.type === 'final' ? '🏆 ทำแบบทดสอบสุดท้าย' : 'ถัดไป →'
-                return (
-                  <button
-                    onClick={goNext}
-                    disabled={!timeGateMet || !dest}
-                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-forest-500 hover:bg-forest-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {dest ? label : 'จบหลักสูตรแล้ว ✓'}
-                  </button>
-                )
-              })()}
-            </div>
           </div>
         )}
 
@@ -844,6 +825,76 @@ export default function CourseViewerPage() {
           </div>
         </div>
       </div>
+
+      {/* Fixed bottom action bar — always visible */}
+      {currentLesson && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3">
+            {/* Time gate progress (compact, only while not met) */}
+            {!viewingFinal && minSeconds > 0 && !timeGateMet && (
+              <div className="mb-2">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-amber-700 font-medium">
+                    ⏳ ต้องอยู่บนหน้านี้อีก {fmtTime(remainingSeconds)}
+                  </span>
+                  <span className="text-gray-500 tabular-nums">
+                    {fmtTime(elapsedSeconds)} / {fmtTime(minSeconds)}
+                  </span>
+                </div>
+                <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-amber-400 to-amber-500 h-1.5 transition-all"
+                    style={{ width: `${Math.min(100, (elapsedSeconds / minSeconds) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={goPrev}
+                disabled={!findPrevDest()}
+                className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← ก่อนหน้า
+              </button>
+
+              {/* Middle: current lesson title (desktop only) */}
+              {!viewingFinal && (
+                <span className="hidden md:block text-xs text-gray-500 truncate max-w-md text-center px-2">
+                  {currentLesson.title}
+                </span>
+              )}
+              {viewingFinal && (
+                <span className="hidden md:block text-xs text-amber-700 font-medium text-center px-2">
+                  🏆 แบบทดสอบสุดท้าย
+                </span>
+              )}
+
+              {viewingFinal ? (
+                <button
+                  onClick={goPrev}
+                  className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium"
+                >
+                  กลับบทเรียน
+                </button>
+              ) : (() => {
+                const dest = findNextDest()
+                const label = dest?.type === 'final' ? '🏆 แบบทดสอบสุดท้าย' : 'ถัดไป →'
+                return (
+                  <button
+                    onClick={goNext}
+                    disabled={!timeGateMet || !dest}
+                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-forest-500 hover:bg-forest-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {dest ? label : 'จบหลักสูตรแล้ว ✓'}
+                  </button>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
 
