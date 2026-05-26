@@ -30,6 +30,7 @@ class Lesson(Base):
     
     notes_content = Column(Text, nullable=True)  # Markdown notes
     order_index = Column(Integer, default=0, nullable=False)
+    min_view_seconds = Column(Integer, nullable=True)  # Min seconds user must stay before "Next"
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -37,7 +38,7 @@ class Lesson(Base):
     module = relationship("Module", back_populates="lessons")
     resources = relationship("LessonResource", back_populates="lesson", cascade="all, delete-orphan")
     progresses = relationship("LessonProgress", back_populates="lesson", cascade="all, delete-orphan")
-    quizzes = relationship("Quiz", back_populates="lesson", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="lesson", cascade="all, delete-orphan", order_by="Quiz.order_index")
 
 
 class LessonResource(Base):

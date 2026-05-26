@@ -1,40 +1,69 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON, Enum
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime, JSON, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
+
 from app.database import Base
 
 
-class QuizType(str, enum.Enum):
-    QUICK = "quick"          # แบบทดสอบย่อยระหว่างเรียน
-    FINAL = "final"          # สอบประเมินผลท้ายหลักสูตร
+class QuizPlacement(str, enum.Enum):
+    MID_VIDEO = "mid_video"
+    END_OF_LESSON = "end_of_lesson"
+    FINAL = "final"
+
+
+class QuestionType(str, enum.Enum):
+    SINGLE_CHOICE = "single_choice"
+    MULTIPLE_CHOICE = "multiple_choice"
+    WRITTEN = "written"
 
 
 class Quiz(Base):
     __tablename__ = "quizzes"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
-    quiz_type = Column(Enum(QuizType), default=QuizType.QUICK)
-    question = Column(Text, nullable=False)
-    options = Column(JSON, nullable=False)  # ["ตัวเลือก A", "ตัวเลือก B", ...]
-    correct_answer = Column(Integer, nullable=False)  # index 0-based
-    explanation = Column(Text, nullable=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=True, index=True)
+    title = Column(String(200), nullable=False)
+    placement = Column(SQLEnum(QuizPlacement, name="quizplacement"), nullable=False)
+    trigger_time = Column(Integer, nullable=True)  # seconds, for mid_video only
+    can_skip = Column(Boolean, default=True, nullable=False)
+    show_correct_answer = Column(Boolean, default=True, nullable=False)
+    passing_score = Column(Integer, default=70)  # percentage
     order_index = Column(Integer, default=0)
-    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
     lesson = relationship("Lesson", back_populates="quizzes")
+    course = relationship("Course")
+    questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan", order_by="Question.order_index")
     attempts = relationship("QuizAttempt", back_populates="quiz", cascade="all, delete-orphan")
+
+
+class Question(Base):
+    __tablename__ = "questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_text = Column(Text, nullable=False)
+    question_type = Column(SQLEnum(QuestionType, name="questiontype"), nullable=False)
+    choices = Column(JSON, nullable=True)  # [{"text": "...", "is_correct": true}, ...]
+    correct_text = Column(Text, nullable=True)  # for written questions
+    points = Column(Integer, default=1)
+    order_index = Column(Integer, default=0)
+
+    quiz = relationship("Quiz", back_populates="questions")
 
 
 class QuizAttempt(Base):
     __tablename__ = "quiz_attempts"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False, index=True)
-    selected_answer = Column(Integer, nullable=False)
-    is_correct = Column(Boolean, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    score = Column(Integer, default=0)  # percentage 0-100
+    answers = Column(JSON, nullable=True)  # {question_id: answer_value}
+    is_passed = Column(Boolean, default=False)
     attempted_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    user = relationship("User", back_populates="quiz_attempts")
+
+    user = relationship("User")
     quiz = relationship("Quiz", back_populates="attempts")

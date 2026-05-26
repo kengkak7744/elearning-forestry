@@ -7,6 +7,7 @@ import { lessonsApi } from '../../api/lessons'
 import Toast from '../../components/Toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import PromptDialog from '../../components/PromptDialog'
+import QuizManager from '../../components/QuizManager'
 
 const categoryOptions = [
   { value: 'compliance', label: 'บังคับตามกฎหมาย' },
@@ -468,15 +469,29 @@ export default function CourseEditPage() {
             )}
           </div>
         )}
+
+        {/* Final quiz */}
+        {!isNew && (
+          <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 mt-6">
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 pb-3 mb-4">
+              แบบทดสอบสุดท้าย
+            </h2>
+            <QuizManager
+              courseId={parseInt(id)}
+              scope="final"
+              showToast={showToast}
+            />
+          </div>
+        )}
       </div>
-      
+
       {/* Toast */}
       <Toast
         message={toast.message}
         type={toast.type}
         onClose={closeToast}
       />
-      
+
       {/* Confirm dialog */}
       <ConfirmDialog
         open={confirmState.open}
@@ -486,7 +501,7 @@ export default function CourseEditPage() {
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState({ open: false })}
       />
-      
+
       {/* Prompt dialog */}
       <PromptDialog
         open={promptState.open}
@@ -797,12 +812,37 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete, showToast }) 
             />
           </div>
 
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">
+              เวลาขั้นต่ำที่ต้องอยู่บนหน้า (วินาที)
+              <span className="text-gray-400 ml-1">— ใส่ 0 หรือเว้นว่าง = ปิด</span>
+            </label>
+            <input
+              type="number"
+              name="min_view_seconds"
+              value={lesson.min_view_seconds || ''}
+              onChange={handleChange}
+              min={0}
+              placeholder="เช่น 120 = 2 นาที"
+              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+            />
+          </div>
+
           <button
             onClick={onSave}
             className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-4 py-1.5 rounded font-medium transition"
           >
             บันทึกบทเรียน
           </button>
+
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <h4 className="font-medium text-sm text-gray-800 mb-2">แบบทดสอบ</h4>
+            <QuizManager
+              lessonId={lesson.id}
+              scope="lesson"
+              showToast={showToast}
+            />
+          </div>
         </div>
       )}
     </div>

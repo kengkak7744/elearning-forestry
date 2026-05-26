@@ -91,6 +91,7 @@ def get_course(
                 "total_pages": lesson.total_pages,
                 "notes_content": lesson.notes_content,
                 "order_index": lesson.order_index,
+                "min_view_seconds": lesson.min_view_seconds,
             })
         modules_data.append({
             "id": module.id,

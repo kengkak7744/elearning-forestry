@@ -13,6 +13,7 @@ class LessonBase(BaseModel):
     total_pages: Optional[int] = Field(None, ge=0)
     notes_content: Optional[str] = None
     order_index: int = 0
+    min_view_seconds: Optional[int] = Field(None, ge=0)
 
 
 class LessonCreate(LessonBase):
@@ -28,6 +29,7 @@ class LessonUpdate(BaseModel):
     total_pages: Optional[int] = None
     notes_content: Optional[str] = None
     order_index: Optional[int] = None
+    min_view_seconds: Optional[int] = None
 
 
 class LessonResponse(LessonBase):
