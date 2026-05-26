@@ -137,7 +137,7 @@ async def upload_video(
             old_path.unlink()
     
     lesson.content_type = ContentType.VIDEO_FILE
-    lesson.content_url = f"/elearning/videos/{unique_name}"
+    lesson.content_url = f"/videos/{unique_name}"
     db.commit()
     db.refresh(lesson)
     return lesson
@@ -179,7 +179,7 @@ async def upload_pdf(
             old_path.unlink()
     
     lesson.content_type = ContentType.PDF
-    lesson.content_url = f"/elearning/pdfs/{unique_name}"
+    lesson.content_url = f"/pdfs/{unique_name}"
     db.commit()
     db.refresh(lesson)
     return lesson

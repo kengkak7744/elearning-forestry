@@ -245,7 +245,11 @@ export default function CourseDetailPage() {
                     onClick={() => navigate(`/courses/${course.id}/learn`)}
                     className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-3 rounded-lg transition mb-3"
                   >
-                    เริ่มเรียน
+                    <Link
+                      to={`/courses/${id}/learn`}
+                    >
+                      เริ่มเรียน
+                    </Link>
                   </button>
                   
                   <button

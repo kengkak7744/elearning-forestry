@@ -12,6 +12,7 @@ import CoursesPage from './pages/CoursesPage'
 import CourseDetailPage from './pages/CourseDetailPage'
 import CoursesListPage from './pages/admin/CoursesListPage'
 import CourseEditPage from './pages/admin/CourseEditPage'
+import CourseViewerPage from './pages/CourseViewerPage'
 
 function App() {
   return (
@@ -57,12 +58,38 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/courses" element={
-            <AdminRoute><CoursesListPage /></AdminRoute>
-          } />
-          <Route path="/admin/courses/:id/edit" element={
-            <AdminRoute><CourseEditPage /></AdminRoute>
-          } />
+          <Route 
+            path="/courses/:id/learn" 
+            element={
+              <ProtectedRoute>
+                <CourseViewerPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/courses/:id/learn/:lessonId" 
+            element={
+              <ProtectedRoute>
+                <CourseViewerPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/courses" 
+            element={
+              <AdminRoute>
+                <CoursesListPage />
+              </AdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/courses/:id/edit" 
+            element={
+              <AdminRoute>
+                <CourseEditPage />
+              </AdminRoute>
+            } 
+          />
 
           {/* Admin pages */}
           <Route path="/admin/users" element={<AdminRoute><UsersListPage /></AdminRoute>} />

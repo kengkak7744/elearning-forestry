@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, users, courses, modules, lessons
+from app.routers import auth, users, courses, modules, lessons, progress
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -35,7 +35,7 @@ app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(modules.router)
 app.include_router(lessons.router)
-
+app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
 
 @app.get("/")
 def read_root():
