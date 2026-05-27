@@ -9,9 +9,9 @@ export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const menuItems = [
+    { path: '/admin/dashboard', label: 'แดชบอร์ด', icon: 'D' },
     { path: '/admin/users', label: 'จัดการผู้ใช้', icon: 'U' },
     { path: '/admin/courses', label: 'จัดการหลักสูตร', icon: 'C' },
-    { path: '/admin/reports', label: 'รายงาน', icon: 'R' },
   ]
 
   const handleLogout = async () => {

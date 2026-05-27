@@ -28,7 +28,7 @@ export default function LearnerHeader() {
             <Icon name="user" className="w-5 h-5 sm:hidden" />
           </Link>
           {user?.role === 'admin' && (
-            <Link to="/admin/users" className="text-xs sm:text-sm text-forest-600 font-medium">
+            <Link to="/admin/dashboard" className="text-xs sm:text-sm text-forest-600 font-medium">
               <span className="hidden sm:inline">จัดการระบบ</span>
               <Icon name="settings" className="w-5 h-5 sm:hidden" />
             </Link>

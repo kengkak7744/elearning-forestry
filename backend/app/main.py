@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files
+from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats
 import os
 
 app = FastAPI(
@@ -34,6 +34,7 @@ app.include_router(lessons.router)
 app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
 app.include_router(quizzes.router, prefix="/api/quizzes", tags=["quizzes"])
 app.include_router(files.router)
+app.include_router(admin_stats.router)
 
 @app.get("/")
 def read_root():

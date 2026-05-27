@@ -36,6 +36,12 @@ export const coursesApi = {
     return response.data
   },
 
+  /** หลักสูตรของฉัน + ความคืบหน้า */
+  myEnrollments: async () => {
+    const response = await apiClient.get('/courses/me/enrollments')
+    return response.data
+  },
+
   /** อัปโหลดรูปภาพปกหลักสูตร */
   uploadCoverImage: async (courseId, file, onProgress) => {
     const formData = new FormData()

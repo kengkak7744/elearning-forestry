@@ -233,6 +233,92 @@ async def upload_cover_image(
 
 # Enrollment endpoints
 
+@router.get("/me/enrollments")
+def my_enrollments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Courses I'm enrolled in + my progress on each."""
+    from app.models.progress import LessonProgress
+    from app.models.lesson import Lesson
+
+    # All my enrollments
+    enrollments = (
+        db.query(Enrollment)
+        .filter(Enrollment.user_id == current_user.id)
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+    if not enrollments:
+        return []
+
+    course_ids = [e.course_id for e in enrollments]
+
+    # Total lessons per course (one query)
+    lesson_counts = dict(
+        db.query(Module.course_id, func.count(Lesson.id))
+        .join(Lesson, Lesson.module_id == Module.id)
+        .filter(Module.course_id.in_(course_ids))
+        .group_by(Module.course_id)
+        .all()
+    )
+
+    # Completed lessons per course for this user (one query)
+    completed_counts = dict(
+        db.query(Module.course_id, func.count(LessonProgress.id))
+        .join(Lesson, Lesson.module_id == Module.id)
+        .join(LessonProgress, LessonProgress.lesson_id == Lesson.id)
+        .filter(
+            Module.course_id.in_(course_ids),
+            LessonProgress.user_id == current_user.id,
+            LessonProgress.completed == True,
+        )
+        .group_by(Module.course_id)
+        .all()
+    )
+
+    # Most-recent lesson access per course
+    last_access_rows = (
+        db.query(Module.course_id, func.max(LessonProgress.last_accessed_at))
+        .join(Lesson, Lesson.module_id == Module.id)
+        .join(LessonProgress, LessonProgress.lesson_id == Lesson.id)
+        .filter(
+            Module.course_id.in_(course_ids),
+            LessonProgress.user_id == current_user.id,
+        )
+        .group_by(Module.course_id)
+        .all()
+    )
+    last_access = {cid: ts for cid, ts in last_access_rows}
+
+    # Fetch course objects once
+    courses = {c.id: c for c in db.query(Course).filter(Course.id.in_(course_ids)).all()}
+
+    result = []
+    for e in enrollments:
+        c = courses.get(e.course_id)
+        if not c:
+            continue
+        total = lesson_counts.get(c.id, 0)
+        done = completed_counts.get(c.id, 0)
+        pct = int((done / total) * 100) if total > 0 else 0
+        result.append({
+            "course_id": c.id,
+            "title": c.title,
+            "category": c.category.value if c.category else None,
+            "cover_image": c.cover_image,
+            "is_mandatory": c.is_mandatory,
+            "instructor_name": c.instructor_name,
+            "estimated_hours": c.estimated_hours,
+            "enrolled_at": e.enrolled_at.isoformat() if e.enrolled_at else None,
+            "total_lessons": total,
+            "completed_lessons": done,
+            "progress_percent": pct,
+            "last_accessed_at": last_access.get(c.id).isoformat() if last_access.get(c.id) else None,
+        })
+    return result
+
+
 @router.post("/{course_id}/enroll", status_code=status.HTTP_201_CREATED)
 def enroll_course(
     course_id: int,

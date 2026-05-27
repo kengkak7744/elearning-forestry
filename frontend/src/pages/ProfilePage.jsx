@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../api/auth'
 import Icon from '../components/Icon'
+import LearnerHeader from '../components/LearnerHeader'
+import MyCourses from '../components/MyCourses'
 import { ROLE_LABELS } from '../constants/labels'
 
 export default function ProfilePage() {
@@ -120,16 +122,8 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <h1 className="text-base sm:text-xl font-bold text-forest-700">โปรไฟล์ของฉัน</h1>
-          <Link to="/" className="text-xs sm:text-sm text-forest-600 hover:text-forest-700 font-medium">
-            ← กลับหน้าหลัก
-          </Link>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
+      <LearnerHeader />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
             <h2 className="text-lg font-bold text-gray-800">ข้อมูลส่วนตัว</h2>
@@ -338,6 +332,17 @@ export default function ProfilePage() {
               </div>
             </form>
           )}
+        </div>
+
+        {/* my enrolled courses */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">หลักสูตรของฉัน</h2>
+            <Link to="/courses" className="text-sm text-forest-600 hover:text-forest-700 font-medium">
+              ดูคอร์สทั้งหมด →
+            </Link>
+          </div>
+          <MyCourses />
         </div>
 
         {/* เปลี่ยนรหัสผ่าน */}

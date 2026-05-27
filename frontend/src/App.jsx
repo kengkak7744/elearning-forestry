@@ -18,6 +18,7 @@ const UsersListPage = lazy(() => import('./pages/admin/UsersListPage'))
 const UserFormPage = lazy(() => import('./pages/admin/UserFormPage'))
 const CoursesListPage = lazy(() => import('./pages/admin/CoursesListPage'))
 const CourseEditPage = lazy(() => import('./pages/admin/CourseEditPage'))
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
 
 function PageFallback() {
   return (
@@ -48,13 +49,14 @@ function App() {
             <Route path="/courses/:id/learn/:lessonId" element={<ProtectedRoute><CourseViewerPage /></ProtectedRoute>} />
 
             {/* Admin pages */}
+            <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
             <Route path="/admin/courses" element={<AdminRoute><CoursesListPage /></AdminRoute>} />
             <Route path="/admin/courses/:id/edit" element={<AdminRoute><CourseEditPage /></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><UsersListPage /></AdminRoute>} />
             <Route path="/admin/users/new" element={<AdminRoute><UserFormPage /></AdminRoute>} />
             <Route path="/admin/users/:id/edit" element={<AdminRoute><UserFormPage /></AdminRoute>} />
 
-            <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
