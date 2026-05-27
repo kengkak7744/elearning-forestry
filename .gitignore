@@ -6,4 +6,6 @@ __pycache__/
 *.log
 public/
 backend/alembic/versions/
-.claude/settings.local.json
+.claude
+.agents
+skills-lock.json
