@@ -212,7 +212,7 @@ export default function CourseViewerPage() {
     }).catch(() => {})
   }
 
-  // Resume from saved position
+  // Resume from saved position; also check if we're already past a mid-quiz trigger
   const handleLoadedMetadata = () => {
     if (!videoRef.current || !currentLesson) return
     const saved = progress[currentLesson.id]
@@ -220,6 +220,10 @@ export default function CourseViewerPage() {
       videoRef.current.currentTime = saved.current_position
     }
     lastSavedRef.current = 0
+    // If the resumed position is past a mid-quiz trigger, fire it now (avoids missing it if user doesn't press play)
+    const t = Math.floor(videoRef.current.currentTime || 0)
+    const due = findDueMidQuiz(t)
+    if (due) triggerMidQuiz(due)
   }
 
   const toggleModule = (moduleId) => {
@@ -462,6 +466,18 @@ export default function CourseViewerPage() {
       }, 200)
     })
   }
+
+  // After quizzes load (or lesson changes), if the video file is already past a mid-quiz trigger
+  // (e.g., user resumed at a saved position), fire the quiz once.
+  useEffect(() => {
+    if (!currentLesson || !quizzesLoaded) return
+    if (currentLesson.content_type !== 'video_file') return
+    if (!videoRef.current) return
+    const t = Math.floor(videoRef.current.currentTime || 0)
+    const due = findDueMidQuiz(t)
+    if (due) triggerMidQuiz(due)
+    // eslint-disable-next-line
+  }, [quizzesLoaded, currentLesson?.id])
 
   // PDF lessons: trigger mid-content quiz after `trigger_time` seconds of viewing
   const quizzesLoaded = quizzes.length > 0
