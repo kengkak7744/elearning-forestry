@@ -16,13 +16,13 @@ class UserBase(BaseModel):
 
 class UserRegister(UserBase):
     username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
-    password: str = Field(..., min_length=6, max_length=100)
-    confirm_password: str = Field(..., min_length=6, max_length=100)
+    password: str = Field(..., min_length=6, max_length=72)
+    confirm_password: str = Field(..., min_length=6, max_length=72)
 
 
 class UserCreate(UserBase):
     username: str = Field(..., min_length=3, max_length=50, pattern="^[a-zA-Z0-9_.-]+$")
-    password: str = Field(..., min_length=6, max_length=100)
+    password: str = Field(..., min_length=6, max_length=72)
     role: UserRole = UserRole.LEARNER
 
 
@@ -48,7 +48,7 @@ class UserResponse(UserBase):
     id: int
     username: str
     role: UserRole
-    is_active: int
+    is_active: bool
     created_at: datetime
     
     class Config:
@@ -57,7 +57,7 @@ class UserResponse(UserBase):
 
 class PasswordChange(BaseModel):
     current_password: str
-    new_password: str = Field(..., min_length=6, max_length=100)
+    new_password: str = Field(..., min_length=6, max_length=72)
 
 class AdminResetPassword(BaseModel):
-    new_password: str = Field(..., min_length=6, max_length=100)
+    new_password: str = Field(..., min_length=6, max_length=72)

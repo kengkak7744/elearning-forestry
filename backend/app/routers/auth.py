@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
@@ -8,7 +8,19 @@ from app.schemas.auth import LoginRequest, Token
 from app.schemas.user import UserResponse, UserRegister, PasswordChange, UserSelfUpdate
 from app.core.security import verify_password, hash_password, create_access_token
 from app.config import settings
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, ACCESS_COOKIE_NAME
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+    )
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -63,32 +75,34 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    """เข้าสู่ระบบด้วย username หรือ email และรหัสผ่าน"""
+def login(credentials: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    """เข้าสู่ระบบด้วย username หรือ email และรหัสผ่าน — sets httpOnly auth cookie."""
     user = db.query(User).filter(or_(
         User.username == credentials.identifier,
         User.email == credentials.identifier,
     )).first()
-    
+
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="บัญชีผู้ใช้ถูกระงับ"
         )
-    
+
     access_token = create_access_token(
         data={"sub": str(user.id)},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    
+
+    _set_auth_cookie(response, access_token)
+
     return Token(
-        access_token=access_token,
+        access_token=access_token,  # also returned in body for API clients
         token_type="bearer",
         user=UserResponse.model_validate(user)
     )
@@ -134,5 +148,6 @@ def change_password(
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-def logout(current_user: User = Depends(get_current_user)):
+def logout(response: Response, current_user: User = Depends(get_current_user)):
+    response.delete_cookie(ACCESS_COOKIE_NAME, path="/")
     return {"message": f"ออกจากระบบสำเร็จ ลาก่อนคุณ {current_user.full_name}"}

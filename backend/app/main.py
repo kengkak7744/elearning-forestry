@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats
 import os
 
@@ -20,6 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Compress JSON/text responses ≥ 1 KB. Already-compressed bytes (video/pdf/images) are skipped automatically.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 os.makedirs("/app/videos", exist_ok=True)
 os.makedirs("/app/pdf_documents", exist_ok=True)

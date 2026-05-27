@@ -97,16 +97,24 @@ def update_user(
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
-    
+
     update_data = user_data.model_dump(exclude_unset=True)
+
+    # Prevent admin from downgrading their own role (locks them out)
+    if user.id == admin.id and "role" in update_data and update_data["role"] != admin.role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ไม่สามารถเปลี่ยนบทบาทของตัวเองได้",
+        )
+
     for field, value in update_data.items():
         setattr(user, field, value)
-    
+
     db.commit()
     db.refresh(user)
     return user
@@ -128,7 +136,7 @@ def deactivate_user(
     if not user:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
     
-    user.is_active = 0
+    user.is_active = False
     db.commit()
     
     return {"message": f"ระงับบัญชี {user.full_name} เรียบร้อย"}

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { usersApi } from '../../api/users'
 import AdminLayout from '../../components/AdminLayout'
 import Icon from '../../components/Icon'
+import Toast from '../../components/Toast'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ROLE_BADGES } from '../../constants/labels'
 
 export default function UsersListPage() {
@@ -17,6 +19,11 @@ export default function UsersListPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetError, setResetError] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
+
+  // Confirm + toast
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const [confirmState, setConfirmState] = useState({ open: false })
+  const showToast = (m, t = 'success') => setToast({ message: m, type: t })
 
   const loadUsers = async () => {
     setLoading(true)
@@ -41,14 +48,23 @@ export default function UsersListPage() {
     // eslint-disable-next-line
   }, [search])
 
-  const handleDeactivate = async (userId, name) => {
-    if (!confirm(`ต้องการระงับบัญชี ${name} ใช่หรือไม่?`)) return
-    try {
-      await usersApi.deactivate(userId)
-      loadUsers()
-    } catch (err) {
-      alert(err.response?.data?.detail || 'เกิดข้อผิดพลาด')
-    }
+  const handleDeactivate = (userId, name) => {
+    setConfirmState({
+      open: true,
+      title: 'ระงับบัญชี',
+      message: `ต้องการระงับบัญชี "${name}" ใช่หรือไม่?`,
+      danger: true,
+      onConfirm: async () => {
+        setConfirmState({ open: false })
+        try {
+          await usersApi.deactivate(userId)
+          showToast('ระงับบัญชีเรียบร้อย')
+          loadUsers()
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+        }
+      },
+    })
   }
 
   // เปิด modal
@@ -346,6 +362,16 @@ export default function UsersListPage() {
           </div>
         </div>
       )}
+
+      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState({ open: false })}
+      />
     </AdminLayout>
   )
 }

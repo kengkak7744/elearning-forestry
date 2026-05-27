@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { coursesApi } from '../api/courses'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORY_BADGES } from '../constants/labels'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 function formatThaiDate(dateString) {
   if (!dateString) return ''
@@ -27,6 +28,7 @@ export default function CourseDetailPage() {
   const [error, setError] = useState('')
   const [enrollLoading, setEnrollLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
+  const [confirmState, setConfirmState] = useState({ open: false })
 
   const loadCourse = async () => {
     setLoading(true)
@@ -59,19 +61,27 @@ export default function CourseDetailPage() {
     }
   }
 
-  const handleUnenroll = async () => {
-    if (!confirm('ต้องการยกเลิกการลงทะเบียนหลักสูตรนี้ใช่หรือไม่?')) return
-    setEnrollLoading(true)
-    setMessage({ type: '', text: '' })
-    try {
-      await coursesApi.unenroll(course.id)
-      setMessage({ type: 'success', text: 'ยกเลิกการลงทะเบียนเรียบร้อย' })
-      await loadCourse()
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'เกิดข้อผิดพลาด' })
-    } finally {
-      setEnrollLoading(false)
-    }
+  const handleUnenroll = () => {
+    setConfirmState({
+      open: true,
+      title: 'ยกเลิกการลงทะเบียน',
+      message: 'ต้องการยกเลิกการลงทะเบียนหลักสูตรนี้ใช่หรือไม่? ความคืบหน้าจะถูกเก็บไว้',
+      danger: true,
+      onConfirm: async () => {
+        setConfirmState({ open: false })
+        setEnrollLoading(true)
+        setMessage({ type: '', text: '' })
+        try {
+          await coursesApi.unenroll(course.id)
+          setMessage({ type: 'success', text: 'ยกเลิกการลงทะเบียนเรียบร้อย' })
+          await loadCourse()
+        } catch (err) {
+          setMessage({ type: 'error', text: err.response?.data?.detail || 'เกิดข้อผิดพลาด' })
+        } finally {
+          setEnrollLoading(false)
+        }
+      },
+    })
   }
 
   if (loading) {
@@ -286,6 +296,15 @@ export default function CourseDetailPage() {
           </div>
         </div>
       </main>
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState({ open: false })}
+      />
     </div>
   )
 }

@@ -1,15 +1,13 @@
-import os
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.course import Module
 from app.models.lesson import Lesson, ContentType
 from app.models.user import User
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonResponse
-from app.dependencies import require_instructor_or_admin, get_current_user
+from app.dependencies import require_instructor_or_admin
 
 
 router = APIRouter(prefix="/api/lessons", tags=["Lessons"])

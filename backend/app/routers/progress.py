@@ -7,25 +7,43 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.progress import LessonProgress
 from app.models.lesson import Lesson
-from sqlalchemy import select
+from app.models.course import Module
+from app.models.enrollment import Enrollment
+from app.schemas.progress import ProgressUpdate
 
 router = APIRouter()
 
 
 @router.post("/")
 def update_progress(
-    payload: dict,
+    payload: ProgressUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    lesson_id = payload.get("lesson_id")
-    current_position = payload.get("current_position", 0)
-    is_completed = payload.get("is_completed", False)
-    content_type = payload.get("content_type", "video")  # optional hint
+    lesson_id = payload.lesson_id
+    current_position = payload.current_position
+    is_completed = payload.is_completed
+    content_type = payload.content_type or "video"
 
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
+    # Validate lesson exists and find which course it belongs to
+    lesson_row = (
+        db.query(Lesson, Module.course_id)
+        .join(Module, Module.id == Lesson.module_id)
+        .filter(Lesson.id == lesson_id)
+        .first()
+    )
+    if not lesson_row:
         raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    lesson, course_id = lesson_row
+
+    # Require enrollment (admin/instructor exempt — they may preview content)
+    if current_user.role.value not in ("admin", "instructor"):
+        enrolled = db.query(Enrollment).filter(
+            Enrollment.user_id == current_user.id,
+            Enrollment.course_id == course_id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=403, detail="ต้องลงทะเบียนหลักสูตรก่อน")
 
     progress = db.query(LessonProgress).filter(
         LessonProgress.user_id == current_user.id,

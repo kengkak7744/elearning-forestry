@@ -4,8 +4,9 @@ from datetime import datetime
 
 class ProgressUpdate(BaseModel):
     lesson_id: int
-    current_position: int = Field(..., ge=0)  # seconds for video, page for pdf
+    current_position: int = Field(0, ge=0)  # seconds for video, page for pdf
     is_completed: bool = False
+    content_type: Optional[str] = None  # "pdf" or video (hint)
 
 class ProgressResponse(BaseModel):
     id: int

@@ -1,18 +1,26 @@
 import axios from 'axios'
 
+// Detect the deployment prefix at runtime.
+// - Prod (behind Traefik at /elearning): pathname starts with /elearning → use /elearning/api
+// - Dev (vite at /): pathname starts with / → use /api (proxied by vite to backend)
+const _path = typeof window !== 'undefined' ? window.location.pathname : ''
+const API_BASE = _path.startsWith('/elearning') ? '/elearning/api' : '/api'
+
 const apiClient = axios.create({
-  // If deploying to a subdirectory, set the baseURL accordingly
-  // baseURL: '/elearning/api',
-  baseURL: '/api',
+  baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
   },
+  // Send the httpOnly auth cookie with every request.
+  withCredentials: true,
 })
 
+// Legacy fallback: if a previous session stored a JWT in localStorage, still send it via Authorization.
+// New logins use httpOnly cookies and don't write to localStorage.
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const legacy = localStorage.getItem('access_token')
+  if (legacy) {
+    config.headers.Authorization = `Bearer ${legacy}`
   }
   return config
 })

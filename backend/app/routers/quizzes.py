@@ -8,6 +8,7 @@ from app.models.user import User
 from app.models.quiz import Quiz, Question, QuizAttempt, QuestionType
 from app.models.lesson import Lesson
 from app.models.course import Course, Module
+from app.models.enrollment import Enrollment
 from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse,
     QuestionCreate, QuestionUpdate, QuestionResponse,
@@ -274,6 +275,24 @@ def submit_quiz(
     quiz = db.query(Quiz).options(joinedload(Quiz.questions)).filter(Quiz.id == quiz_id).first()
     if not quiz:
         raise HTTPException(status_code=404, detail="ไม่พบแบบทดสอบ")
+
+    # Require enrollment in the parent course (admin/instructor exempt for previews)
+    if current_user.role.value not in ("admin", "instructor"):
+        if quiz.course_id is not None:
+            target_course_id = quiz.course_id
+        else:
+            lesson_row = (
+                db.query(Module.course_id)
+                .join(Lesson, Lesson.module_id == Module.id)
+                .filter(Lesson.id == quiz.lesson_id)
+                .first()
+            )
+            target_course_id = lesson_row[0] if lesson_row else None
+        if target_course_id is None or not db.query(Enrollment).filter(
+            Enrollment.user_id == current_user.id,
+            Enrollment.course_id == target_course_id,
+        ).first():
+            raise HTTPException(status_code=403, detail="ต้องลงทะเบียนหลักสูตรก่อนทำแบบทดสอบ")
 
     total_points = 0
     earned_points = 0
