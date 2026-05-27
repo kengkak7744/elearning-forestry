@@ -134,7 +134,7 @@ export default function CoursesPage() {
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-forest-100 to-forest-200 flex items-center justify-center">
-                        <span className="text-6xl opacity-30">🌲</span>
+                        <Icon name="tree" className="w-20 h-20 text-forest-500 opacity-40" />
                       </div>
                     )}
 

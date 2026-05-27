@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import QuizTaker from './QuizTaker'
+import Icon from './Icon'
 
 export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempted, showToast }) {
   const [passed, setPassed] = useState(quiz?.is_passed || false)
@@ -18,7 +19,8 @@ export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempte
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
-              ⏸ แบบทดสอบกลางวิดีโอ
+              <Icon name="pause" className="w-5 h-5" />
+              แบบทดสอบกลางวิดีโอ
             </h3>
           </div>
           <p className="text-xs sm:text-sm text-gray-500 mb-4">

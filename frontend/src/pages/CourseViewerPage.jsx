@@ -71,15 +71,22 @@ export default function CourseViewerPage() {
     if (!progressLoaded) return
     if (allLessons.length === 0) return
 
-    // 1. A lesson actively in progress (has position but not completed) — most recent
-    const inProgress = allLessons.find(l => {
-      const p = progress[l.id]
-      return p && !p.is_completed && p.current_position > 0
-    })
-    // 2. The first lesson that's not yet completed
+    // Sort lessons by most recent access (uses last_accessed_at from backend)
+    const accessed = allLessons
+      .map(l => ({ lesson: l, p: progress[l.id] }))
+      .filter(x => x.p?.last_accessed_at)
+      .sort((a, b) =>
+        new Date(b.p.last_accessed_at).getTime() - new Date(a.p.last_accessed_at).getTime()
+      )
+
+    // 1. Most recent NOT completed — they were mid-way through this
+    const mostRecentOngoing = accessed.find(x => !x.p.is_completed)?.lesson
+    // 2. Most recent at all — they were last viewing this (even if completed)
+    const mostRecent = accessed[0]?.lesson
+    // 3. The first lesson that's not yet completed (never started)
     const firstIncomplete = allLessons.find(l => !progress[l.id]?.is_completed)
-    // 3. Fall back to first lesson
-    const resume = inProgress || firstIncomplete || allLessons[0]
+    // 4. Fall back to first lesson
+    const resume = mostRecentOngoing || mostRecent || firstIncomplete || allLessons[0]
     navigate(`/courses/${id}/learn/${resume.id}`, { replace: true })
   }, [course, lessonId, id, navigate, progressLoaded, progress])
 
@@ -622,7 +629,10 @@ export default function CourseViewerPage() {
         {viewingFinal && finalQuiz && (
           <>
             <div className="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl p-4 sm:p-6 mb-4">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1">🏆 แบบทดสอบสุดท้าย</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1 flex items-center gap-2">
+                <Icon name="trophy" className="w-6 h-6 text-amber-600" />
+                แบบทดสอบสุดท้าย
+              </h2>
               <p className="text-sm text-gray-600">ทำแบบทดสอบรวมเพื่อจบหลักสูตร</p>
             </div>
             <div className="mb-4">
@@ -695,18 +705,27 @@ export default function CourseViewerPage() {
                 </h2>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mb-3">
                   <span className="flex items-center gap-1">
-                    {currentLesson.content_type === 'pdf' ? '📄 PDF' :
-                     currentLesson.content_type === 'video_youtube' ? '📺 YouTube' : '🎬 วิดีโอ'}
+                    {currentLesson.content_type === 'pdf' ? (
+                      <><Icon name="document" className="w-3.5 h-3.5" /> PDF</>
+                    ) : currentLesson.content_type === 'video_youtube' ? (
+                      <><Icon name="tv" className="w-3.5 h-3.5" /> YouTube</>
+                    ) : (
+                      <><Icon name="film" className="w-3.5 h-3.5" /> วิดีโอ</>
+                    )}
                   </span>
                   {currentLesson.duration_seconds && (
-                    <span>⏱ {fmtTime(currentLesson.duration_seconds)}</span>
+                    <span className="flex items-center gap-1">
+                      <Icon name="stopwatch" className="w-3.5 h-3.5" /> {fmtTime(currentLesson.duration_seconds)}
+                    </span>
                   )}
                   {currentLesson.total_pages && (
-                    <span>📃 {currentLesson.total_pages} หน้า</span>
+                    <span className="flex items-center gap-1">
+                      <Icon name="document" className="w-3.5 h-3.5" /> {currentLesson.total_pages} หน้า
+                    </span>
                   )}
                   {minSeconds > 0 && (
-                    <span className={timeGateMet ? 'text-green-600' : 'text-amber-600'}>
-                      ⏳ ต้องอยู่ขั้นต่ำ {fmtTime(minSeconds)}
+                    <span className={`flex items-center gap-1 ${timeGateMet ? 'text-green-600' : 'text-amber-600'}`}>
+                      <Icon name="hourglass" className="w-3.5 h-3.5" /> ต้องอยู่ขั้นต่ำ {fmtTime(minSeconds)}
                     </span>
                   )}
                 </div>
@@ -765,8 +784,8 @@ export default function CourseViewerPage() {
                   </span>
                   <span className="flex-1 font-medium text-gray-800 flex items-center gap-2">
                     {module.title}
-                    {!unlocked && <span title="ล็อก" className="text-gray-500">🔒</span>}
-                    {unlocked && cleared && <span title="ผ่านแล้ว" className="text-green-600 text-xs">✓</span>}
+                    {!unlocked && <Icon name="lock" className="w-4 h-4 text-gray-500" />}
+                    {unlocked && cleared && <Icon name="check" className="w-4 h-4 text-green-600" />}
                   </span>
                   <span className="text-xs text-gray-500">
                     {module.lessons.length} บทเรียน
@@ -808,8 +827,9 @@ export default function CourseViewerPage() {
                               {lesson.title}
                             </span>
                             {hasQuiz && (
-                              <span className={`text-xs flex-shrink-0 ${quizPassed ? 'text-green-600' : 'text-amber-600'}`}>
-                                {quizPassed ? '📝✓' : '📝'}
+                              <span className={`flex-shrink-0 inline-flex items-center ${quizPassed ? 'text-green-600' : 'text-amber-600'}`}>
+                                <Icon name="note" className="w-4 h-4" />
+                                {quizPassed && <Icon name="check" className="w-3 h-3 -ml-0.5" />}
                               </span>
                             )}
                             <span className="text-xs text-gray-500 flex-shrink-0">
@@ -838,11 +858,15 @@ export default function CourseViewerPage() {
                       : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
                 }`}
               >
-                <span className="text-xl flex-shrink-0">🏆</span>
+                <Icon name="trophy" className="w-6 h-6 text-amber-500 flex-shrink-0" />
                 <span className="flex-1 font-medium text-gray-800 flex items-center gap-2">
                   {finalQuiz.title}
-                  {!allModulesCleared && <span title="ล็อก" className="text-gray-500">🔒</span>}
-                  {finalQuiz.is_passed && <span className="text-green-600 text-xs">✓ ผ่านแล้ว</span>}
+                  {!allModulesCleared && <Icon name="lock" className="w-4 h-4 text-gray-500" />}
+                  {finalQuiz.is_passed && (
+                    <span className="text-green-600 text-xs inline-flex items-center gap-0.5">
+                      <Icon name="check" className="w-3 h-3" /> ผ่านแล้ว
+                    </span>
+                  )}
                 </span>
                 <span className="text-xs text-gray-500 flex-shrink-0">
                   {finalQuiz.questions.length} คำถาม
@@ -861,8 +885,9 @@ export default function CourseViewerPage() {
             {!viewingFinal && minSeconds > 0 && !timeGateMet && (
               <div className="mb-2">
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-amber-700 font-medium">
-                    ⏳ ต้องอยู่บนหน้านี้อีก {fmtTime(remainingSeconds)}
+                  <span className="text-amber-700 font-medium inline-flex items-center gap-1">
+                    <Icon name="hourglass" className="w-3.5 h-3.5" />
+                    ต้องอยู่บนหน้านี้อีก {fmtTime(remainingSeconds)}
                   </span>
                   <span className="text-gray-500 tabular-nums">
                     {fmtTime(elapsedSeconds)} / {fmtTime(minSeconds)}
@@ -893,8 +918,8 @@ export default function CourseViewerPage() {
                 </span>
               )}
               {viewingFinal && (
-                <span className="hidden md:block text-xs text-amber-700 font-medium text-center px-2">
-                  🏆 แบบทดสอบสุดท้าย
+                <span className="hidden md:inline-flex items-center gap-1 text-xs text-amber-700 font-medium text-center px-2">
+                  <Icon name="trophy" className="w-4 h-4" /> แบบทดสอบสุดท้าย
                 </span>
               )}
 
@@ -906,14 +931,19 @@ export default function CourseViewerPage() {
                   กลับบทเรียน
                 </button>
               ) : (() => {
-                const label = nextDest?.type === 'final' ? '🏆 แบบทดสอบสุดท้าย' : 'ถัดไป →'
                 return (
                   <button
                     onClick={goNext}
                     disabled={!timeGateMet || !nextDest}
-                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-forest-500 hover:bg-forest-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-forest-500 hover:bg-forest-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
                   >
-                    {nextDest ? label : 'จบหลักสูตรแล้ว ✓'}
+                    {!nextDest ? (
+                      <>จบหลักสูตรแล้ว <Icon name="check" className="w-4 h-4" /></>
+                    ) : nextDest.type === 'final' ? (
+                      <><Icon name="trophy" className="w-4 h-4" /> แบบทดสอบสุดท้าย</>
+                    ) : (
+                      <>ถัดไป →</>
+                    )}
                   </button>
                 )
               })()}

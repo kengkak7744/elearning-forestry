@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { coursesApi } from '../../api/courses'
 import { CATEGORY_BADGES } from '../../constants/labels'
 import { mediaUrl } from '../../utils/media'
+import Icon from '../../components/Icon'
 
 export default function CoursesListPage() {
   const [courses, setCourses] = useState([])
@@ -99,8 +100,8 @@ export default function CoursesListPage() {
                         className="w-full h-full object-cover object-top"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">
-                        🖼
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Icon name="image" className="w-12 h-12 text-gray-300" />
                       </div>
                     )}
                   </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { quizzesApi } from '../api/quizzes'
+import Icon from './Icon'
 
 export default function QuizTaker({ quiz, onAttempted, showToast }) {
   const [started, setStarted] = useState(false)
@@ -42,10 +43,13 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
   return (
     <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-white">
       <div className="flex items-center gap-2 flex-wrap mb-1">
-        <span className="text-base sm:text-lg font-bold text-gray-800">📝 {quiz.title}</span>
+        <span className="text-base sm:text-lg font-bold text-gray-800 inline-flex items-center gap-1.5">
+          <Icon name="note" className="w-5 h-5 text-forest-600" />
+          {quiz.title}
+        </span>
         {currentlyPassed ? (
-          <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
-            ✓ ผ่านแล้ว
+          <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+            <Icon name="check" className="w-3 h-3" /> ผ่านแล้ว
           </span>
         ) : quiz.can_skip ? (
           <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
@@ -93,8 +97,9 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                 <p className="font-medium text-sm text-gray-800 mb-2 break-words">
                   {idx + 1}. {q.question_text}
                   {qResult && (
-                    <span className={`ml-2 text-xs ${qResult.correct ? 'text-green-700' : 'text-red-700'}`}>
-                      {qResult.correct ? '✓ ถูกต้อง' : '✗ ผิด'}
+                    <span className={`ml-2 text-xs inline-flex items-center gap-0.5 ${qResult.correct ? 'text-green-700' : 'text-red-700'}`}>
+                      <Icon name={qResult.correct ? 'check' : 'xmark'} className="w-3.5 h-3.5" />
+                      {qResult.correct ? 'ถูกต้อง' : 'ผิด'}
                     </span>
                   )}
                 </p>
@@ -115,7 +120,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                           />
                           <span className={`text-sm break-words ${isCorrectChoice ? 'font-bold text-green-700' : 'text-gray-700'}`}>
                             {c.text}
-                            {isCorrectChoice && ' ✓'}
+                            {isCorrectChoice && <Icon name="check" className="w-3.5 h-3.5 ml-1 inline text-green-700" />}
                           </span>
                         </label>
                       )
@@ -143,7 +148,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                           />
                           <span className={`text-sm break-words ${isCorrectChoice ? 'font-bold text-green-700' : 'text-gray-700'}`}>
                             {c.text}
-                            {isCorrectChoice && ' ✓'}
+                            {isCorrectChoice && <Icon name="check" className="w-3.5 h-3.5 ml-1 inline text-green-700" />}
                           </span>
                         </label>
                       )
