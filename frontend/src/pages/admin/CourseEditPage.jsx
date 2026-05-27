@@ -191,6 +191,7 @@ export default function CourseEditPage() {
         } catch (err) {
           showToast(err.response?.data?.detail || 'เพิ่มบทเรียนไม่สำเร็จ', 'error')
         }
+        setPromptState({ open: false })
       },
     })
   }
