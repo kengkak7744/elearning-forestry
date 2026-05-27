@@ -510,6 +510,7 @@ export default function CourseViewerPage() {
               }
 
               if (ytPollRef.current) clearInterval(ytPollRef.current)
+              // Poll every 2s — halves postMessage traffic; mid-quiz still fires within 2s of the trigger.
               ytPollRef.current = setInterval(() => {
                 if (!ytPlayerRef.current?.getCurrentTime) return
                 let t = 0
@@ -534,7 +535,7 @@ export default function CourseViewerPage() {
                     }).then(p => setProgress(prev => ({ ...prev, [lid]: p }))).catch(() => {})
                   }
                 }
-              }, 1000)
+              }, 2000)
             },
           },
         })

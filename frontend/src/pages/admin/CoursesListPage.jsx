@@ -97,6 +97,8 @@ export default function CoursesListPage() {
                       <img
                         src={mediaUrl(c.cover_image)}
                         alt={c.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover object-top"
                       />
                     ) : (

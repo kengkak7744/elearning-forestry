@@ -130,12 +130,16 @@ export default function CoursesPage() {
                       <img
                         src={mediaUrl(course.cover_image)}
                         alt={course.title}
+                        loading="lazy"
+                        decoding="async"
                         className="absolute inset-0 w-full h-full object-cover object-top"
                       />
                     ) : (
                       <img
                         src="/elearning/forest_logo.png"
                         alt={course.title}
+                        loading="lazy"
+                        decoding="async"
                         className="absolute inset-0 w-full h-full object-cover object-top"
                       />
                     )}

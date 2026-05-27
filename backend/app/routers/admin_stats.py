@@ -1,5 +1,5 @@
 """Aggregate statistics for the admin dashboard."""
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -13,13 +13,19 @@ from app.models.progress import LessonProgress
 
 router = APIRouter(prefix="/api/admin/stats", tags=["Admin Stats"])
 
+# Admin stats are aggregate queries — browser cache for 60s eliminates duplicate hits
+# from the dashboard's parallel Promise.all and from quick back-navigation.
+_STATS_CACHE = "private, max-age=60"
+
 
 @router.get("/overview")
 def overview(
+    response: Response,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     """High-level numbers for the dashboard cards."""
+    response.headers["Cache-Control"] = _STATS_CACHE
     total_users = db.query(func.count(User.id)).scalar() or 0
     total_active_users = db.query(func.count(User.id)).filter(User.is_active == 1).scalar() or 0
     total_courses = db.query(func.count(Course.id)).scalar() or 0
@@ -75,11 +81,13 @@ def overview(
 
 @router.get("/top-courses")
 def top_courses(
+    response: Response,
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     """Courses ranked by enrollment count."""
+    response.headers["Cache-Control"] = _STATS_CACHE
     rows = (
         db.query(
             Course.id,
@@ -108,11 +116,13 @@ def top_courses(
 
 @router.get("/top-departments")
 def top_departments(
+    response: Response,
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     """Departments ranked by total enrollments (one user, many enrollments → all count)."""
+    response.headers["Cache-Control"] = _STATS_CACHE
     rows = (
         db.query(
             User.department,
@@ -137,11 +147,13 @@ def top_departments(
 
 @router.get("/recent-enrollments")
 def recent_enrollments(
+    response: Response,
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     """Latest enrollments — who enrolled in what, and when."""
+    response.headers["Cache-Control"] = _STATS_CACHE
     rows = (
         db.query(Enrollment, User, Course)
         .join(User, User.id == Enrollment.user_id)

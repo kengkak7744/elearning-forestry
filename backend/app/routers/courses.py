@@ -1,7 +1,7 @@
 import os
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
@@ -26,6 +26,7 @@ ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 @router.get("", response_model=list[CourseListItem])
 def list_courses(
+    response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     category: Optional[CourseCategory] = None,
@@ -34,6 +35,8 @@ def list_courses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Catalog rarely changes per-user; cache in browser for 30s to dedupe back-navigation.
+    response.headers["Cache-Control"] = "private, max-age=30"
     query = db.query(Course)
     
     if current_user.role.value in ("learner", "manager"):
@@ -235,10 +238,13 @@ async def upload_cover_image(
 
 @router.get("/me/enrollments")
 def my_enrollments(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Courses I'm enrolled in + my progress on each."""
+    # User-specific; short cache so dashboard back-nav doesn't refetch but progress still feels live.
+    response.headers["Cache-Control"] = "private, max-age=10"
     from app.models.progress import LessonProgress
     from app.models.lesson import Lesson
 

@@ -50,6 +50,8 @@ export default function MyCourses() {
                 <img
                   src={mediaUrl(e.cover_image)}
                   alt={e.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover object-top"
                 />
               ) : (
