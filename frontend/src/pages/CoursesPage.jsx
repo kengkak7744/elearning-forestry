@@ -133,9 +133,11 @@ export default function CoursesPage() {
                         className="absolute inset-0 w-full h-full object-cover object-top"
                       />
                     ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-forest-100 to-forest-200 flex items-center justify-center">
-                        <Icon name="tree" className="w-20 h-20 text-forest-500 opacity-40" />
-                      </div>
+                      <img
+                        src="/elearning/forest_logo.png"
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover object-top"
+                      />
                     )}
 
                     {/* Badges — top left */}
