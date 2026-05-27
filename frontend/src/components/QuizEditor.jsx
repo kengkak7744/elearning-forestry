@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { quizzesApi } from '../api/quizzes'
 import QuestionEditor from './QuestionEditor'
+import ConfirmDialog from './ConfirmDialog'
 
 const placementLabels = {
   mid_video: 'กลางวิดีโอ',
@@ -11,6 +12,7 @@ const placementLabels = {
 export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [confirmState, setConfirmState] = useState({ open: false })
   const [draft, setDraft] = useState({
     title: quiz.title,
     trigger_time: quiz.trigger_time || 0,
@@ -57,15 +59,23 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
     })
   }
 
-  const handleDeleteQuestion = async (questionId) => {
-    if (!confirm('ลบคำถามนี้?')) return
-    try {
-      await quizzesApi.deleteQuestion(questionId)
-      onUpdate({ questions: quiz.questions.filter(q => q.id !== questionId) })
-      showToast('ลบคำถามสำเร็จ')
-    } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
-    }
+  const handleDeleteQuestion = (questionId) => {
+    setConfirmState({
+      open: true,
+      title: 'ลบคำถาม',
+      message: 'ต้องการลบคำถามนี้?',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await quizzesApi.deleteQuestion(questionId)
+          onUpdate({ questions: quiz.questions.filter(q => q.id !== questionId) })
+          showToast('ลบคำถามสำเร็จ')
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+        }
+        setConfirmState({ open: false })
+      },
+    })
   }
 
   const placementColor = {
@@ -234,6 +244,15 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState({ open: false })}
+      />
     </div>
   )
 }
