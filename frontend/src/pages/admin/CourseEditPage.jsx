@@ -8,19 +8,8 @@ import Toast from '../../components/Toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import PromptDialog from '../../components/PromptDialog'
 import QuizManager from '../../components/QuizManager'
-
-const categoryOptions = [
-  { value: 'compliance', label: 'บังคับตามกฎหมาย' },
-  { value: 'technical', label: 'วิชาชีพ' },
-  { value: 'safety', label: 'ความปลอดภัย' },
-  { value: 'skill', label: 'ทักษะทั่วไป' },
-]
-
-const contentTypeOptions = [
-  { value: 'video_file', label: 'วิดีโอ (อัปโหลดไฟล์)' },
-  { value: 'video_youtube', label: 'วิดีโอ (YouTube)' },
-  { value: 'pdf', label: 'เอกสาร PDF' },
-]
+import { CATEGORY_OPTIONS, CONTENT_TYPE_OPTIONS } from '../../constants/labels'
+import { mediaUrl } from '../../utils/media'
 
 export default function CourseEditPage() {
   const { id } = useParams()
@@ -310,7 +299,7 @@ export default function CourseEditPage() {
               <div className="flex items-start gap-4">
                 {coverImage ? (
                   <img
-                    src={coverImage}
+                    src={mediaUrl(coverImage)}
                     alt="ปกหลักสูตร"
                     className="w-32 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                   />
@@ -356,7 +345,7 @@ export default function CourseEditPage() {
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
               >
-                {categoryOptions.map(opt => (
+                {CATEGORY_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -655,7 +644,7 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete, showToast }) 
         <span className="text-xs text-gray-500 font-mono flex-shrink-0">{index + 1}.</span>
         <span className="flex-1 text-sm text-gray-800 truncate">{lesson.title}</span>
         <span className="text-xs text-gray-500 flex-shrink-0">
-          {contentTypeOptions.find(o => o.value === lesson.content_type)?.label || lesson.content_type}
+          {CONTENT_TYPE_OPTIONS.find(o => o.value === lesson.content_type)?.label || lesson.content_type}
         </span>
         <button
           onClick={onDelete}
@@ -687,7 +676,7 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete, showToast }) 
                 onChange={handleChange}
                 className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
               >
-                {contentTypeOptions.map(opt => (
+                {CONTENT_TYPE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>

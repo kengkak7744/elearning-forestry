@@ -8,6 +8,7 @@ import Icon from '../components/Icon'
 import Toast from '../components/Toast'
 import QuizTaker from '../components/QuizTaker'
 import MidVideoQuizModal from '../components/MidVideoQuizModal'
+import { mediaUrl } from '../utils/media'
 
 export default function CourseViewerPage() {
   const { id, lessonId } = useParams()
@@ -42,12 +43,7 @@ export default function CourseViewerPage() {
   // Time-on-page gate (per lesson)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
-  const fixUrl = (url) => {
-    if (!url) return ''
-    if (url.startsWith('http')) return url
-    if (url.startsWith('/elearning')) return url
-    return `/elearning${url}`
-    }
+  const fixUrl = mediaUrl
 
   // Load course + progress
   useEffect(() => {
@@ -291,8 +287,8 @@ export default function CourseViewerPage() {
     return m > 0 ? `${m}:${String(r).padStart(2, '0')}` : `${r}วิ`
   }
 
-  // Prev/Next destinations
-  const findCurrentPos = () => {
+  // Prev/Next destinations — memoized
+  const currentPos = useMemo(() => {
     if (!course || !currentLesson) return null
     for (let mi = 0; mi < course.modules.length; mi++) {
       const m = course.modules[mi]
@@ -301,13 +297,12 @@ export default function CourseViewerPage() {
       }
     }
     return null
-  }
+  }, [course, currentLesson])
 
-  const findNextDest = () => {
+  const nextDest = useMemo(() => {
     if (viewingFinal) return null
-    const pos = findCurrentPos()
-    if (!pos) return null
-    const { mi, li, m } = pos
+    if (!currentPos) return null
+    const { mi, li, m } = currentPos
     if (li + 1 < m.lessons.length) return { type: 'lesson', lesson: m.lessons[li + 1], moduleId: m.id }
     for (let i = mi + 1; i < course.modules.length; i++) {
       if (course.modules[i].lessons.length > 0) {
@@ -316,9 +311,10 @@ export default function CourseViewerPage() {
     }
     if (finalQuiz) return { type: 'final' }
     return null
-  }
+  }, [course, currentPos, viewingFinal, finalQuiz])
 
-  const findPrevDest = () => {
+  const prevDest = useMemo(() => {
+    if (!course) return null
     if (viewingFinal) {
       for (let i = course.modules.length - 1; i >= 0; i--) {
         const m = course.modules[i]
@@ -326,9 +322,8 @@ export default function CourseViewerPage() {
       }
       return null
     }
-    const pos = findCurrentPos()
-    if (!pos) return null
-    const { mi, li, m } = pos
+    if (!currentPos) return null
+    const { mi, li, m } = currentPos
     if (li > 0) return { type: 'lesson', lesson: m.lessons[li - 1], moduleId: m.id }
     for (let i = mi - 1; i >= 0; i--) {
       if (course.modules[i].lessons.length > 0) {
@@ -337,32 +332,30 @@ export default function CourseViewerPage() {
       }
     }
     return null
-  }
+  }, [course, currentPos, viewingFinal])
 
   const goNext = () => {
     if (!timeGateMet) {
       showToast(`ต้องอยู่บนหน้านี้อีก ${fmtTime(remainingSeconds)} ก่อนไปต่อ`, 'error')
       return
     }
-    const dest = findNextDest()
-    if (!dest) {
+    if (!nextDest) {
       showToast('คุณเรียนถึงบทสุดท้ายแล้ว', 'success')
       return
     }
-    if (dest.type === 'final') switchToFinal()
-    else switchLesson(dest.lesson, dest.moduleId)
+    if (nextDest.type === 'final') switchToFinal()
+    else switchLesson(nextDest.lesson, nextDest.moduleId)
   }
 
   const goPrev = () => {
-    const dest = findPrevDest()
-    if (!dest) {
+    if (!prevDest) {
       showToast('นี่คือบทแรกแล้ว', 'success')
       return
     }
-    if (dest.type === 'lesson') {
+    if (prevDest.type === 'lesson') {
       markPdfCompleteIfApplicable()
       setViewingFinal(false)
-      navigate(`/courses/${id}/learn/${dest.lesson.id}`)
+      navigate(`/courses/${id}/learn/${prevDest.lesson.id}`)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -691,10 +684,9 @@ export default function CourseViewerPage() {
               {/* Lesson info */}
               <div className="p-4 sm:p-6">
                 {(() => {
-                  const pos = findCurrentPos()
-                  return pos ? (
+                  return currentPos ? (
                     <div className="text-xs text-forest-600 font-medium mb-2">
-                      โมดูล {pos.mi + 1} · บทเรียน {pos.li + 1}
+                      โมดูล {currentPos.mi + 1} · บทเรียน {currentPos.li + 1}
                     </div>
                   ) : null
                 })()}
@@ -888,7 +880,7 @@ export default function CourseViewerPage() {
             <div className="flex items-center justify-between gap-3">
               <button
                 onClick={goPrev}
-                disabled={!findPrevDest()}
+                disabled={!prevDest}
                 className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ← ก่อนหน้า
@@ -914,15 +906,14 @@ export default function CourseViewerPage() {
                   กลับบทเรียน
                 </button>
               ) : (() => {
-                const dest = findNextDest()
-                const label = dest?.type === 'final' ? '🏆 แบบทดสอบสุดท้าย' : 'ถัดไป →'
+                const label = nextDest?.type === 'final' ? '🏆 แบบทดสอบสุดท้าย' : 'ถัดไป →'
                 return (
                   <button
                     onClick={goNext}
-                    disabled={!timeGateMet || !dest}
+                    disabled={!timeGateMet || !nextDest}
                     className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-forest-500 hover:bg-forest-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    {dest ? label : 'จบหลักสูตรแล้ว ✓'}
+                    {nextDest ? label : 'จบหลักสูตรแล้ว ✓'}
                   </button>
                 )
               })()}

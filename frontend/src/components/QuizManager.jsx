@@ -16,11 +16,11 @@ export default function QuizManager({ lessonId, courseId, scope, showToast }) {
     setLoading(true)
     try {
       if (scope === 'lesson' && lessonId) {
-        const data = await quizzesApi.getByLesson(lessonId)
+        const data = await quizzesApi.getByLessonAdmin(lessonId)
         setQuizzes(data)
       } else if (scope === 'final' && courseId) {
         try {
-          const final = await quizzesApi.getFinal(courseId)
+          const final = await quizzesApi.getFinalAdmin(courseId)
           setQuizzes([final])
         } catch {
           setQuizzes([])

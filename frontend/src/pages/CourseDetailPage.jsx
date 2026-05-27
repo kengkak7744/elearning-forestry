@@ -2,13 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { coursesApi } from '../api/courses'
 import { useAuth } from '../contexts/AuthContext'
-
-const categoryLabels = {
-  compliance: { label: 'บังคับตามกฎหมาย', color: 'bg-red-100 text-red-700' },
-  technical: { label: 'วิชาชีพ', color: 'bg-blue-100 text-blue-700' },
-  safety: { label: 'ความปลอดภัย', color: 'bg-amber-100 text-amber-700' },
-  skill: { label: 'ทักษะทั่วไป', color: 'bg-purple-100 text-purple-700' },
-}
+import { CATEGORY_BADGES } from '../constants/labels'
 
 function formatThaiDate(dateString) {
   if (!dateString) return ''
@@ -103,7 +97,7 @@ export default function CourseDetailPage() {
     )
   }
 
-  const cat = categoryLabels[course.category] || { label: course.category, color: 'bg-gray-100' }
+  const cat = CATEGORY_BADGES[course.category] || { label: course.category, color: 'bg-gray-100' }
 
   return (
     <div className="min-h-screen bg-gray-50">

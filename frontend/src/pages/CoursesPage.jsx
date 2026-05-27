@@ -3,13 +3,9 @@ import { Link } from 'react-router-dom'
 import { coursesApi } from '../api/courses'
 import { useAuth } from '../contexts/AuthContext'
 import Icon from '../components/Icon'
-
-const categoryLabels = {
-  compliance: { label: 'บังคับตามกฎหมาย', color: 'bg-red-100 text-red-700' },
-  technical: { label: 'วิชาชีพ', color: 'bg-blue-100 text-blue-700' },
-  safety: { label: 'ความปลอดภัย', color: 'bg-amber-100 text-amber-700' },
-  skill: { label: 'ทักษะทั่วไป', color: 'bg-purple-100 text-purple-700' },
-}
+import LearnerHeader from '../components/LearnerHeader'
+import { CATEGORY_BADGES } from '../constants/labels'
+import { mediaUrl } from '../utils/media'
 
 const categoryIcons = {
   compliance: '',
@@ -19,7 +15,7 @@ const categoryIcons = {
 }
 
 export default function CoursesPage() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -56,43 +52,7 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <span className="text-xl sm:text-2xl flex-shrink-0">
-                <img src="/elearning/forest_logo.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10" />
-              </span>
-              <div className="min-w-0">
-                <h1 className="text-sm sm:text-lg font-bold text-forest-700 truncate">ระบบ e-Learning</h1>
-                <p className="text-xs text-gray-500 hidden sm:block">กรมป่าไม้</p>
-              </div>
-            </div>
-          </Link>
-          
-          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
-              <span className="hidden sm:inline">หน้าหลัก</span>
-              <Icon name="home" className="w-5 h-5 sm:hidden" />
-            </Link>
-            <Link to="/profile" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
-              <span className="hidden sm:inline">โปรไฟล์</span>
-              <Icon name="user" className="w-5 h-5 sm:hidden" />
-            </Link>
-            {user?.role === 'admin' && (
-              <Link to="/admin/users" className="text-xs sm:text-sm text-forest-600 font-medium">
-                <span className="hidden sm:inline">จัดการระบบ</span>
-                <Icon name="settings" className="w-5 h-5 sm:hidden" />
-              </Link>
-            )}
-            <button onClick={logout} className="text-xs sm:text-sm text-gray-600">
-              <span className="hidden sm:inline">ออกจากระบบ</span>
-              <Icon name="logout" className="w-5 h-5 sm:hidden" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <LearnerHeader />
 
       {/* Page header */}
       <div className="bg-gradient-to-br from-forest-500 to-forest-700 text-white">
@@ -156,7 +116,7 @@ export default function CoursesPage() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {courses.map((course) => {
-                const cat = categoryLabels[course.category] || { label: course.category, color: 'bg-gray-100' }
+                const cat = CATEGORY_BADGES[course.category] || { label: course.category, color: 'bg-gray-100' }
                 const icon = categoryIcons[course.category] || 'รูป'
                 
                 return (
@@ -168,7 +128,7 @@ export default function CoursesPage() {
                     {/* Full-card background image */}
                     {course.cover_image ? (
                       <img
-                        src={course.cover_image}
+                        src={mediaUrl(course.cover_image)}
                         alt={course.title}
                         className="absolute inset-0 w-full h-full object-cover object-top"
                       />

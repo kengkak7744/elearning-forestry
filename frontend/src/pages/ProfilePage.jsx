@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../api/auth'
 import Icon from '../components/Icon'
+import { ROLE_LABELS } from '../constants/labels'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
@@ -30,13 +31,6 @@ export default function ProfilePage() {
   })
   const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' })
   const [passwordLoading, setPasswordLoading] = useState(false)
-
-  const roleLabels = {
-    learner: 'ผู้เรียน',
-    manager: 'หัวหน้างาน',
-    instructor: 'วิทยากร',
-    admin: 'ผู้ดูแลระบบ',
-  }
 
   const handleProfileChange = (e) => {
     setProfileForm({ ...profileForm, [e.target.name]: e.target.value })
@@ -159,7 +153,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 uppercase mb-1">บทบาท</div>
-                  <div className="font-medium">{roleLabels[user?.role]}</div>
+                  <div className="font-medium">{ROLE_LABELS[user?.role]}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 uppercase mb-1">ชื่อ-นามสกุล</div>

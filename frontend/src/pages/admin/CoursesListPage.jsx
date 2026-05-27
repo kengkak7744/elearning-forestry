@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AdminLayout from '../../components/AdminLayout'
+import Toast from '../../components/Toast'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { coursesApi } from '../../api/courses'
-
-const categoryLabels = {
-  compliance: { label: 'บังคับตามกฎหมาย', color: 'bg-red-100 text-red-700' },
-  technical: { label: 'วิชาชีพ', color: 'bg-blue-100 text-blue-700' },
-  safety: { label: 'ความปลอดภัย', color: 'bg-amber-100 text-amber-700' },
-  skill: { label: 'ทักษะทั่วไป', color: 'bg-purple-100 text-purple-700' },
-}
+import { CATEGORY_BADGES } from '../../constants/labels'
+import { mediaUrl } from '../../utils/media'
 
 export default function CoursesListPage() {
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const [confirmState, setConfirmState] = useState({ open: false })
+
+  const showToast = (message, type = 'success') => setToast({ message, type })
+  const closeToast = () => setToast({ message: '', type: 'success' })
 
   const load = async () => {
     setLoading(true)
@@ -21,7 +23,7 @@ export default function CoursesListPage() {
       const data = await coursesApi.list({ search })
       setCourses(data)
     } catch (err) {
-      console.error(err)
+      showToast(err.response?.data?.detail || 'โหลดรายการไม่สำเร็จ', 'error')
     } finally {
       setLoading(false)
     }
@@ -33,14 +35,23 @@ export default function CoursesListPage() {
     // eslint-disable-next-line
   }, [search])
 
-  const handleDelete = async (course) => {
-    if (!confirm(`ลบหลักสูตร "${course.title}" และข้อมูลทั้งหมด?`)) return
-    try {
-      await coursesApi.delete(course.id)
-      load()
-    } catch (err) {
-      alert(err.response?.data?.detail || 'ลบไม่สำเร็จ')
-    }
+  const handleDelete = (course) => {
+    setConfirmState({
+      open: true,
+      title: 'ลบหลักสูตร',
+      message: `ต้องการลบหลักสูตร "${course.title}" และข้อมูลทั้งหมด?`,
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await coursesApi.delete(course.id)
+          showToast('ลบหลักสูตรเรียบร้อย')
+          load()
+        } catch (err) {
+          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+        }
+        setConfirmState({ open: false })
+      },
+    })
   }
 
   return (
@@ -76,14 +87,14 @@ export default function CoursesListPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {courses.map(c => {
-              const cat = categoryLabels[c.category] || { label: c.category, color: 'bg-gray-100' }
+              const cat = CATEGORY_BADGES[c.category] || { label: c.category, color: 'bg-gray-100' }
               return (
                 <div key={c.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
                   {/* Cover image */}
                   <div className="aspect-square w-full overflow-hidden bg-gray-100">
                     {c.cover_image ? (
                       <img
-                        src={c.cover_image}
+                        src={mediaUrl(c.cover_image)}
                         alt={c.title}
                         className="w-full h-full object-cover object-top"
                       />
@@ -139,6 +150,16 @@ export default function CoursesListPage() {
           </div>
         )}
       </div>
+
+      <Toast message={toast.message} type={toast.type} onClose={closeToast} />
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState({ open: false })}
+      />
     </AdminLayout>
   )
 }

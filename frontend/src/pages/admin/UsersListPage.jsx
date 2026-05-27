@@ -3,13 +3,7 @@ import { Link } from 'react-router-dom'
 import { usersApi } from '../../api/users'
 import AdminLayout from '../../components/AdminLayout'
 import Icon from '../../components/Icon'
-
-const roleLabels = {
-  learner: { label: 'เจ้าหน้าที่ผู้เรียน', color: 'bg-blue-100 text-blue-700' },
-  manager: { label: 'หัวหน้างาน', color: 'bg-purple-100 text-purple-700' },
-  instructor: { label: 'วิทยากร', color: 'bg-amber-100 text-amber-700' },
-  admin: { label: 'ผู้ดูแลระบบ', color: 'bg-forest-100 text-forest-700' },
-}
+import { ROLE_BADGES } from '../../constants/labels'
 
 export default function UsersListPage() {
   const [users, setUsers] = useState([])
@@ -160,7 +154,7 @@ export default function UsersListPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {users.map((u) => {
-                  const role = roleLabels[u.role] || { label: u.role, color: 'bg-gray-100' }
+                  const role = ROLE_BADGES[u.role] || { label: u.role, color: 'bg-gray-100' }
                   return (
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm font-mono max-w-[200px] break-words">{u.username}</td>
@@ -208,7 +202,7 @@ export default function UsersListPage() {
             <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">ไม่พบข้อมูล</div>
           ) : (
             users.map((u) => {
-              const role = roleLabels[u.role] || { label: u.role, color: 'bg-gray-100' }
+              const role = ROLE_BADGES[u.role] || { label: u.role, color: 'bg-gray-100' }
               return (
                 <div key={u.id} className="bg-white rounded-xl shadow-sm p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
