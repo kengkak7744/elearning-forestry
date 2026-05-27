@@ -1,4 +1,5 @@
-from fastapi import Depends, HTTPException, status
+from typing import Optional
+from fastapi import Depends, HTTPException, status, Query, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -85,3 +86,31 @@ def require_staff(current_user: User = Depends(get_current_user)) -> User:
             detail="หลักสูตรนี้สำหรับเจ้าหน้าที่กรมป่าไม้เท่านั้น"
         )
     return current_user
+
+
+def require_media_token(
+    t: Optional[str] = Query(None, description="JWT token for file access"),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> User:
+    """For <video>/<iframe>/<img> requests: accept token from ?t= query param OR Authorization header.
+
+    The browser doesn't attach Authorization to media tag requests, so ?t= is the practical fallback.
+    """
+    raw = t
+    if not raw and authorization:
+        scheme, _, value = authorization.partition(" ")
+        if scheme.lower() == "bearer" and value:
+            raw = value
+
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ต้องล็อกอินก่อนเข้าถึงไฟล์")
+
+    payload = decode_access_token(raw)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="โทเค็นไม่ถูกต้องหรือหมดอายุ")
+
+    user = db.query(User).filter(User.id == int(payload["sub"])).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ผู้ใช้ไม่พร้อมใช้งาน")
+    return user

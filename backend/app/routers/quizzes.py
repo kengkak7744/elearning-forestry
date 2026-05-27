@@ -22,14 +22,70 @@ def require_admin(current_user: User):
         raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์")
 
 
+def _strip_question_answers(q):
+    """Hide answer keys from learners. Returns a question dict safe to send to the client."""
+    safe_choices = None
+    if q.choices:
+        safe_choices = [{"text": c.get("text", "")} for c in q.choices]
+    return {
+        "id": q.id,
+        "quiz_id": q.quiz_id,
+        "question_text": q.question_text,
+        "question_type": q.question_type.value if q.question_type else None,
+        "choices": safe_choices,
+        "correct_text": None,
+        "points": q.points,
+        "order_index": q.order_index,
+    }
+
+
+def _quiz_to_safe_dict(q, include_status=False, best=None):
+    """Quiz dict with stripped question answers."""
+    base = {
+        "id": q.id,
+        "lesson_id": q.lesson_id,
+        "course_id": q.course_id,
+        "title": q.title,
+        "placement": q.placement.value if q.placement else None,
+        "trigger_time": q.trigger_time,
+        "can_skip": q.can_skip,
+        "show_correct_answer": q.show_correct_answer,
+        "passing_score": q.passing_score,
+        "order_index": q.order_index,
+        "questions": [
+            _strip_question_answers(qu)
+            for qu in sorted(q.questions, key=lambda x: x.order_index)
+        ],
+    }
+    if include_status:
+        base["best_score"] = best["score"] if best else None
+        base["is_passed"] = best["is_passed"] if best else False
+    return base
+
+
 # === Quiz CRUD ===
 
-@router.get("/lesson/{lesson_id}", response_model=List[QuizResponse])
+@router.get("/lesson/{lesson_id}")
 def get_lesson_quizzes(
     lesson_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Learner-safe: answer keys stripped."""
+    quizzes = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
+        Quiz.lesson_id == lesson_id
+    ).order_by(Quiz.order_index).all()
+    return [_quiz_to_safe_dict(q) for q in quizzes]
+
+
+@router.get("/admin/lesson/{lesson_id}", response_model=List[QuizResponse])
+def get_lesson_quizzes_admin(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin/instructor only: includes answer keys for editing."""
+    require_admin(current_user)
     quizzes = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
         Quiz.lesson_id == lesson_id
     ).order_by(Quiz.order_index).all()
@@ -70,45 +126,33 @@ def get_course_quizzes_with_status(
         if not existing or a.score > existing["score"]:
             best_by_quiz[a.quiz_id] = {"score": a.score, "is_passed": a.is_passed}
 
-    result = []
-    for q in all_quizzes:
-        best = best_by_quiz.get(q.id)
-        result.append({
-            "id": q.id,
-            "lesson_id": q.lesson_id,
-            "course_id": q.course_id,
-            "title": q.title,
-            "placement": q.placement.value if q.placement else None,
-            "trigger_time": q.trigger_time,
-            "can_skip": q.can_skip,
-            "show_correct_answer": q.show_correct_answer,
-            "passing_score": q.passing_score,
-            "order_index": q.order_index,
-            "questions": [
-                {
-                    "id": qu.id,
-                    "quiz_id": qu.quiz_id,
-                    "question_text": qu.question_text,
-                    "question_type": qu.question_type.value if qu.question_type else None,
-                    "choices": qu.choices,
-                    "correct_text": qu.correct_text,
-                    "points": qu.points,
-                    "order_index": qu.order_index,
-                } for qu in sorted(q.questions, key=lambda x: x.order_index)
-            ],
-            "best_score": best["score"] if best else None,
-            "is_passed": best["is_passed"] if best else False,
-        })
-
-    return result
+    return [_quiz_to_safe_dict(q, include_status=True, best=best_by_quiz.get(q.id)) for q in all_quizzes]
 
 
-@router.get("/course/{course_id}/final", response_model=QuizResponse)
+@router.get("/course/{course_id}/final")
 def get_course_final_quiz(
     course_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Learner-safe: answer keys stripped."""
+    quiz = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
+        Quiz.course_id == course_id,
+        Quiz.placement == "final"
+    ).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="ยังไม่มีแบบทดสอบสุดท้าย")
+    return _quiz_to_safe_dict(quiz)
+
+
+@router.get("/admin/course/{course_id}/final", response_model=QuizResponse)
+def get_course_final_quiz_admin(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin/instructor only: includes answer keys for editing."""
+    require_admin(current_user)
     quiz = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
         Quiz.course_id == course_id,
         Quiz.placement == "final"

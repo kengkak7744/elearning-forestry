@@ -28,6 +28,36 @@ MAX_PDF_SIZE = 500 * 1024 * 1024     # 500 MB
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".mkv"}
 ALLOWED_PDF_EXTENSIONS = {".pdf"}
 
+CHUNK_SIZE = 1024 * 1024  # 1 MB
+
+
+async def _stream_upload_to_disk(file: UploadFile, dest: Path, max_size: int) -> None:
+    """Stream UploadFile chunks to disk; raise 400 if max_size exceeded. Deletes partial file on failure."""
+    total = 0
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_size:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไฟล์ใหญ่เกิน {max_size // (1024*1024)} MB"
+                    )
+                out.write(chunk)
+    except HTTPException:
+        if dest.exists():
+            try: dest.unlink()
+            except Exception: pass
+        raise
+    except Exception:
+        if dest.exists():
+            try: dest.unlink()
+            except Exception: pass
+        raise
+
 
 @router.post("", response_model=LessonResponse, status_code=status.HTTP_201_CREATED)
 def create_lesson(
@@ -115,27 +145,18 @@ async def upload_video(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"รองรับเฉพาะไฟล์ {', '.join(ALLOWED_VIDEO_EXTENSIONS)}"
         )
-    
-    # Read and validate size
-    content = await file.read()
-    if len(content) > MAX_VIDEO_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"ไฟล์ใหญ่เกิน {MAX_VIDEO_SIZE // (1024*1024)} MB"
-        )
-    
-    # Save with unique name
+
+    # Stream to disk (chunked, with size limit enforced during streaming)
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = VIDEO_DIR / unique_name
-    file_path.write_bytes(content)
-    
-    # Update lesson
+    await _stream_upload_to_disk(file, file_path, MAX_VIDEO_SIZE)
+
     # Delete old file if exists
     if lesson.content_url and lesson.content_type == ContentType.VIDEO_FILE:
         old_path = VIDEO_DIR / Path(lesson.content_url).name
         if old_path.exists():
             old_path.unlink()
-    
+
     lesson.content_type = ContentType.VIDEO_FILE
     lesson.content_url = f"/videos/{unique_name}"
     db.commit()
@@ -161,23 +182,16 @@ async def upload_pdf(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="รองรับเฉพาะไฟล์ PDF"
         )
-    
-    content = await file.read()
-    if len(content) > MAX_PDF_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"ไฟล์ใหญ่เกิน {MAX_PDF_SIZE // (1024*1024)} MB"
-        )
-    
+
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = PDF_DIR / unique_name
-    file_path.write_bytes(content)
-    
+    await _stream_upload_to_disk(file, file_path, MAX_PDF_SIZE)
+
     if lesson.content_url and lesson.content_type == ContentType.PDF:
         old_path = PDF_DIR / Path(lesson.content_url).name
         if old_path.exists():
             old_path.unlink()
-    
+
     lesson.content_type = ContentType.PDF
     lesson.content_url = f"/pdfs/{unique_name}"
     db.commit()
@@ -185,24 +199,4 @@ async def upload_pdf(
     return lesson
 
 
-# Serve uploaded files (private — requires auth)
-@router.get("/files/video/{filename}")
-def serve_video(
-    filename: str,
-    _user: User = Depends(get_current_user)
-):
-    file_path = VIDEO_DIR / filename
-    if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
-    return FileResponse(file_path)
-
-
-@router.get("/files/pdf/{filename}")
-def serve_pdf(
-    filename: str,
-    _user: User = Depends(get_current_user)
-):
-    file_path = PDF_DIR / filename
-    if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
-    return FileResponse(file_path, media_type="application/pdf")
+# File serving moved to app.routers.files (with auth and path-traversal hardening).

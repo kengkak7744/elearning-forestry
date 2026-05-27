@@ -120,7 +120,6 @@ def get_course(
         "is_enrolled": is_enrolled,
         "modules": modules_data,
     }
-    return response_data
 
 
 @router.post("", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
@@ -197,18 +196,31 @@ async def upload_cover_image(
             detail=f"รองรับเฉพาะไฟล์ {', '.join(ALLOWED_IMAGE_EXTENSIONS)}"
         )
 
-    content = await file.read()
-    if len(content) > MAX_IMAGE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"ไฟล์ใหญ่เกิน {MAX_IMAGE_SIZE // (1024*1024)} MB"
-        )
-
+    # Stream to disk (chunked, with size limit enforced during streaming)
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = IMAGE_DIR / unique_name
-    file_path.write_bytes(content)
+    total = 0
+    CHUNK = 1024 * 256  # 256 KB
+    try:
+        with file_path.open("wb") as out:
+            while True:
+                chunk = await file.read(CHUNK)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_IMAGE_SIZE:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไฟล์ใหญ่เกิน {MAX_IMAGE_SIZE // (1024*1024)} MB"
+                    )
+                out.write(chunk)
+    except HTTPException:
+        if file_path.exists():
+            try: file_path.unlink()
+            except Exception: pass
+        raise
 
-    if course.cover_image and course.cover_image.startswith("/images/"):
+    if course.cover_image and (course.cover_image.startswith("/images/") or course.cover_image.startswith("/elearning/images/")):
         old_path = IMAGE_DIR / Path(course.cover_image).name
         if old_path.exists():
             old_path.unlink()

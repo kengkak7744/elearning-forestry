@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, users, courses, modules, lessons, progress, quizzes
-from fastapi.staticfiles import StaticFiles
+from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files
 import os
 
 app = FastAPI(
@@ -25,9 +24,6 @@ app.add_middleware(
 os.makedirs("/app/videos", exist_ok=True)
 os.makedirs("/app/pdf_documents", exist_ok=True)
 os.makedirs("/app/images", exist_ok=True)
-app.mount("/videos", StaticFiles(directory="/app/videos"), name="videos")
-app.mount("/pdfs", StaticFiles(directory="/app/pdf_documents"), name="pdfs")
-app.mount("/images", StaticFiles(directory="/app/images"), name="images")
 
 # รวม routers
 app.include_router(auth.router)
@@ -37,6 +33,7 @@ app.include_router(modules.router)
 app.include_router(lessons.router)
 app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
 app.include_router(quizzes.router, prefix="/api/quizzes", tags=["quizzes"])
+app.include_router(files.router)
 
 @app.get("/")
 def read_root():
