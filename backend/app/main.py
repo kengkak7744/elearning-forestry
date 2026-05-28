@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats
+from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats, certificates
 from app.config import settings
 import os
 
@@ -47,6 +47,7 @@ async def security_headers(request: Request, call_next):
 os.makedirs("/app/videos", exist_ok=True)
 os.makedirs("/app/pdf_documents", exist_ok=True)
 os.makedirs("/app/images", exist_ok=True)
+os.makedirs("/app/certificates", exist_ok=True)
 
 # รวม routers
 app.include_router(auth.router)
@@ -58,6 +59,7 @@ app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
 app.include_router(quizzes.router, prefix="/api/quizzes", tags=["quizzes"])
 app.include_router(files.router)
 app.include_router(admin_stats.router)
+app.include_router(certificates.router)
 
 @app.get("/")
 def read_root():

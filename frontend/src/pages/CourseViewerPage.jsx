@@ -983,12 +983,22 @@ export default function CourseViewerPage() {
               )}
 
               {viewingFinal ? (
-                <button
-                  onClick={goPrev}
-                  className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium"
-                >
-                  กลับบทเรียน
-                </button>
+                finalQuiz?.is_passed ? (
+                  <button
+                    onClick={() => setScoresOpen(true)}
+                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Icon name="trophy" className="w-4 h-4" />
+                    จบหลักสูตร · รับใบรับรอง
+                  </button>
+                ) : (
+                  <button
+                    onClick={goPrev}
+                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium"
+                  >
+                    กลับบทเรียน
+                  </button>
+                )
               ) : (() => {
                 const blocked = !currentLessonGated
                 return (
@@ -1031,6 +1041,7 @@ export default function CourseViewerPage() {
       <CourseScoresModal
         open={scoresOpen}
         quizzes={quizzes}
+        courseId={id}
         onClose={() => setScoresOpen(false)}
       />
     </div>

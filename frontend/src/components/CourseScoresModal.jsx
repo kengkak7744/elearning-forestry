@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { certificatesApi } from '../api/certificates'
 import Icon from './Icon'
 
 const placementLabels = {
@@ -6,13 +7,47 @@ const placementLabels = {
   end_of_lesson: 'ท้ายบทเรียน',
 }
 
-export default function CourseScoresModal({ open, quizzes, onClose }) {
+export default function CourseScoresModal({ open, quizzes, courseId, onClose }) {
+  const [cert, setCert] = useState(null) // {certificate_id, ...} when issued
+  const [certLoading, setCertLoading] = useState(false)
+  const [certError, setCertError] = useState('')
+
   useEffect(() => {
     if (!open) return
     const handler = (e) => { if (e.key === 'Escape') onClose?.() }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
+
+  // When the learner has passed the course, look up their existing certificate
+  // so we can render Download (vs. Claim) on the button.
+  useEffect(() => {
+    if (!open || !courseId) return
+    setCert(null)
+    setCertError('')
+    certificatesApi.eligibility(courseId)
+      .then((data) => {
+        if (data.has_certificate) {
+          setCert({ id: data.certificate_id, number: data.certificate_number })
+        }
+      })
+      .catch(() => {})
+  }, [open, courseId])
+
+  const claim = async () => {
+    if (!courseId) return
+    setCertLoading(true)
+    setCertError('')
+    try {
+      const data = await certificatesApi.issue(courseId)
+      setCert({ id: data.id, number: data.certificate_number })
+      window.open(certificatesApi.downloadUrl(data.id), '_blank', 'noopener')
+    } catch (err) {
+      setCertError(err.response?.data?.detail || 'ออกใบรับรองไม่สำเร็จ')
+    } finally {
+      setCertLoading(false)
+    }
+  }
 
   if (!open) return null
 
@@ -115,6 +150,50 @@ export default function CourseScoresModal({ open, quizzes, onClose }) {
                   ? 'คุณผ่านหลักสูตรนี้แล้ว ผ่านครบทุกด่านและแบบทดสอบสุดท้าย'
                   : `ผ่านด่านบังคับแล้ว ${passedRequired}/${requiredLessonQuizzes.length} ด่าน · ต้องผ่านแบบทดสอบสุดท้ายเพื่อจบหลักสูตร`}
               </span>
+            </div>
+          )}
+
+          {/* Certificate — only when the course is actually passed.
+              Backend rechecks eligibility (which also requires all lessons completed),
+              so the button can also fail with a clear reason. */}
+          {coursePassed && courseId && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <Icon name="trophy" className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-900">ใบรับรองการผ่านหลักสูตร</p>
+                  {cert ? (
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      เลขที่ {cert.number}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      ออกใบรับรอง PDF ได้ทันที
+                    </p>
+                  )}
+                  {certError && <p className="text-xs text-red-700 mt-1">{certError}</p>}
+                </div>
+                {cert ? (
+                  <a
+                    href={certificatesApi.downloadUrl(cert.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg inline-flex items-center gap-1.5"
+                  >
+                    <Icon name="document" className="w-4 h-4" />
+                    ดาวน์โหลด
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={claim}
+                    disabled={certLoading}
+                    className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {certLoading ? 'กำลังออก...' : 'รับใบรับรอง'}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

@@ -355,6 +355,7 @@ export default function CourseDetailPage() {
       <CourseScoresModal
         open={scoresOpen}
         quizzes={myQuizzes}
+        courseId={id}
         onClose={() => setScoresOpen(false)}
       />
     </div>
