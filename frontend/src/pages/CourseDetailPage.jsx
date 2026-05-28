@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { coursesApi } from '../api/courses'
+import { quizzesApi } from '../api/quizzes'
 import { useAuth } from '../contexts/AuthContext'
 import { CATEGORY_BADGES } from '../constants/labels'
 import ConfirmDialog from '../components/ConfirmDialog'
+import CourseStatsModal from '../components/CourseStatsModal'
+import CourseScoresModal from '../components/CourseScoresModal'
 
 function formatThaiDate(dateString) {
   if (!dateString) return ''
@@ -29,6 +32,25 @@ export default function CourseDetailPage() {
   const [enrollLoading, setEnrollLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const [confirmState, setConfirmState] = useState({ open: false })
+  // Stats: admin gets the full course stats modal; learner gets their own scores.
+  const isAdmin = user?.role === 'admin' || user?.role === 'instructor'
+  const [statsOpen, setStatsOpen] = useState(false)
+  const [scoresOpen, setScoresOpen] = useState(false)
+  const [myQuizzes, setMyQuizzes] = useState(null)
+  const [scoresLoading, setScoresLoading] = useState(false)
+
+  const openMyScores = async () => {
+    setScoresLoading(true)
+    try {
+      const data = await quizzesApi.getCourseAll(id)
+      setMyQuizzes(data)
+      setScoresOpen(true)
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'โหลดคะแนนไม่สำเร็จ' })
+    } finally {
+      setScoresLoading(false)
+    }
+  }
 
   const loadCourse = async () => {
     setLoading(true)
@@ -244,7 +266,7 @@ export default function CourseDetailPage() {
                   <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm text-center mb-4">
                     คุณลงทะเบียนแล้ว
                   </div>
-                  
+
                   <button
                     onClick={() => navigate(`/courses/${course.id}/learn`)}
                     className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-3 rounded-lg transition mb-3"
@@ -255,7 +277,7 @@ export default function CourseDetailPage() {
                       เริ่มเรียน
                     </Link>
                   </button>
-                  
+
                   <button
                     onClick={handleUnenroll}
                     disabled={enrollLoading}
@@ -273,6 +295,24 @@ export default function CourseDetailPage() {
                   {enrollLoading ? 'กำลังลงทะเบียน...' : 'ลงทะเบียนเรียน'}
                 </button>
               )}
+
+              {/* Stats — admin sees all-users stats; learner sees only their own scores (if enrolled) */}
+              {isAdmin ? (
+                <button
+                  onClick={() => setStatsOpen(true)}
+                  className="w-full mt-3 bg-forest-50 hover:bg-forest-100 text-forest-700 font-medium py-2 rounded-lg transition"
+                >
+                  ดูสถิติหลักสูตร
+                </button>
+              ) : course.is_enrolled ? (
+                <button
+                  onClick={openMyScores}
+                  disabled={scoresLoading}
+                  className="w-full mt-3 bg-forest-50 hover:bg-forest-100 text-forest-700 font-medium py-2 rounded-lg transition disabled:opacity-50"
+                >
+                  {scoresLoading ? 'กำลังโหลด...' : 'ดูคะแนนของคุณ'}
+                </button>
+              ) : null}
 
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -304,6 +344,18 @@ export default function CourseDetailPage() {
         danger={confirmState.danger}
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState({ open: false })}
+      />
+
+      <CourseStatsModal
+        open={statsOpen}
+        courseId={id}
+        onClose={() => setStatsOpen(false)}
+      />
+
+      <CourseScoresModal
+        open={scoresOpen}
+        quizzes={myQuizzes}
+        onClose={() => setScoresOpen(false)}
       />
     </div>
   )

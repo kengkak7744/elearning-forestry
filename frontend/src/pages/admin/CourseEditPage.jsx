@@ -8,6 +8,7 @@ import Toast from '../../components/Toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import PromptDialog from '../../components/PromptDialog'
 import QuizManager from '../../components/QuizManager'
+import CourseStatsModal from '../../components/CourseStatsModal'
 import { CATEGORY_OPTIONS, CONTENT_TYPE_OPTIONS } from '../../constants/labels'
 import { mediaUrl } from '../../utils/media'
 
@@ -25,6 +26,7 @@ export default function CourseEditPage() {
   const closeToast = () => setToast({ message: '', type: 'success' })
   const [confirmState, setConfirmState] = useState({ open: false })
   const [promptState, setPromptState] = useState({ open: false })
+  const [statsOpen, setStatsOpen] = useState(false)
 
   const [coverImage, setCoverImage] = useState(null)
   const [coverUploading, setCoverUploading] = useState(false)
@@ -254,9 +256,20 @@ export default function CourseEditPage() {
           <span>{isNew ? 'สร้างหลักสูตรใหม่' : 'แก้ไขหลักสูตร'}</span>
         </div>
 
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">
-          {isNew ? 'สร้างหลักสูตรใหม่' : 'แก้ไขหลักสูตร'}
-        </h1>
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+            {isNew ? 'สร้างหลักสูตรใหม่' : 'แก้ไขหลักสูตร'}
+          </h1>
+          {!isNew && (
+            <button
+              type="button"
+              onClick={() => setStatsOpen(true)}
+              className="bg-forest-50 hover:bg-forest-100 text-forest-700 text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              ดูสถิติหลักสูตร
+            </button>
+          )}
+        </div>
 
         {/* Course meta form */}
         <form onSubmit={handleSaveCourse} className="bg-white rounded-xl shadow-sm p-5 sm:p-6 mb-6 space-y-4">
@@ -500,6 +513,12 @@ export default function CourseEditPage() {
         placeholder={promptState.placeholder}
         onConfirm={promptState.onConfirm}
         onCancel={() => setPromptState({ open: false })}
+      />
+
+      <CourseStatsModal
+        open={statsOpen}
+        courseId={isNew ? null : id}
+        onClose={() => setStatsOpen(false)}
       />
     </AdminLayout>
   )

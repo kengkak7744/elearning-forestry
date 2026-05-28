@@ -8,6 +8,8 @@ export const quizzesApi = {
   // Admin/instructor — full data with answers, for QuizEditor
   getByLessonAdmin: (lessonId) => client.get(`/quizzes/admin/lesson/${lessonId}`).then(r => r.data),
   getFinalAdmin: (courseId) => client.get(`/quizzes/admin/course/${courseId}/final`).then(r => r.data),
+  getStats: (quizId) => client.get(`/quizzes/admin/${quizId}/stats`).then(r => r.data),
+  getCourseStats: (courseId) => client.get(`/quizzes/admin/course/${courseId}/stats`).then(r => r.data),
   create: (data) => client.post('/quizzes/', data).then(r => r.data),
   update: (id, data) => client.patch(`/quizzes/${id}`, data).then(r => r.data),
   delete: (id) => client.delete(`/quizzes/${id}`).then(r => r.data),

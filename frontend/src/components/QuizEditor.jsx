@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { quizzesApi } from '../api/quizzes'
 import QuestionEditor from './QuestionEditor'
 import ConfirmDialog from './ConfirmDialog'
+import QuizStatsModal from './QuizStatsModal'
 
 const placementLabels = {
   mid_video: 'กลางวิดีโอ',
@@ -13,6 +14,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [confirmState, setConfirmState] = useState({ open: false })
+  const [statsOpen, setStatsOpen] = useState(false)
   const [draft, setDraft] = useState({
     title: quiz.title,
     trigger_time: quiz.trigger_time || 0,
@@ -112,6 +114,12 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
         <span className="text-xs text-gray-500 flex-shrink-0">
           {quiz.questions.length} คำถาม
         </span>
+        <button
+          onClick={() => setStatsOpen(true)}
+          className="text-xs text-forest-700 hover:text-forest-800 flex-shrink-0"
+        >
+          ดูสถิติ
+        </button>
         <button
           onClick={onDelete}
           className="text-xs text-red-600 hover:text-red-700 flex-shrink-0"
@@ -299,6 +307,12 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
         danger={confirmState.danger}
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState({ open: false })}
+      />
+
+      <QuizStatsModal
+        open={statsOpen}
+        quizId={quiz.id}
+        onClose={() => setStatsOpen(false)}
       />
     </div>
   )

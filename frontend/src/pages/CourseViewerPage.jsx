@@ -8,6 +8,7 @@ import Icon from '../components/Icon'
 import Toast from '../components/Toast'
 import QuizTaker from '../components/QuizTaker'
 import MidVideoQuizModal from '../components/MidVideoQuizModal'
+import CourseScoresModal from '../components/CourseScoresModal'
 import { mediaUrl } from '../utils/media'
 
 export default function CourseViewerPage() {
@@ -23,6 +24,7 @@ export default function CourseViewerPage() {
   const [quizzes, setQuizzes] = useState([])  // all course quizzes with is_passed status
   const [viewingFinal, setViewingFinal] = useState(false)
   const [progressLoaded, setProgressLoaded] = useState(false)
+  const [scoresOpen, setScoresOpen] = useState(false)
 
   const [toast, setToast] = useState({ message: '', type: 'success' })
   const showToast = (m, t = 'success') => setToast({ message: m, type: t })
@@ -611,6 +613,15 @@ export default function CourseViewerPage() {
           <h1 className="text-sm sm:text-base font-bold text-gray-800 truncate flex-1 text-center">
             {course.title}
           </h1>
+          <button
+            type="button"
+            onClick={() => setScoresOpen(true)}
+            className="text-sm text-gray-600 hover:text-forest-600 flex-shrink-0 inline-flex items-center gap-1"
+            aria-label="ดูคะแนนของฉัน"
+          >
+            <Icon name="trophy" className="w-5 h-5" />
+            <span className="hidden sm:inline">คะแนน</span>
+          </button>
           <Link to="/" className="text-sm text-gray-600 hover:text-forest-600 flex-shrink-0">
             <Icon name="home" className="w-5 h-5" />
           </Link>
@@ -968,6 +979,12 @@ export default function CourseViewerPage() {
         onAttempted={refreshQuizzes}
         onContinue={closeMidQuiz}
         onSkip={closeMidQuiz}
+      />
+
+      <CourseScoresModal
+        open={scoresOpen}
+        quizzes={quizzes}
+        onClose={() => setScoresOpen(false)}
       />
     </div>
   )
