@@ -105,7 +105,10 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
         <div className="space-y-4 mt-2">
           {activeQuestions.map((q, idx) => {
             const qResult = result?.results?.[q.id]
-            const stateClass = qResult
+            const isOpinion = q.question_type === 'opinion'
+            // Opinions are always scored as correct but shouldn't visually flag
+            // as right/wrong — they're feedback, not a test.
+            const stateClass = qResult && !isOpinion
               ? qResult.correct
                 ? 'border-green-300 bg-green-50'
                 : 'border-red-300 bg-red-50'
@@ -115,7 +118,12 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
               <div key={q.id} className={`p-3 rounded-lg border ${stateClass}`}>
                 <p className="font-medium text-sm text-gray-800 mb-2 break-words">
                   {idx + 1}. {q.question_text}
-                  {qResult && (
+                  {isOpinion && (
+                    <span className="ml-2 text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                      ไม่บังคับ
+                    </span>
+                  )}
+                  {qResult && !isOpinion && (
                     <span className={`ml-2 text-xs inline-flex items-center gap-0.5 ${qResult.correct ? 'text-green-700' : 'text-red-700'}`}>
                       <Icon name={qResult.correct ? 'check' : 'xmark'} className="w-3.5 h-3.5" />
                       {qResult.correct ? 'ถูกต้อง' : 'ผิด'}
@@ -189,6 +197,17 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                       <p className="text-xs text-green-700 mt-1">เฉลย: {qResult.correct_answer}</p>
                     )}
                   </div>
+                )}
+
+                {q.question_type === 'opinion' && (
+                  <textarea
+                    value={answers[q.id] || ''}
+                    onChange={(e) => setAnswer(q.id, e.target.value)}
+                    disabled={!!result}
+                    placeholder="พิมพ์ความคิดเห็น... (จะเว้นว่างก็ได้)"
+                    rows={3}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm resize-y"
+                  />
                 )}
               </div>
             )

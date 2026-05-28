@@ -16,6 +16,9 @@ class QuestionType(str, enum.Enum):
     SINGLE_CHOICE = "single_choice"
     MULTIPLE_CHOICE = "multiple_choice"
     WRITTEN = "written"
+    # Free-response feedback/opinion. Always scored as correct (full points)
+    # regardless of what the learner types — including blank.
+    OPINION = "opinion"
 
 
 class Quiz(Base):

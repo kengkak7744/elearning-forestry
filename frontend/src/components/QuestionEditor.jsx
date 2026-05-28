@@ -5,6 +5,7 @@ const typeLabels = {
   single_choice: 'เลือกข้อเดียว',
   multiple_choice: 'เลือกหลายข้อ',
   written: 'เขียนตอบ',
+  opinion: 'ความคิดเห็น (ไม่ตรวจ)',
 }
 
 export default function QuestionEditor({ question, index, onUpdate, onDelete, showToast }) {
@@ -150,6 +151,13 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
                 placeholder="คำตอบที่ถูก (เปรียบเทียบแบบไม่สนตัวพิมพ์เล็ก-ใหญ่)"
               />
             </div>
+          )}
+
+          {/* Opinion — no correct answer */}
+          {question.question_type === 'opinion' && (
+            <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded p-2">
+              คำถามแบบความคิดเห็น — ผู้เรียนตอบอะไรก็ได้ (หรือเว้นว่าง) จะถูกนับว่าตอบถูกเสมอ
+            </p>
           )}
 
           <button

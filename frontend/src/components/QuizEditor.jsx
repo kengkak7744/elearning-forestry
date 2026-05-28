@@ -46,9 +46,9 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const handleAddQuestion = async (type) => {
     try {
       const newQ = await quizzesApi.addQuestion(quiz.id, {
-        question_text: 'คำถามใหม่',
+        question_text: type === 'opinion' ? 'ความคิดเห็นของคุณต่อหลักสูตรนี้' : 'คำถามใหม่',
         question_type: type,
-        choices: (type === 'single_choice' || type === 'multiple_choice') 
+        choices: (type === 'single_choice' || type === 'multiple_choice')
           ? [{ text: 'ตัวเลือก 1', is_correct: true }, { text: 'ตัวเลือก 2', is_correct: false }]
           : null,
         correct_text: type === 'written' ? '' : null,
@@ -280,6 +280,12 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                 className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
               >
                 + เขียนตอบ
+              </button>
+              <button
+                onClick={() => handleAddQuestion('opinion')}
+                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded"
+              >
+                + ความคิดเห็น
               </button>
             </div>
           </div>

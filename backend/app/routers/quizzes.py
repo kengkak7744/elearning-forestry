@@ -354,6 +354,11 @@ def submit_quiz(
                 if str(user_answer).strip().lower() == q.correct_text.strip().lower():
                     is_correct = True
 
+        elif q.question_type == QuestionType.OPINION:
+            # Free-response feedback — any answer (including blank) is accepted.
+            is_correct = True
+            correct_answer = None
+
         if is_correct:
             earned_points += q.points
 
