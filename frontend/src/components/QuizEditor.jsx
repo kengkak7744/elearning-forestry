@@ -167,7 +167,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                     checked={draft.randomize_questions}
                     onChange={(e) => setDraft({ ...draft, randomize_questions: e.target.checked })}
                   />
-                  สุ่มคำถามจากธนาคาร
+                  สุ่มคำถาม
                 </label>
                 {draft.randomize_questions && (
                   <div className="mt-2 ml-6">

@@ -252,13 +252,19 @@ export default function CourseViewerPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Elapsed time on this lesson (clock seconds while page is mounted)
+  // Elapsed time on this lesson (clock seconds while page is mounted).
+  // For PDFs, restore from saved progress on F5/reconnect — current_position
+  // on a PDF lesson stores the seconds-on-page (see save effect below).
   useEffect(() => {
-    setElapsedSeconds(0)
     if (!currentLesson || viewingFinal) return
+    if (!progressLoaded) return
+    const restored = currentLesson.content_type === 'pdf'
+      ? (progressRef.current[currentLesson.id]?.current_position || 0)
+      : 0
+    setElapsedSeconds(restored)
     const iv = setInterval(() => setElapsedSeconds(s => s + 1), 1000)
     return () => clearInterval(iv)
-  }, [currentLesson?.id, viewingFinal])
+  }, [currentLesson?.id, viewingFinal, progressLoaded])
 
   // PDF: save elapsed view time every 10s; mark complete once time gate is met (or after 30s default)
   useEffect(() => {

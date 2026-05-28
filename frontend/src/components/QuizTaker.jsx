@@ -80,7 +80,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
       <p className="text-xs text-gray-500 mb-3">
         คำถาม {activeQuestions.length} ข้อ
         {quiz.randomize_questions && (
-          <span className="ml-1 text-forest-700">(สุ่มจากธนาคารคำถาม)</span>
+          <span className="ml-1 text-forest-700">(สุ่มคำถาม)</span>
         )}
         {' · '}เกณฑ์ผ่าน {quiz.passing_score}%
         {quiz.best_score !== null && quiz.best_score !== undefined && (
