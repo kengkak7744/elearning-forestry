@@ -1,10 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
   <head>
+    <!-- charset MUST be first in <head> so the parser locks encoding before any byte content -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/forest_logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WildFire-Elearning</title>
+    <meta name="theme-color" content="#085041" />
+    <link rel="icon" type="image/png" href="/elearning/forest_logo.png" />
+
+    <!-- Internal staff system — do NOT index in public search engines. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <title>ระบบ e-Learning กรมป่าไม้</title>
+    <meta
+      name="description"
+      content="ระบบ e-Learning สำหรับเจ้าหน้าที่กรมป่าไม้ — หลักสูตรอบรม ทดสอบ และติดตามความคืบหน้าการเรียนรู้ออนไลน์"
+    />
+
+    <!-- Open Graph / link previews (Line, Slack, Teams, Facebook).
+         These render even without indexing — the share-preview crawler hits the
+         URL directly when a user pastes the link, regardless of robots meta. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="th_TH" />
+    <meta property="og:site_name" content="ระบบ e-Learning กรมป่าไม้" />
+    <meta property="og:title" content="ระบบ e-Learning กรมป่าไม้" />
+    <meta
+      property="og:description"
+      content="ระบบ e-Learning สำหรับเจ้าหน้าที่กรมป่าไม้ — หลักสูตรอบรม ทดสอบ และติดตามความคืบหน้าการเรียนรู้ออนไลน์"
+    />
+    <meta property="og:image" content="/elearning/forest_logo.png" />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- Font: preconnect so the TCP/TLS handshake overlaps with HTML parse,
+         then load via <link> (not CSS @import) so the preload scanner
+         discovers it without waiting for the stylesheet to parse. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

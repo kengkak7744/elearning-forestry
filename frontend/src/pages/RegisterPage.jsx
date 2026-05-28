@@ -63,7 +63,7 @@ export default function RegisterPage() {
       <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 w-full max-w-2xl">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-forest-500 rounded-full mb-3 text-2xl">
-            <img src="/forest_logo.png" alt="Logo" className="w-20 h-20" />
+            <img src="/elearning/forest_logo.png" alt="Logo" className="w-20 h-20" />
           </div>
           <h1 className="text-2xl font-bold text-forest-700">สมัครสมาชิก</h1>
           <p className="text-gray-600 text-sm mt-1">สำหรับเจ้าหน้าที่กรมป่าไม้</p>

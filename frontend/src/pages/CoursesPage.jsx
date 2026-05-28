@@ -22,33 +22,23 @@ export default function CoursesPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [mandatoryOnly, setMandatoryOnly] = useState(false)
 
-  const loadCourses = async () => {
+  useEffect(() => {
+    const params = {}
+    if (search) params.search = search
+    if (categoryFilter) params.category = categoryFilter
+    if (mandatoryOnly) params.is_mandatory = true
+
     setLoading(true)
-    try {
-      const params = {}
-      if (search) params.search = search
-      if (categoryFilter) params.category = categoryFilter
-      if (mandatoryOnly) params.is_mandatory = true
-      
-      const data = await coursesApi.list(params)
-      setCourses(data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadCourses()
-    // eslint-disable-next-line
-  }, [categoryFilter, mandatoryOnly])
-
-  useEffect(() => {
-    const timer = setTimeout(() => loadCourses(), 400)
+    // Debounce so text input doesn't fire per-keystroke; filters use the same path
+    // so changing a filter and typing doesn't double-fire.
+    const timer = setTimeout(() => {
+      coursesApi.list(params)
+        .then(setCourses)
+        .catch(err => console.error(err))
+        .finally(() => setLoading(false))
+    }, search ? 400 : 0)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line
-  }, [search])
+  }, [search, categoryFilter, mandatoryOnly])
 
   return (
     <div className="min-h-screen bg-gray-50">

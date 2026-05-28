@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import { authApi } from '../api/auth'
 
 const AuthContext = createContext(null)
@@ -22,32 +22,32 @@ export function AuthProvider({ children }) {
     checkAuth()
   }, [])
 
-  const login = async (identifier, password) => {
+  const login = useCallback(async (identifier, password) => {
     const data = await authApi.login(identifier, password)
     // Server sets the httpOnly cookie. No localStorage write.
     localStorage.removeItem('access_token')
     setUser(data.user)
     return data.user
-  }
+  }, [])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try { await authApi.logout() } catch {}
     localStorage.removeItem('access_token')
     setUser(null)
-  }
+  }, [])
 
-  const updateUser = (updatedUser) => {
+  const updateUser = useCallback((updatedUser) => {
     setUser(updatedUser)
-  }
+  }, [])
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     loading,
     login,
     logout,
     updateUser,
     isAuthenticated: !!user,
-  }
+  }), [user, loading, login, logout, updateUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

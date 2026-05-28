@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats
+from app.config import settings
 import os
 
 app = FastAPI(
@@ -24,6 +25,23 @@ app.add_middleware(
 
 # Compress JSON/text responses ≥ 1 KB. Already-compressed bytes (video/pdf/images) are skipped automatically.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+    )
+    if settings.COOKIE_SECURE:
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+    return response
 
 os.makedirs("/app/videos", exist_ok=True)
 os.makedirs("/app/pdf_documents", exist_ok=True)

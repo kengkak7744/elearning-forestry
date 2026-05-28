@@ -64,10 +64,14 @@ const icons = {
   ),
 }
 
-export default function Icon({ name, className = 'w-5 h-5', strokeWidth = 1.5 }) {
+export default function Icon({ name, className = 'w-5 h-5', strokeWidth = 1.5, title }) {
   const path = icons[name]
   if (!path) return null
-  
+
+  // Default: decorative. Callers that need a standalone icon-only control should
+  // either pass `title` (rare) or — preferred — give the parent button an aria-label.
+  const decorative = !title
+
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -76,7 +80,11 @@ export default function Icon({ name, className = 'w-5 h-5', strokeWidth = 1.5 })
       strokeWidth={strokeWidth}
       stroke="currentColor"
       className={className}
+      aria-hidden={decorative ? 'true' : undefined}
+      role={decorative ? undefined : 'img'}
+      focusable="false"
     >
+      {title ? <title>{title}</title> : null}
       {path}
     </svg>
   )

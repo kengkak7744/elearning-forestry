@@ -40,18 +40,20 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-forest-500 rounded-full mb-4 text-3xl">
-            <img src="/forest_logo.png" alt="Logo" className="w-20 h-20" />
+            <img src="/elearning/forest_logo.png" alt="Logo" className="w-20 h-20" />
           </div>
           <h1 className="text-2xl font-bold text-forest-700">ระบบ e-Learning</h1>
           <p className="text-gray-600 mt-1">กรมป่าไม้</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-identifier" className="block text-sm font-medium text-gray-700 mb-1">
               ชื่อผู้ใช้ หรือ อีเมล
             </label>
             <input
+              id="login-identifier"
+              name="username"
               type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
@@ -64,10 +66,12 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">
               รหัสผ่าน
             </label>
             <input
+              id="login-password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -81,7 +85,8 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-2.5 rounded-lg transition disabled:opacity-50"
+            aria-busy={loading || undefined}
+            className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-2.5 rounded-lg transition disabled:opacity-50 min-h-[44px]"
           >
             {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
           </button>

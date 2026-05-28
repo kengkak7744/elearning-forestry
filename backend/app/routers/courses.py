@@ -2,7 +2,7 @@ import os
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 from typing import Optional
 from app.database import get_db
@@ -60,8 +60,10 @@ def get_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # selectinload (not joinedload): avoids cartesian module×lesson row explosion;
+    # each relationship loads via a single IN query.
     course = db.query(Course).options(
-        joinedload(Course.modules).joinedload(Module.lessons)
+        selectinload(Course.modules).selectinload(Module.lessons)
     ).filter(Course.id == course_id).first()
     
     if not course:

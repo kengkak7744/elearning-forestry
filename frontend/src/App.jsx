@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 
 // Login/Register are small and accessed first — keep eager.
 import LoginPage from './pages/LoginPage'
@@ -30,6 +31,7 @@ function PageFallback() {
 
 function App() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <BrowserRouter>
       {/* On if deploying to a subdirectory */}
@@ -62,6 +64,7 @@ function App() {
         </Suspense>
       </BrowserRouter>
     </AuthProvider>
+    </ErrorBoundary>
   )
 }
 
