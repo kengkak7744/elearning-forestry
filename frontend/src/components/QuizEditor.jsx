@@ -54,7 +54,6 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
           ? [{ text: 'ตัวเลือก 1', is_correct: true }, { text: 'ตัวเลือก 2', is_correct: false }]
           : null,
         correct_text: type === 'written' ? '' : null,
-        points: 1,
         order_index: quiz.questions.length,
       })
       onUpdate({ questions: [...quiz.questions, newQ] })

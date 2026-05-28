@@ -552,8 +552,10 @@ def submit_quiz(
         ).first():
             raise HTTPException(status_code=403, detail="ต้องลงทะเบียนหลักสูตรก่อนทำแบบทดสอบ")
 
-    total_points = 0
-    earned_points = 0
+    # Count-based scoring: every non-opinion question weights equally (1 each).
+    # Opinion questions don't count in either direction — they're feedback only.
+    graded_count = 0
+    correct_count = 0
     results = {}
 
     # With randomization, the learner saw a subset. Score against the IDs they
@@ -567,7 +569,12 @@ def submit_quiz(
         questions_to_score = list(quiz.questions)
 
     for q in questions_to_score:
-        total_points += q.points
+        # Opinion: recorded in `answers` for admin review, never counted.
+        if q.question_type == QuestionType.OPINION:
+            results[q.id] = {"correct": True, "correct_answer": None}
+            continue
+
+        graded_count += 1
         user_answer = payload.answers.get(str(q.id))
         if user_answer is None:
             user_answer = payload.answers.get(q.id)
@@ -595,21 +602,20 @@ def submit_quiz(
                 if str(user_answer).strip().lower() == q.correct_text.strip().lower():
                     is_correct = True
 
-        elif q.question_type == QuestionType.OPINION:
-            # Free-response feedback — any answer (including blank) is accepted.
-            is_correct = True
-            correct_answer = None
+        # Opinion case is handled before this branch — no need to handle it here.
 
         if is_correct:
-            earned_points += q.points
+            correct_count += 1
 
         results[q.id] = {
             "correct": is_correct,
             "correct_answer": correct_answer if quiz.show_correct_answer else None,
         }
 
-    score = int((earned_points / total_points) * 100) if total_points > 0 else 0
-    is_passed = score >= quiz.passing_score
+    # Score = % of graded (non-opinion) questions answered correctly.
+    score = int((correct_count / graded_count) * 100) if graded_count > 0 else 0
+    # An all-opinion quiz (e.g. course feedback survey) is "passed" automatically.
+    is_passed = score >= quiz.passing_score if graded_count > 0 else True
 
     attempt = QuizAttempt(
         user_id=current_user.id,

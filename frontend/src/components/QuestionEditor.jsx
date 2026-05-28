@@ -14,7 +14,6 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
     question_text: question.question_text,
     choices: question.choices || [],
     correct_text: question.correct_text || '',
-    points: question.points,
   })
 
   const handleSave = async () => {
@@ -83,17 +82,6 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
               onChange={(e) => setDraft({ ...draft, question_text: e.target.value })}
               rows={2}
               className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">คะแนน</label>
-            <input
-              type="number"
-              value={draft.points}
-              onChange={(e) => setDraft({ ...draft, points: parseInt(e.target.value) || 1 })}
-              min={1}
-              className="w-24 px-3 py-1.5 border border-gray-300 rounded text-sm"
             />
           </div>
 

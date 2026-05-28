@@ -349,9 +349,38 @@ export default function CourseViewerPage() {
     return null
   }, [course, currentPos, viewingFinal])
 
+  // Lesson-level gate: every non-skippable quiz on the current lesson must be
+  // passed before the learner can move to the next lesson.
+  const blockingQuiz = useMemo(() => {
+    if (!currentLesson) return null
+    const lq = lessonQuizzes[currentLesson.id] || []
+    return lq.find(q => !q.can_skip && (q.questions?.length || 0) > 0 && !q.is_passed) || null
+  }, [currentLesson, lessonQuizzes])
+  const currentLessonGated = !blockingQuiz
+
   const goNext = () => {
     if (!timeGateMet) {
       showToast(`ต้องอยู่บนหน้านี้อีก ${fmtTime(remainingSeconds)} ก่อนไปต่อ`, 'error')
+      return
+    }
+    if (blockingQuiz) {
+      // Take the learner *to* the quiz they need to pass, not just block silently.
+      if (blockingQuiz.placement === 'mid_video') {
+        // Open the same modal the video-time trigger would.
+        setActiveMidQuiz(blockingQuiz)
+      } else {
+        // end_of_lesson quizzes are rendered inline below the lesson — scroll to it.
+        const el = document.getElementById(`quiz-${blockingQuiz.id}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Brief highlight so the user notices where they landed.
+          el.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2')
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-amber-400', 'ring-offset-2')
+          }, 1800)
+        }
+      }
+      showToast('ต้องผ่านแบบทดสอบนี้ก่อนไปต่อ', 'error')
       return
     }
     if (!nextDest) {
@@ -766,12 +795,13 @@ export default function CourseViewerPage() {
         {!viewingFinal && currentLesson && (lessonQuizzes[currentLesson.id] || []).length > 0 && (
           <div className="space-y-3 mb-4">
             {lessonQuizzes[currentLesson.id].map(quiz => (
-              <QuizTaker
-                key={quiz.id}
-                quiz={quiz}
-                showToast={showToast}
-                onAttempted={refreshQuizzes}
-              />
+              <div key={quiz.id} id={`quiz-${quiz.id}`} className="rounded-xl transition-shadow">
+                <QuizTaker
+                  quiz={quiz}
+                  showToast={showToast}
+                  onAttempted={refreshQuizzes}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -821,15 +851,21 @@ export default function CourseViewerPage() {
                         const isDone = lProgress?.is_completed
                         const hasQuiz = (lessonQuizzes[lesson.id] || []).length > 0
                         const quizPassed = hasQuiz && lessonQuizzes[lesson.id].every(q => q.is_passed || q.can_skip)
+                        // Lesson nav gate: learner can re-enter lessons they've reached
+                        // (current + any with prior progress). New lessons stay locked
+                        // until they "Next" their way into them.
+                        const lessonReached = isActive || !!lProgress
+                        const lessonClickable = unlocked && lessonReached
                         return (
                           <button
                             key={lesson.id}
                             onClick={() => switchLesson(lesson, module.id)}
-                            disabled={!unlocked}
+                            disabled={!lessonClickable}
+                            title={!lessonReached ? 'ต้องเรียนตามลำดับ — ยังไม่ปลดล็อกบทนี้' : undefined}
                             className={`w-full p-3 flex items-center gap-3 text-left transition ${
                               isActive
                                 ? 'bg-forest-50 border-l-4 border-forest-500'
-                                : unlocked ? 'hover:bg-gray-50' : 'cursor-not-allowed'
+                                : lessonClickable ? 'hover:bg-gray-50' : 'cursor-not-allowed opacity-60'
                             }`}
                           >
                             <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ${
@@ -837,6 +873,8 @@ export default function CourseViewerPage() {
                                 ? 'bg-forest-500 text-white'
                                 : isActive
                                 ? 'bg-forest-200 text-forest-700'
+                                : !lessonReached
+                                ? 'bg-gray-100 text-gray-400'
                                 : 'bg-gray-200 text-gray-600'
                             }`}>
                               {isDone ? <Icon name="check" className="w-3 h-3" /> : lIdx + 1}
@@ -849,6 +887,9 @@ export default function CourseViewerPage() {
                                 <Icon name="note" className="w-4 h-4" />
                                 {quizPassed && <Icon name="check" className="w-3 h-3 -ml-0.5" />}
                               </span>
+                            )}
+                            {!lessonReached && unlocked && (
+                              <Icon name="lock" className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             )}
                             <span className="text-xs text-gray-500 flex-shrink-0">
                               {lesson.content_type === 'pdf' ? 'PDF' : 'วิดีโอ'}
@@ -949,13 +990,19 @@ export default function CourseViewerPage() {
                   กลับบทเรียน
                 </button>
               ) : (() => {
+                const blocked = !currentLessonGated
                 return (
                   <button
                     onClick={goNext}
                     disabled={!timeGateMet || !nextDest}
-                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg bg-forest-500 hover:bg-forest-600 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+                    title={blocked ? 'คลิกเพื่อไปทำแบบทดสอบที่ต้องผ่าน' : undefined}
+                    className={`flex-1 sm:flex-none px-5 sm:px-6 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5 ${
+                      blocked ? 'bg-amber-500 hover:bg-amber-600' : 'bg-forest-500 hover:bg-forest-600'
+                    }`}
                   >
-                    {!nextDest ? (
+                    {blocked ? (
+                      <><Icon name="lock" className="w-4 h-4" /> ไปทำแบบทดสอบ</>
+                    ) : !nextDest ? (
                       <>จบหลักสูตรแล้ว <Icon name="check" className="w-4 h-4" /></>
                     ) : nextDest.type === 'final' ? (
                       <><Icon name="trophy" className="w-4 h-4" /> แบบทดสอบสุดท้าย</>
