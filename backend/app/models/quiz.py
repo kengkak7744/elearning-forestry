@@ -31,6 +31,12 @@ class Quiz(Base):
     show_correct_answer = Column(Boolean, default=True, nullable=False)
     passing_score = Column(Integer, default=70)  # percentage
     order_index = Column(Integer, default=0)
+    # Pull a random subset from the question bank on each attempt.
+    # When False, all questions in the bank are served in order_index order.
+    randomize_questions = Column(Boolean, default=False, nullable=False)
+    # How many to serve when randomize_questions is True. If null or ≥ bank size,
+    # the whole bank is served (in random order).
+    questions_per_attempt = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     lesson = relationship("Lesson", back_populates="quizzes")

@@ -42,6 +42,8 @@ class QuizBase(BaseModel):
     show_correct_answer: bool = True
     passing_score: int = 70
     order_index: int = 0
+    randomize_questions: bool = False
+    questions_per_attempt: Optional[int] = None
 
 
 class QuizCreate(QuizBase):
@@ -56,6 +58,8 @@ class QuizUpdate(BaseModel):
     show_correct_answer: Optional[bool] = None
     passing_score: Optional[int] = None
     order_index: Optional[int] = None
+    randomize_questions: Optional[bool] = None
+    questions_per_attempt: Optional[int] = None
 
 
 class QuizResponse(QuizBase):
@@ -70,6 +74,10 @@ class QuizResponse(QuizBase):
 
 class AnswerSubmit(BaseModel):
     answers: dict  # {question_id: answer_value}
+    # IDs of the questions the learner was actually served. With randomization
+    # the server doesn't know which subset the client saw, so the client must
+    # tell us. If omitted, fallback = score against the full bank (back-compat).
+    question_ids: Optional[List[int]] = None
 
 
 class AttemptResponse(BaseModel):

@@ -7,25 +7,40 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
   const [answers, setAnswers] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState(null) // { score, is_passed, results: {qid: {correct, correct_answer}} }
+  // When the learner hits "เริ่ม", freeze the random subset so subsequent parent
+  // refetches can't change which questions they're answering mid-attempt.
+  const [lockedQuestions, setLockedQuestions] = useState(null)
 
   const passedBefore = quiz.is_passed
   const currentlyPassed = result?.is_passed || passedBefore
-  const hasQuestions = quiz.questions && quiz.questions.length > 0
+  const activeQuestions = lockedQuestions || quiz.questions || []
+  const hasQuestions = activeQuestions.length > 0
 
   const setAnswer = (qid, value) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }))
   }
 
+  const start = () => {
+    setLockedQuestions(quiz.questions || [])
+    setStarted(true)
+  }
+
   const reset = () => {
     setAnswers({})
     setResult(null)
+    // New attempt → take whatever the latest random subset is.
+    setLockedQuestions(quiz.questions || [])
     setStarted(true)
   }
 
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
-      const data = await quizzesApi.submit(quiz.id, answers)
+      const data = await quizzesApi.submit(
+        quiz.id,
+        answers,
+        activeQuestions.map((q) => q.id),
+      )
       setResult(data)
       if (data.is_passed) {
         showToast?.(`ผ่านแบบทดสอบ! คะแนน ${data.score}%`, 'success')
@@ -63,7 +78,11 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
       </div>
 
       <p className="text-xs text-gray-500 mb-3">
-        คำถาม {quiz.questions.length} ข้อ · เกณฑ์ผ่าน {quiz.passing_score}%
+        คำถาม {activeQuestions.length} ข้อ
+        {quiz.randomize_questions && (
+          <span className="ml-1 text-forest-700">(สุ่มจากธนาคารคำถาม)</span>
+        )}
+        {' · '}เกณฑ์ผ่าน {quiz.passing_score}%
         {quiz.best_score !== null && quiz.best_score !== undefined && (
           <span className="ml-2">· คะแนนสูงสุดของคุณ: {quiz.best_score}%</span>
         )}
@@ -75,7 +94,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
 
       {hasQuestions && !started && !result && (
         <button
-          onClick={() => setStarted(true)}
+          onClick={start}
           className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-4 py-2 rounded-lg font-medium"
         >
           {currentlyPassed ? 'ทำใหม่' : 'เริ่มทำแบบทดสอบ'}
@@ -84,7 +103,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
 
       {hasQuestions && (started || result) && (
         <div className="space-y-4 mt-2">
-          {quiz.questions.map((q, idx) => {
+          {activeQuestions.map((q, idx) => {
             const qResult = result?.results?.[q.id]
             const stateClass = qResult
               ? qResult.correct

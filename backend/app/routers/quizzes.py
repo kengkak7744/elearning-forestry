@@ -1,3 +1,4 @@
+import random
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from typing import List
@@ -40,8 +41,25 @@ def _strip_question_answers(q):
     }
 
 
+def _serve_questions(quiz):
+    """Return the question subset to show the learner.
+
+    Non-random: full bank, sorted by order_index (stable, authoring order).
+    Random: random.sample of size `questions_per_attempt` (capped at bank size).
+            Each fetch re-rolls — refresh during an attempt is fine because the
+            client locks the set when it submits via `question_ids`.
+    """
+    ordered = sorted(quiz.questions, key=lambda x: x.order_index)
+    if quiz.randomize_questions and quiz.questions_per_attempt:
+        n = min(quiz.questions_per_attempt, len(ordered))
+        if n > 0:
+            return random.sample(ordered, n)
+    return ordered
+
+
 def _quiz_to_safe_dict(q, include_status=False, best=None):
     """Quiz dict with stripped question answers."""
+    served = _serve_questions(q)
     base = {
         "id": q.id,
         "lesson_id": q.lesson_id,
@@ -53,10 +71,9 @@ def _quiz_to_safe_dict(q, include_status=False, best=None):
         "show_correct_answer": q.show_correct_answer,
         "passing_score": q.passing_score,
         "order_index": q.order_index,
-        "questions": [
-            _strip_question_answers(qu)
-            for qu in sorted(q.questions, key=lambda x: x.order_index)
-        ],
+        "randomize_questions": q.randomize_questions,
+        "questions_per_attempt": q.questions_per_attempt,
+        "questions": [_strip_question_answers(qu) for qu in served],
     }
     if include_status:
         base["best_score"] = best["score"] if best else None
@@ -298,7 +315,17 @@ def submit_quiz(
     earned_points = 0
     results = {}
 
-    for q in quiz.questions:
+    # With randomization, the learner saw a subset. Score against the IDs they
+    # were served (passed by the client), not the full bank — otherwise total
+    # points includes unseen questions and the score caps below 100%.
+    if payload.question_ids:
+        served_ids = set(payload.question_ids)
+        questions_to_score = [q for q in quiz.questions if q.id in served_ids]
+    else:
+        # Back-compat: legacy clients don't send question_ids → score full bank.
+        questions_to_score = list(quiz.questions)
+
+    for q in questions_to_score:
         total_points += q.points
         user_answer = payload.answers.get(str(q.id))
         if user_answer is None:

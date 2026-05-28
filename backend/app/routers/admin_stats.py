@@ -27,7 +27,7 @@ def overview(
     """High-level numbers for the dashboard cards."""
     response.headers["Cache-Control"] = _STATS_CACHE
     total_users = db.query(func.count(User.id)).scalar() or 0
-    total_active_users = db.query(func.count(User.id)).filter(User.is_active == 1).scalar() or 0
+    total_active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
     total_courses = db.query(func.count(Course.id)).scalar() or 0
     published_courses = db.query(func.count(Course.id)).filter(Course.is_published == True).scalar() or 0
     total_enrollments = db.query(func.count(Enrollment.id)).scalar() or 0

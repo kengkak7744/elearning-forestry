@@ -11,7 +11,8 @@ export const quizzesApi = {
   create: (data) => client.post('/quizzes/', data).then(r => r.data),
   update: (id, data) => client.patch(`/quizzes/${id}`, data).then(r => r.data),
   delete: (id) => client.delete(`/quizzes/${id}`).then(r => r.data),
-  submit: (quizId, answers) => client.post(`/quizzes/${quizId}/submit`, { answers }).then(r => r.data),
+  submit: (quizId, answers, questionIds) =>
+    client.post(`/quizzes/${quizId}/submit`, { answers, question_ids: questionIds }).then(r => r.data),
   
   // Questions
   addQuestion: (quizId, data) => client.post(`/quizzes/${quizId}/questions`, data).then(r => r.data),

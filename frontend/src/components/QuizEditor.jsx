@@ -19,12 +19,21 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
     can_skip: quiz.can_skip,
     show_correct_answer: quiz.show_correct_answer,
     passing_score: quiz.passing_score,
+    randomize_questions: quiz.randomize_questions || false,
+    questions_per_attempt: quiz.questions_per_attempt || '',
   })
 
   const handleSaveSettings = async () => {
     try {
       const payload = { ...draft }
       if (quiz.placement !== 'mid_video') delete payload.trigger_time
+      // Normalize: when randomization is off, drop the count; when on, require a number.
+      if (!payload.randomize_questions) {
+        payload.questions_per_attempt = null
+      } else {
+        const n = parseInt(payload.questions_per_attempt, 10)
+        payload.questions_per_attempt = Number.isFinite(n) && n > 0 ? n : null
+      }
       const updated = await quizzesApi.update(quiz.id, payload)
       onUpdate(updated)
       setEditing(false)
@@ -151,6 +160,33 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                 />
               </div>
 
+              <div className="border-t border-gray-200 pt-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={draft.randomize_questions}
+                    onChange={(e) => setDraft({ ...draft, randomize_questions: e.target.checked })}
+                  />
+                  สุ่มคำถามจากธนาคาร
+                </label>
+                {draft.randomize_questions && (
+                  <div className="mt-2 ml-6">
+                    <label className="block text-xs text-gray-600 mb-1">
+                      จำนวนข้อต่อครั้ง (จากทั้งหมด {quiz.questions.length} ข้อ)
+                    </label>
+                    <input
+                      type="number"
+                      value={draft.questions_per_attempt}
+                      onChange={(e) => setDraft({ ...draft, questions_per_attempt: e.target.value })}
+                      min={1}
+                      max={quiz.questions.length || undefined}
+                      placeholder="เช่น 5"
+                      className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -191,6 +227,11 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                 <span>คะแนนผ่าน: {quiz.passing_score}%</span>
                 <span>{quiz.can_skip ? 'ข้ามได้' : 'ห้ามข้าม'}</span>
                 <span>{quiz.show_correct_answer ? 'แสดงเฉลย' : 'ไม่แสดงเฉลย'}</span>
+                {quiz.randomize_questions && (
+                  <span className="text-forest-700 font-medium">
+                    สุ่ม {quiz.questions_per_attempt || 'ทั้งหมด'}/{quiz.questions.length} ข้อ
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setEditing(true)}
