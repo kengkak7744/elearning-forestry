@@ -5,26 +5,67 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes slide-in-top {
-  from { transform: translate(-50%, -100%); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+@layer base {
+  :root {
+    /* Brand background — keep the warm beige #F5F4EE that defines the platform identity */
+    --background: 50 22% 95%;
+    --foreground: 152 73% 8%;
+
+    /* Cards float white on the beige background — reads as elevated without shadow */
+    --card: 0 0% 100%;
+    --card-foreground: 152 73% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 152 73% 8%;
+
+    /* Forest-600 #0F6E56 — the existing CTA color, promoted to primary token */
+    --primary: 160 76% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Sandy beige — for tonal/secondary buttons */
+    --secondary: 50 18% 90%;
+    --secondary-foreground: 152 45% 18%;
+
+    --muted: 50 14% 88%;
+    --muted-foreground: 152 18% 32%;
+
+    /* Forest-500 #1D9E75 — badges, highlights */
+    --accent: 160 53% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 60% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 26 80% 14%;
+
+    --border: 50 12% 82%;
+    --input: 50 12% 82%;
+    --ring: 160 76% 24%;
+
+    --radius: 0.75rem;
+  }
 }
 
-.animate-slide-in-top {
-  animation: slide-in-top 0.2s ease-out;
-}
+@layer base {
+  * {
+    @apply border-border;
+  }
 
-body {
-  font-family: 'Sarabun', system-ui, sans-serif;
-  margin: 0;
-  background: #F5F4EE;
+  body {
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+  }
 }
 
 /* Keyboard-only focus indicator. Falls back gracefully where individual
    components add their own focus:ring; this guarantees nothing is left
    without a visible focus state. */
 :focus-visible {
-  outline: 2px solid #0F6E56; /* forest-600 — ≥ 3:1 against white/forest-50 */
+  outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
   border-radius: 2px;
 }

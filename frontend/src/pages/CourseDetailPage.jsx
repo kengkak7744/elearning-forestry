@@ -1,56 +1,104 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { coursesApi } from '../api/courses'
-import { quizzesApi } from '../api/quizzes'
-import { useAuth } from '../contexts/AuthContext'
-import { CATEGORY_BADGES } from '../constants/labels'
-import ConfirmDialog from '../components/ConfirmDialog'
-import CourseStatsModal from '../components/CourseStatsModal'
-import CourseScoresModal from '../components/CourseScoresModal'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  GraduationCap,
+  Layers,
+  LineChart,
+  Lock,
+  PlayCircle,
+  Users,
+} from 'lucide-react'
+import { coursesApi } from '@/api/courses'
+import { quizzesApi } from '@/api/quizzes'
+import { useAuth } from '@/contexts/AuthContext'
+import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
+import { mediaUrl } from '@/utils/media'
+import { showToast } from '@/lib/toast'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import CourseStatsModal from '@/components/CourseStatsModal'
+import CourseScoresModal from '@/components/CourseScoresModal'
 
-function formatThaiDate(dateString) {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  const thaiMonths = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-  ]
-  const day = date.getDate()
-  const month = thaiMonths[date.getMonth()]
-  const year = date.getFullYear() + 543
-  return `${day} ${month} ${year}`
+function formatThaiDate(d) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function LessonRow({ lesson, locked }) {
+  const Icon = locked ? Lock : lesson.is_completed ? CheckCircle2 : PlayCircle
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-md px-2 py-2 ${
+        locked ? 'text-muted-foreground' : 'text-foreground'
+      }`}
+    >
+      <Icon
+        className={`h-5 w-5 flex-shrink-0 ${
+          locked
+            ? 'text-muted-foreground/60'
+            : lesson.is_completed
+            ? 'text-success'
+            : 'text-primary'
+        }`}
+      />
+      <span className="flex-1 truncate text-sm">{lesson.title}</span>
+      {lesson.duration_seconds ? (
+        <span className="text-[11px] text-muted-foreground">
+          {Math.ceil(lesson.duration_seconds / 60)} นาที
+        </span>
+      ) : null}
+    </li>
+  )
 }
 
 export default function CourseDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'instructor'
+
   const [course, setCourse] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [enrollLoading, setEnrollLoading] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
-  const [confirmState, setConfirmState] = useState({ open: false })
-  // Stats: admin gets the full course stats modal; learner gets their own scores.
-  const isAdmin = user?.role === 'admin' || user?.role === 'instructor'
+  const [unenrollOpen, setUnenrollOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [scoresOpen, setScoresOpen] = useState(false)
   const [myQuizzes, setMyQuizzes] = useState(null)
   const [scoresLoading, setScoresLoading] = useState(false)
-
-  const openMyScores = async () => {
-    setScoresLoading(true)
-    try {
-      const data = await quizzesApi.getCourseAll(id)
-      setMyQuizzes(data)
-      setScoresOpen(true)
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'โหลดคะแนนไม่สำเร็จ' })
-    } finally {
-      setScoresLoading(false)
-    }
-  }
 
   const loadCourse = async () => {
     setLoading(true)
@@ -66,285 +114,366 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     loadCourse()
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const handleEnroll = async () => {
     setEnrollLoading(true)
-    setMessage({ type: '', text: '' })
     try {
       await coursesApi.enroll(course.id)
-      setMessage({ type: 'success', text: 'ลงทะเบียนเรียนสำเร็จ' })
+      showToast('ลงทะเบียนเรียนสำเร็จ', 'success')
       await loadCourse()
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'เกิดข้อผิดพลาด' })
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setEnrollLoading(false)
     }
   }
 
-  const handleUnenroll = () => {
-    setConfirmState({
-      open: true,
-      title: 'ยกเลิกการลงทะเบียน',
-      message: 'ต้องการยกเลิกการลงทะเบียนหลักสูตรนี้ใช่หรือไม่? ความคืบหน้าจะถูกเก็บไว้',
-      danger: true,
-      onConfirm: async () => {
-        setConfirmState({ open: false })
-        setEnrollLoading(true)
-        setMessage({ type: '', text: '' })
-        try {
-          await coursesApi.unenroll(course.id)
-          setMessage({ type: 'success', text: 'ยกเลิกการลงทะเบียนเรียบร้อย' })
-          await loadCourse()
-        } catch (err) {
-          setMessage({ type: 'error', text: err.response?.data?.detail || 'เกิดข้อผิดพลาด' })
-        } finally {
-          setEnrollLoading(false)
-        }
-      },
-    })
+  const handleUnenroll = async () => {
+    setUnenrollOpen(false)
+    setEnrollLoading(true)
+    try {
+      await coursesApi.unenroll(course.id)
+      showToast('ยกเลิกการลงทะเบียนเรียบร้อย', 'success')
+      await loadCourse()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+    } finally {
+      setEnrollLoading(false)
+    }
+  }
+
+  const openMyScores = async () => {
+    setScoresLoading(true)
+    try {
+      const data = await quizzesApi.getCourseAll(id)
+      setMyQuizzes(data)
+      setScoresOpen(true)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'โหลดคะแนนไม่สำเร็จ', 'error')
+    } finally {
+      setScoresLoading(false)
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        กำลังโหลด...
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <Skeleton className="mb-4 h-6 w-32" />
+        <Skeleton className="mb-6 aspect-[16/8] w-full rounded-xl" />
+        <Skeleton className="mb-2 h-9 w-3/4" />
+        <Skeleton className="h-5 w-1/2" />
       </div>
     )
   }
 
   if (error || !course) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <p className="text-gray-500 mb-4">{error || 'ไม่พบหลักสูตร'}</p>
-            <Link to="/courses" className="text-forest-600 hover:text-forest-700 font-medium">
-              ← กลับไปหน้าหลักสูตร
-            </Link>
-          </div>
-        </div>
+      <div className="mx-auto max-w-2xl px-4 py-12">
+        <Card className="border-dashed border-border/60">
+          <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
+            <BookOpen className="h-10 w-10 text-muted-foreground/60" />
+            <p className="text-sm text-muted-foreground">{error || 'ไม่พบหลักสูตร'}</p>
+            <Button asChild variant="outline">
+              <Link to="/courses">
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                {BUTTONS.BACK_TO_COURSES}
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  const cat = CATEGORY_BADGES[course.category] || { label: course.category, color: 'bg-gray-100' }
+  const cat = CATEGORY_BADGES[course.category]
+  const cover = course.cover_image ? mediaUrl(course.cover_image) : '/elearning/forest_logo.png'
+  const enrolled = !!course.is_enrolled
+
+  const enrollCta = enrolled ? (
+    <Button
+      onClick={() => navigate(`/courses/${course.id}/learn`)}
+      size="lg"
+      className="w-full"
+    >
+      <PlayCircle className="mr-1.5 h-4 w-4" />
+      {BUTTONS.START_LESSON}
+    </Button>
+  ) : (
+    <Button
+      onClick={handleEnroll}
+      disabled={enrollLoading}
+      size="lg"
+      className="w-full"
+    >
+      <GraduationCap className="mr-1.5 h-4 w-4" />
+      {enrollLoading ? BUTTONS.ENROLLING : BUTTONS.ENROLL}
+    </Button>
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Link to="/courses" className="text-gray-600 hover:text-forest-600 text-sm font-medium flex-shrink-0">
-              ← กลับ
-            </Link>
-          </div>
-          
-          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
-              หน้าหลัก
-            </Link>
-            <Link to="/profile" className="text-xs sm:text-sm text-gray-600 hover:text-forest-600 font-medium">
-              โปรไฟล์
-            </Link>
-            <button onClick={logout} className="text-xs sm:text-sm text-gray-600 hover:text-forest-600">
-              ออกจากระบบ
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10 pb-32 md:pb-10">
+      <Link
+        to="/courses"
+        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {BUTTONS.BACK_TO_COURSES}
+      </Link>
 
-      {/* Hero section */}
-      <div className="bg-gradient-to-br from-forest-500 to-forest-700 text-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium bg-white text-forest-700`}>
-              {cat.label}
-            </span>
-            {course.is_mandatory && (
-              <span className="bg-red-500 text-white text-xs px-3 py-1 rounded-full font-medium">
-                หลักสูตรบังคับ
-              </span>
-            )}
-            {!course.is_published && (
-              <span className="bg-gray-700 text-white text-xs px-3 py-1 rounded-full font-medium">
-                ฉบับร่าง
-              </span>
-            )}
+      {/* Hero */}
+      <div className="grid gap-6 md:grid-cols-[1fr_320px]">
+        <div className="min-w-0">
+          <div className="relative mb-5 aspect-[16/9] w-full overflow-hidden rounded-xl bg-muted">
+            <img
+              src={cover}
+              alt=""
+              loading="eager"
+              fetchpriority="high"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+              {cat && (
+                <Badge variant="secondary" className="bg-background/90">
+                  {cat.label}
+                </Badge>
+              )}
+              {course.is_mandatory && (
+                <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive">
+                  หลักสูตรบังคับ
+                </Badge>
+              )}
+              {!course.is_published && <Badge variant="secondary">ฉบับร่าง</Badge>}
+            </div>
           </div>
-          
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
+
+          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
             {course.title}
           </h1>
-          
-          {/* Meta info */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-forest-50">
-            {course.instructor_name && (
-              <div>
-                <span className="text-forest-200">วิทยากร: </span>
-                <span className="font-medium">{course.instructor_name}</span>
+          {course.instructor_name && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              วิทยากร: <span className="font-medium text-foreground">{course.instructor_name}</span>
+            </p>
+          )}
+
+          <Tabs defaultValue="overview" className="mt-8">
+            <TabsList>
+              <TabsTrigger value="overview">ภาพรวม</TabsTrigger>
+              <TabsTrigger value="content">เนื้อหา</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="mt-4">
+              <Card className="border-border/60">
+                <CardContent className="space-y-4 p-5 sm:p-6">
+                  <h2 className="text-base font-semibold text-foreground">รายละเอียดหลักสูตร</h2>
+                  {course.description ? (
+                    <p className="whitespace-pre-wrap leading-relaxed text-sm text-foreground">
+                      {course.description}
+                    </p>
+                  ) : (
+                    <p className="text-sm italic text-muted-foreground">ไม่มีคำอธิบาย</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="content" className="mt-4">
+              {Array.isArray(course.modules) && course.modules.length > 0 ? (
+                <Accordion type="multiple" className="rounded-lg border border-border/60 bg-card">
+                  {course.modules.map((m, mi) => (
+                    <AccordionItem
+                      key={m.id ?? mi}
+                      value={String(m.id ?? mi)}
+                      className="px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-2 text-left">
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {mi + 1}. {m.title}
+                          </span>
+                          <Badge variant="secondary" className="ml-2 font-normal">
+                            {m.lessons?.length ?? 0} บทเรียน
+                          </Badge>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="space-y-0.5 pb-2">
+                          {(m.lessons ?? []).map((lesson) => (
+                            <LessonRow
+                              key={lesson.id}
+                              lesson={lesson}
+                              locked={!enrolled}
+                            />
+                          ))}
+                        </ul>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              ) : (
+                <Card className="border-border/60">
+                  <CardContent className="p-5 sm:p-6">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      <div className="rounded-lg border border-border bg-muted/30 p-4">
+                        <div className="text-2xl font-semibold tabular-nums text-foreground">
+                          {course.total_modules ?? 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">โมดูล</div>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/30 p-4">
+                        <div className="text-2xl font-semibold tabular-nums text-foreground">
+                          {course.total_lessons ?? 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">บทเรียน</div>
+                      </div>
+                    </div>
+                    {(course.total_lessons ?? 0) === 0 && (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        ยังไม่มีบทเรียนในหลักสูตรนี้
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Side card */}
+        <aside className="md:sticky md:top-20 md:h-fit">
+          <Card className="border-border/60">
+            <CardContent className="space-y-4 p-5">
+              {enrolled && (
+                <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                  <CheckCircle2 className="h-4 w-4" />
+                  คุณลงทะเบียนแล้ว
+                </div>
+              )}
+
+              <div className="hidden md:block">{enrollCta}</div>
+
+              {enrolled && (
+                <Button
+                  variant="outline"
+                  className="hidden w-full md:flex"
+                  onClick={() => setUnenrollOpen(true)}
+                  disabled={enrollLoading}
+                >
+                  {BUTTONS.UNENROLL}
+                </Button>
+              )}
+
+              {isAdmin ? (
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => setStatsOpen(true)}
+                >
+                  <LineChart className="mr-1.5 h-4 w-4" />
+                  {BUTTONS.VIEW_STATS}
+                </Button>
+              ) : enrolled ? (
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={openMyScores}
+                  disabled={scoresLoading}
+                >
+                  <LineChart className="mr-1.5 h-4 w-4" />
+                  {scoresLoading ? 'กำลังโหลด...' : BUTTONS.VIEW_SCORES}
+                </Button>
+              ) : null}
+
+              <div className="space-y-2 border-t border-border/60 pt-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                    <Users className="h-3.5 w-3.5" />
+                    ผู้ลงทะเบียน
+                  </span>
+                  <span className="font-medium tabular-nums">{course.enrolled_count ?? 0}</span>
+                </div>
+                {course.estimated_hours ? (
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      ระยะเวลา
+                    </span>
+                    <span className="font-medium">{course.estimated_hours} ชั่วโมง</span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">เผยแพร่</span>
+                  <span className="font-medium">{formatThaiDate(course.created_at)}</span>
+                </div>
               </div>
-            )}
-            <div>
-              <span className="text-forest-200">เผยแพร่: </span>
-              <span className="font-medium">{formatThaiDate(course.created_at)}</span>
-            </div>
-            {course.estimated_hours && (
-              <div>
-                <span className="text-forest-200">ระยะเวลา: </span>
-                <span className="font-medium">{course.estimated_hours} ชั่วโมง</span>
-              </div>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+
+      {/* Mobile sticky bottom CTA */}
+      <div
+        className="fixed inset-x-0 bottom-14 z-20 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center gap-2">
+          {enrolled && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setUnenrollOpen(true)}
+              disabled={enrollLoading}
+              className="flex-shrink-0"
+            >
+              {BUTTONS.CANCEL}
+            </Button>
+          )}
+          <div className="flex-1">
+            {enrolled ? (
+              <Button
+                onClick={() => navigate(`/courses/${course.id}/learn`)}
+                size="lg"
+                className="w-full"
+              >
+                <PlayCircle className="mr-1.5 h-4 w-4" />
+                {BUTTONS.START_LESSON}
+                <ChevronRight className="ml-auto h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleEnroll}
+                disabled={enrollLoading}
+                size="lg"
+                className="w-full"
+              >
+                {enrollLoading ? BUTTONS.ENROLLING : BUTTONS.ENROLL}
+              </Button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Main content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Description */}
-          <div className="lg:col-span-2 space-y-6">
-            {message.text && (
-              <div className={`px-4 py-3 rounded-lg text-sm border ${
-                message.type === 'success'
-                  ? 'bg-green-50 border-green-200 text-green-700'
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
-                {message.text}
-              </div>
-            )}
-
-            <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">รายละเอียดหลักสูตร</h2>
-              {course.description ? (
-                <p className="text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
-                  {course.description}
-                </p>
-              ) : (
-                <p className="text-gray-400 italic">ไม่มีคำอธิบาย</p>
-              )}
-            </div>
-
-            {/* Course structure */}
-            <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">เนื้อหาในหลักสูตร</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-forest-50 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-forest-700">{course.total_modules}</div>
-                  <div className="text-sm text-gray-600">โมดูล</div>
-                </div>
-                <div className="bg-forest-50 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-forest-700">{course.total_lessons}</div>
-                  <div className="text-sm text-gray-600">บทเรียน</div>
-                </div>
-              </div>
-              {course.total_lessons === 0 && (
-                <p className="text-sm text-gray-500 mt-4">
-                  ยังไม่มีบทเรียนในหลักสูตรนี้
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Enrollment card */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 lg:sticky lg:top-24">
-              <div className="text-center mb-5 pb-5 border-b border-gray-100">
-                <div className="text-3xl font-bold text-forest-600">
-                  {course.enrolled_count}
-                </div>
-                <div className="text-sm text-gray-600 mt-1">
-                  ผู้ลงทะเบียนเรียน
-                </div>
-              </div>
-
-              {course.is_enrolled ? (
-                <>
-                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm text-center mb-4">
-                    คุณลงทะเบียนแล้ว
-                  </div>
-
-                  <button
-                    onClick={() => navigate(`/courses/${course.id}/learn`)}
-                    className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-3 rounded-lg transition mb-3"
-                  >
-                    <Link
-                      to={`/courses/${id}/learn`}
-                    >
-                      เริ่มเรียน
-                    </Link>
-                  </button>
-
-                  <button
-                    onClick={handleUnenroll}
-                    disabled={enrollLoading}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg transition disabled:opacity-50"
-                  >
-                    {enrollLoading ? 'กำลังดำเนินการ...' : 'ยกเลิกการลงทะเบียน'}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={handleEnroll}
-                  disabled={enrollLoading}
-                  className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-3 rounded-lg transition disabled:opacity-50"
-                >
-                  {enrollLoading ? 'กำลังลงทะเบียน...' : 'ลงทะเบียนเรียน'}
-                </button>
-              )}
-
-              {/* Stats — admin sees all-users stats; learner sees only their own scores (if enrolled) */}
-              {isAdmin ? (
-                <button
-                  onClick={() => setStatsOpen(true)}
-                  className="w-full mt-3 bg-forest-50 hover:bg-forest-100 text-forest-700 font-medium py-2 rounded-lg transition"
-                >
-                  ดูสถิติหลักสูตร
-                </button>
-              ) : course.is_enrolled ? (
-                <button
-                  onClick={openMyScores}
-                  disabled={scoresLoading}
-                  className="w-full mt-3 bg-forest-50 hover:bg-forest-100 text-forest-700 font-medium py-2 rounded-lg transition disabled:opacity-50"
-                >
-                  {scoresLoading ? 'กำลังโหลด...' : 'ดูคะแนนของคุณ'}
-                </button>
-              ) : null}
-
-              <div className="mt-5 pt-5 border-t border-gray-100 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">หมวดหมู่</span>
-                  <span className="font-medium text-gray-700">{cat.label}</span>
-                </div>
-                {course.estimated_hours && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">ระยะเวลา</span>
-                    <span className="font-medium text-gray-700">{course.estimated_hours} ชั่วโมง</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ประเภท</span>
-                  <span className="font-medium text-gray-700">
-                    {course.is_mandatory ? 'บังคับ' : 'เลือกได้'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        danger={confirmState.danger}
-        onConfirm={confirmState.onConfirm}
-        onCancel={() => setConfirmState({ open: false })}
-      />
+      <AlertDialog open={unenrollOpen} onOpenChange={setUnenrollOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยกเลิกการลงทะเบียน</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการยกเลิกการลงทะเบียนหลักสูตรนี้ใช่หรือไม่? ความคืบหน้าจะถูกเก็บไว้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{BUTTONS.CANCEL}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnenroll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {BUTTONS.CONFIRM}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CourseStatsModal
         open={statsOpen}

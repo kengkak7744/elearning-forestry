@@ -4,6 +4,8 @@ import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import ErrorBoundary from './components/ErrorBoundary'
+import { Toaster } from '@/components/ui/sonner'
+import { LearnerShell, ViewerShell, AdminShell } from '@/components/layout/AppShell'
 
 // Login/Register are small and accessed first — keep eager.
 import LoginPage from './pages/LoginPage'
@@ -23,7 +25,7 @@ const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage')
 
 function PageFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center text-gray-500 text-sm">
+    <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
       กำลังโหลด...
     </div>
   )
@@ -32,38 +34,63 @@ function PageFallback() {
 function App() {
   return (
     <ErrorBoundary>
-    <AuthProvider>
-      <BrowserRouter>
-      {/* On if deploying to a subdirectory */}
-      {/* <BrowserRouter basename="/elearning"> */}
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
-            {/* Public */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+      <AuthProvider>
+        <Toaster />
+        <BrowserRouter>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              {/* Public */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
 
-            {/* User pages */}
-            <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/courses" element={<ProtectedRoute><CoursesPage /></ProtectedRoute>} />
-            <Route path="/courses/:id" element={<ProtectedRoute><CourseDetailPage /></ProtectedRoute>} />
-            <Route path="/courses/:id/learn" element={<ProtectedRoute><CourseViewerPage /></ProtectedRoute>} />
-            <Route path="/courses/:id/learn/:lessonId" element={<ProtectedRoute><CourseViewerPage /></ProtectedRoute>} />
+              {/* Learner shell — top bar + mobile bottom nav */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <LearnerShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/courses" element={<CoursesPage />} />
+                <Route path="/courses/:id" element={<CourseDetailPage />} />
+              </Route>
 
-            {/* Admin pages */}
-            <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
-            <Route path="/admin/courses" element={<AdminRoute><CoursesListPage /></AdminRoute>} />
-            <Route path="/admin/courses/:id/edit" element={<AdminRoute><CourseEditPage /></AdminRoute>} />
-            <Route path="/admin/users" element={<AdminRoute><UsersListPage /></AdminRoute>} />
-            <Route path="/admin/users/new" element={<AdminRoute><UserFormPage /></AdminRoute>} />
-            <Route path="/admin/users/:id/edit" element={<AdminRoute><UserFormPage /></AdminRoute>} />
+              {/* Viewer shell — full-bleed, slim back bar */}
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <ViewerShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/courses/:id/learn" element={<CourseViewerPage />} />
+                <Route path="/courses/:id/learn/:lessonId" element={<CourseViewerPage />} />
+              </Route>
 
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </AuthProvider>
+              {/* Admin shell — sidebar + content */}
+              <Route
+                element={
+                  <AdminRoute>
+                    <AdminShell />
+                  </AdminRoute>
+                }
+              >
+                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+                <Route path="/admin/courses" element={<CoursesListPage />} />
+                <Route path="/admin/courses/:id/edit" element={<CourseEditPage />} />
+                <Route path="/admin/users" element={<UsersListPage />} />
+                <Route path="/admin/users/new" element={<UserFormPage />} />
+                <Route path="/admin/users/:id/edit" element={<UserFormPage />} />
+              </Route>
+
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }

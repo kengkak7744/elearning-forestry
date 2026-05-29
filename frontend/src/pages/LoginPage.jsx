@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import Toast from '../components/Toast'
+import { useAuth } from '@/contexts/AuthContext'
+import { showToast } from '@/lib/toast'
+import { BUTTONS } from '@/constants/labels'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const { login } = useAuth()
@@ -14,20 +18,13 @@ export default function LoginPage() {
   const location = useLocation()
   const from = location.state?.from?.pathname || '/'
 
-  // Toast state
-  const [toast, setToast] = useState({ message: '', type: 'success' })
-  const showToast = (message, type = 'success') => setToast({ message, type })
-  const closeToast = () => setToast({ message: '', type: 'success' })
-
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
-
     try {
       await login(identifier, password)
-      showToast('เข้าสู่ระบบสำเร็จ')
-      setTimeout(() => navigate(from, { replace: true }), 800)
+      showToast('เข้าสู่ระบบสำเร็จ', 'success')
+      navigate(from, { replace: true })
     } catch (err) {
       showToast(err.response?.data?.detail || 'เข้าสู่ระบบไม่สำเร็จ', 'error')
     } finally {
@@ -36,75 +33,79 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-forest-50 to-forest-100 flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-forest-500 rounded-full mb-4 text-3xl">
-            <img src="/elearning/forest_logo.png" alt="Logo" className="w-20 h-20" />
-          </div>
-          <h1 className="text-2xl font-bold text-forest-700">ระบบ e-Learning</h1>
-          <p className="text-gray-600 mt-1">กรมป่าไม้</p>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <img
+            src="/elearning/forest_logo.png"
+            alt=""
+            width="72"
+            height="72"
+            fetchpriority="high"
+            className="mb-3 h-16 w-16"
+          />
+          <h1 className="text-2xl font-semibold text-foreground">ระบบ e-Learning</h1>
+          <p className="text-sm text-muted-foreground">กรมป่าไม้</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div>
-            <label htmlFor="login-identifier" className="block text-sm font-medium text-gray-700 mb-1">
-              ชื่อผู้ใช้ หรือ อีเมล
-            </label>
-            <input
-              id="login-identifier"
-              name="username"
-              type="text"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              required
-              autoFocus
-              autoComplete="username"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-              placeholder="username หรือ email@example.com"
-            />
-          </div>
+        <Card className="border-border/60">
+          <CardHeader className="pb-4">
+            <h2 className="text-lg font-semibold">{BUTTONS.LOGIN}</h2>
+            <p className="text-sm text-muted-foreground">กรอกข้อมูลเพื่อเข้าใช้งานระบบ</p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <div className="space-y-1.5">
+                <Label htmlFor="login-identifier">ชื่อผู้ใช้ หรือ อีเมล</Label>
+                <Input
+                  id="login-identifier"
+                  name="username"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                  autoFocus
+                  autoComplete="username"
+                  placeholder="username หรือ email@example.com"
+                />
+              </div>
 
-          <div>
-            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">
-              รหัสผ่าน
-            </label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-              placeholder="••••••••"
-            />
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="login-password">รหัสผ่าน</Label>
+                <Input
+                  id="login-password"
+                  name="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                />
+              </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            aria-busy={loading || undefined}
-            className="w-full bg-forest-500 hover:bg-forest-600 text-white font-medium py-2.5 rounded-lg transition disabled:opacity-50 min-h-[44px]"
-          >
-            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-          </button>
-        </form>
-
-        <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-          <p className="text-sm text-gray-600">
-            ยังไม่มีบัญชี?{' '}
-            <Link to="/register" className="text-forest-600 hover:text-forest-700 font-medium">
-              สมัครสมาชิก
-            </Link>
-          </p>
-          <p className="text-xs text-gray-500 mt-3">
-            สำหรับเจ้าหน้าที่กรมป่าไม้
-          </p>
-        </div>
+              <Button
+                type="submit"
+                disabled={loading}
+                aria-busy={loading || undefined}
+                className="w-full"
+                size="lg"
+              >
+                {loading ? BUTTONS.LOGGING_IN : BUTTONS.LOGIN}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-1 border-t border-border/60 pt-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              ยังไม่มีบัญชี?{' '}
+              <Link to="/register" className="font-medium text-primary hover:underline">
+                {BUTTONS.REGISTER}
+              </Link>
+            </p>
+            <p className="text-xs text-muted-foreground/80">สำหรับเจ้าหน้าที่กรมป่าไม้</p>
+          </CardFooter>
+        </Card>
       </div>
-      <Toast message={toast.message} type={toast.type} onClose={closeToast} />
     </div>
   )
 }

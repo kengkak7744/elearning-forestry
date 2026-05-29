@@ -1,7 +1,30 @@
 import { useState } from 'react'
-import { quizzesApi } from '../api/quizzes'
+import {
+  ChevronDown,
+  ChevronRight,
+  LineChart,
+  Plus,
+  Save,
+  Trash2,
+} from 'lucide-react'
+import { quizzesApi } from '@/api/quizzes'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { cn } from '@/lib/utils'
 import QuestionEditor from './QuestionEditor'
-import ConfirmDialog from './ConfirmDialog'
 import QuizStatsModal from './QuizStatsModal'
 
 const placementLabels = {
@@ -13,7 +36,7 @@ const placementLabels = {
 export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [confirmState, setConfirmState] = useState({ open: false })
+  const [confirmDeleteQ, setConfirmDeleteQ] = useState(null)
   const [statsOpen, setStatsOpen] = useState(false)
   const [draft, setDraft] = useState({
     title: quiz.title,
@@ -29,7 +52,6 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
     try {
       const payload = { ...draft }
       if (quiz.placement !== 'mid_video') delete payload.trigger_time
-      // Normalize: when randomization is off, drop the count; when on, require a number.
       if (!payload.randomize_questions) {
         payload.questions_per_attempt = null
       } else {
@@ -39,7 +61,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
       const updated = await quizzesApi.update(quiz.id, payload)
       onUpdate(updated)
       setEditing(false)
-      showToast('บันทึกการตั้งค่าสำเร็จ')
+      showToast('บันทึกการตั้งค่าสำเร็จ', 'success')
     } catch (err) {
       showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
     }
@@ -48,16 +70,21 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const handleAddQuestion = async (type) => {
     try {
       const newQ = await quizzesApi.addQuestion(quiz.id, {
-        question_text: type === 'opinion' ? 'ความคิดเห็นของคุณต่อหลักสูตรนี้' : 'คำถามใหม่',
+        question_text:
+          type === 'opinion' ? 'ความคิดเห็นของคุณต่อหลักสูตรนี้' : 'คำถามใหม่',
         question_type: type,
-        choices: (type === 'single_choice' || type === 'multiple_choice')
-          ? [{ text: 'ตัวเลือก 1', is_correct: true }, { text: 'ตัวเลือก 2', is_correct: false }]
-          : null,
+        choices:
+          type === 'single_choice' || type === 'multiple_choice'
+            ? [
+                { text: 'ตัวเลือก 1', is_correct: true },
+                { text: 'ตัวเลือก 2', is_correct: false },
+              ]
+            : null,
         correct_text: type === 'written' ? '' : null,
         order_index: quiz.questions.length,
       })
       onUpdate({ questions: [...quiz.questions, newQ] })
-      showToast('เพิ่มคำถามสำเร็จ')
+      showToast('เพิ่มคำถามสำเร็จ', 'success')
     } catch (err) {
       showToast(err.response?.data?.detail || 'เพิ่มคำถามไม่สำเร็จ', 'error')
     }
@@ -65,195 +92,251 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
 
   const handleUpdateQuestion = (questionId, updates) => {
     onUpdate({
-      questions: quiz.questions.map(q => q.id === questionId ? { ...q, ...updates } : q)
+      questions: quiz.questions.map((q) =>
+        q.id === questionId ? { ...q, ...updates } : q
+      ),
     })
   }
 
-  const handleDeleteQuestion = (questionId) => {
-    setConfirmState({
-      open: true,
-      title: 'ลบคำถาม',
-      message: 'ต้องการลบคำถามนี้?',
-      danger: true,
-      onConfirm: async () => {
-        try {
-          await quizzesApi.deleteQuestion(questionId)
-          onUpdate({ questions: quiz.questions.filter(q => q.id !== questionId) })
-          showToast('ลบคำถามสำเร็จ')
-        } catch (err) {
-          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
-        }
-        setConfirmState({ open: false })
-      },
-    })
+  const handleDeleteQuestion = async () => {
+    if (!confirmDeleteQ) return
+    const questionId = confirmDeleteQ.id
+    setConfirmDeleteQ(null)
+    try {
+      await quizzesApi.deleteQuestion(questionId)
+      onUpdate({ questions: quiz.questions.filter((q) => q.id !== questionId) })
+      showToast('ลบคำถามสำเร็จ', 'success')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+    }
   }
 
-  const placementColor = {
-    mid_video: 'bg-blue-50 border-blue-200',
-    end_of_lesson: 'bg-purple-50 border-purple-200',
-    final: 'bg-amber-50 border-amber-200',
+  const placementToneClass = {
+    mid_video: 'border-primary/20 bg-primary/5',
+    end_of_lesson: 'border-accent/20 bg-accent/5',
+    final: 'border-warning/30 bg-warning/5',
   }
 
   return (
-    <div className={`border rounded-lg overflow-hidden ${placementColor[quiz.placement]}`}>
-      {/* Header */}
-      <div className="p-3 flex items-center gap-2">
-        <button
+    <div
+      className={cn(
+        'overflow-hidden rounded-lg border',
+        placementToneClass[quiz.placement] ?? 'border-border bg-card'
+      )}
+    >
+      <div className="flex items-center gap-2 p-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
           onClick={() => setExpanded(!expanded)}
-          className="text-gray-500 text-sm w-5 flex-shrink-0"
+          aria-label={expanded ? 'ย่อ' : 'ขยาย'}
         >
-          {expanded ? '▼' : '▶'}
-        </button>
-        <span className="text-xs bg-white px-2 py-0.5 rounded font-medium flex-shrink-0">
+          {expanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </Button>
+        <Badge variant="secondary" className="flex-shrink-0 bg-background font-normal">
           {placementLabels[quiz.placement]}
-        </span>
-        <span className="flex-1 font-medium text-sm text-gray-800 truncate">
+        </Badge>
+        <span className="flex-1 truncate text-sm font-medium text-foreground">
           {quiz.title}
         </span>
-        <span className="text-xs text-gray-500 flex-shrink-0">
+        <span className="flex-shrink-0 text-xs text-muted-foreground">
           {quiz.questions.length} คำถาม
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setStatsOpen(true)}
-          className="text-xs text-forest-700 hover:text-forest-800 flex-shrink-0"
+          className="text-primary hover:text-primary"
         >
-          ดูสถิติ
-        </button>
-        <button
+          <LineChart className="mr-1 h-3.5 w-3.5" />
+          สถิติ
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onDelete}
-          className="text-xs text-red-600 hover:text-red-700 flex-shrink-0"
+          className="h-8 w-8 text-destructive hover:text-destructive"
         >
-          ลบ
-        </button>
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="sr-only">ลบ</span>
+        </Button>
       </div>
 
       {expanded && (
-        <div className="bg-white p-4 space-y-4 border-t border-gray-200">
-          {/* Settings */}
+        <div className="space-y-4 border-t border-border bg-card p-4">
           {editing ? (
-            <div className="bg-gray-50 p-3 rounded space-y-3">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">ชื่อแบบทดสอบ</label>
-                <input
-                  type="text"
+            <div className="space-y-3 rounded-md bg-muted/30 p-3">
+              <div className="space-y-1">
+                <Label htmlFor={`qe-title-${quiz.id}`} className="text-xs">
+                  ชื่อแบบทดสอบ
+                </Label>
+                <Input
+                  id={`qe-title-${quiz.id}`}
                   value={draft.title}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
                 />
               </div>
 
               {quiz.placement === 'mid_video' && (
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">เวลาที่แสดง (วินาที)</label>
-                  <input
+                <div className="space-y-1">
+                  <Label htmlFor={`qe-trigger-${quiz.id}`} className="text-xs">
+                    เวลาที่แสดง (วินาที)
+                  </Label>
+                  <Input
+                    id={`qe-trigger-${quiz.id}`}
                     type="number"
-                    value={draft.trigger_time}
-                    onChange={(e) => setDraft({ ...draft, trigger_time: parseInt(e.target.value) || 0 })}
                     min={0}
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+                    value={draft.trigger_time}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        trigger_time: parseInt(e.target.value) || 0,
+                      })
+                    }
                   />
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">คะแนนผ่าน (%)</label>
-                <input
+              <div className="space-y-1">
+                <Label htmlFor={`qe-pass-${quiz.id}`} className="text-xs">
+                  คะแนนผ่าน (%)
+                </Label>
+                <Input
+                  id={`qe-pass-${quiz.id}`}
                   type="number"
-                  value={draft.passing_score}
-                  onChange={(e) => setDraft({ ...draft, passing_score: parseInt(e.target.value) || 0 })}
                   min={0}
                   max={100}
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+                  value={draft.passing_score}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      passing_score: parseInt(e.target.value) || 0,
+                    })
+                  }
                 />
               </div>
 
-              <div className="border-t border-gray-200 pt-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+              <div className="space-y-2 border-t border-border pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label
+                    htmlFor={`qe-random-${quiz.id}`}
+                    className="cursor-pointer text-sm font-normal"
+                  >
+                    สุ่มคำถาม
+                  </Label>
+                  <Switch
+                    id={`qe-random-${quiz.id}`}
                     checked={draft.randomize_questions}
-                    onChange={(e) => setDraft({ ...draft, randomize_questions: e.target.checked })}
+                    onCheckedChange={(v) =>
+                      setDraft({ ...draft, randomize_questions: v })
+                    }
                   />
-                  สุ่มคำถาม
-                </label>
+                </div>
                 {draft.randomize_questions && (
-                  <div className="mt-2 ml-6">
-                    <label className="block text-xs text-gray-600 mb-1">
+                  <div className="ml-1 space-y-1">
+                    <Label htmlFor={`qe-perattempt-${quiz.id}`} className="text-xs">
                       จำนวนข้อต่อครั้ง (จากทั้งหมด {quiz.questions.length} ข้อ)
-                    </label>
-                    <input
+                    </Label>
+                    <Input
+                      id={`qe-perattempt-${quiz.id}`}
                       type="number"
-                      value={draft.questions_per_attempt}
-                      onChange={(e) => setDraft({ ...draft, questions_per_attempt: e.target.value })}
                       min={1}
                       max={quiz.questions.length || undefined}
+                      value={draft.questions_per_attempt}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          questions_per_attempt: e.target.value,
+                        })
+                      }
                       placeholder="เช่น 5"
-                      className="w-32 px-3 py-1.5 border border-gray-300 rounded text-sm"
+                      className="w-32"
                     />
                   </div>
                 )}
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+              <div className="flex items-center justify-between gap-3">
+                <Label
+                  htmlFor={`qe-skip-${quiz.id}`}
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  อนุญาตให้ข้าม
+                </Label>
+                <Switch
+                  id={`qe-skip-${quiz.id}`}
                   checked={draft.can_skip}
-                  onChange={(e) => setDraft({ ...draft, can_skip: e.target.checked })}
+                  onCheckedChange={(v) => setDraft({ ...draft, can_skip: v })}
                 />
-                อนุญาตให้ข้าม
-              </label>
+              </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+              <div className="flex items-center justify-between gap-3">
+                <Label
+                  htmlFor={`qe-correct-${quiz.id}`}
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  แสดงคำตอบที่ถูกหลังตอบ
+                </Label>
+                <Switch
+                  id={`qe-correct-${quiz.id}`}
                   checked={draft.show_correct_answer}
-                  onChange={(e) => setDraft({ ...draft, show_correct_answer: e.target.checked })}
+                  onCheckedChange={(v) =>
+                    setDraft({ ...draft, show_correct_answer: v })
+                  }
                 />
-                แสดงคำตอบที่ถูกหลังตอบ
-              </label>
+              </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSaveSettings}
-                  className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-4 py-1.5 rounded"
-                >
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={handleSaveSettings}>
+                  <Save className="mr-1 h-3.5 w-3.5" />
                   บันทึก
-                </button>
-                <button
-                  onClick={() => setEditing(false)}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded"
-                >
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
                   ยกเลิก
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between text-xs text-gray-600">
-              <div className="flex gap-3 flex-wrap">
-                {quiz.placement === 'mid_video' && <span>เวลา: {quiz.trigger_time}s</span>}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap gap-3">
+                {quiz.placement === 'mid_video' && (
+                  <span>เวลา: {quiz.trigger_time}s</span>
+                )}
                 <span>คะแนนผ่าน: {quiz.passing_score}%</span>
                 <span>{quiz.can_skip ? 'ข้ามได้' : 'ห้ามข้าม'}</span>
-                <span>{quiz.show_correct_answer ? 'แสดงเฉลย' : 'ไม่แสดงเฉลย'}</span>
+                <span>
+                  {quiz.show_correct_answer ? 'แสดงเฉลย' : 'ไม่แสดงเฉลย'}
+                </span>
                 {quiz.randomize_questions && (
-                  <span className="text-forest-700 font-medium">
-                    สุ่ม {quiz.questions_per_attempt || 'ทั้งหมด'}/{quiz.questions.length} ข้อ
+                  <span className="font-medium text-primary">
+                    สุ่ม {quiz.questions_per_attempt || 'ทั้งหมด'}/
+                    {quiz.questions.length} ข้อ
                   </span>
                 )}
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setEditing(true)}
-                className="text-forest-600 hover:text-forest-700"
+                className="text-primary hover:text-primary"
               >
                 แก้ไขการตั้งค่า
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Questions */}
           <div>
-            <h4 className="font-medium text-sm text-gray-800 mb-2">คำถาม</h4>
+            <h4 className="mb-2 text-sm font-medium text-foreground">คำถาม</h4>
             {quiz.questions.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-3">ยังไม่มีคำถาม</p>
+              <p className="py-3 text-center text-sm text-muted-foreground">
+                ยังไม่มีคำถาม
+              </p>
             ) : (
               <div className="space-y-2">
                 {quiz.questions.map((q, idx) => (
@@ -262,51 +345,72 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                     question={q}
                     index={idx}
                     onUpdate={(updates) => handleUpdateQuestion(q.id, updates)}
-                    onDelete={() => handleDeleteQuestion(q.id)}
+                    onDelete={() => setConfirmDeleteQ(q)}
                     showToast={showToast}
                   />
                 ))}
               </div>
             )}
 
-            <div className="flex gap-2 flex-wrap mt-3">
-              <button
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleAddQuestion('single_choice')}
-                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
               >
-                + เลือกข้อเดียว
-              </button>
-              <button
+                <Plus className="mr-1 h-3 w-3" />
+                เลือกข้อเดียว
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleAddQuestion('multiple_choice')}
-                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
               >
-                + เลือกหลายข้อ
-              </button>
-              <button
+                <Plus className="mr-1 h-3 w-3" />
+                เลือกหลายข้อ
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleAddQuestion('written')}
-                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
               >
-                + เขียนตอบ
-              </button>
-              <button
+                <Plus className="mr-1 h-3 w-3" />
+                เขียนตอบ
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleAddQuestion('opinion')}
-                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded"
+                className="border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
               >
-                + ความคิดเห็น
-              </button>
+                <Plus className="mr-1 h-3 w-3" />
+                ความคิดเห็น
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        danger={confirmState.danger}
-        onConfirm={confirmState.onConfirm}
-        onCancel={() => setConfirmState({ open: false })}
-      />
+      <AlertDialog
+        open={!!confirmDeleteQ}
+        onOpenChange={(o) => !o && setConfirmDeleteQ(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบคำถาม</AlertDialogTitle>
+            <AlertDialogDescription>ต้องการลบคำถามนี้?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteQuestion}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              ยืนยันลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <QuizStatsModal
         open={statsOpen}

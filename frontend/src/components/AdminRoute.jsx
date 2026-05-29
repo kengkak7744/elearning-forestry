@@ -1,14 +1,15 @@
 import { Navigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import Icon from './Icon'
+import { Ban } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { Card, CardContent } from '@/components/ui/card'
 
 export default function AdminRoute({ children }) {
   const { user, loading, isAuthenticated } = useAuth()
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-forest-600">กำลังโหลด...</div>
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        กำลังโหลด...
       </div>
     )
   }
@@ -19,13 +20,19 @@ export default function AdminRoute({ children }) {
 
   if (user?.role !== 'admin') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white rounded-xl shadow p-8 text-center max-w-md">
-          <Icon name="ban" className="w-12 h-12 mx-auto mb-4 text-red-500" />
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ไม่มีสิทธิ์เข้าถึง</h1>
-          <p className="text-gray-600 mb-4">หน้านี้สำหรับผู้ดูแลระบบเท่านั้น</p>
-          <Navigate to="/" replace />
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="max-w-md border-border/60">
+          <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <Ban className="h-7 w-7" />
+            </div>
+            <h1 className="text-xl font-semibold text-foreground">ไม่มีสิทธิ์เข้าถึง</h1>
+            <p className="text-sm text-muted-foreground">
+              หน้านี้สำหรับผู้ดูแลระบบเท่านั้น
+            </p>
+            <Navigate to="/" replace />
+          </CardContent>
+        </Card>
       </div>
     )
   }

@@ -1,6 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, Pause } from 'lucide-react'
 import QuizTaker from './QuizTaker'
-import Icon from './Icon'
+import { BUTTONS } from '@/constants/labels'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempted, showToast }) {
   const [passed, setPassed] = useState(quiz?.is_passed || false)
@@ -9,26 +19,25 @@ export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempte
     setPassed(quiz?.is_passed || false)
   }, [quiz?.id, quiz?.is_passed])
 
-  if (!quiz) return null
-
-  const canContinue = quiz.can_skip || passed
+  const open = !!quiz
+  const canContinue = quiz?.can_skip || passed
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto my-auto">
-        <div className="p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
-              <Icon name="pause" className="w-5 h-5" />
-              แบบทดสอบกลางวิดีโอ
-            </h3>
-          </div>
-          <p className="text-xs sm:text-sm text-gray-500 mb-4">
-            {quiz.can_skip
+    <Dialog open={open} onOpenChange={(o) => !o && onSkip?.()}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pause className="h-5 w-5 text-primary" />
+            แบบทดสอบกลางวิดีโอ
+          </DialogTitle>
+          <DialogDescription>
+            {quiz?.can_skip
               ? 'คุณสามารถข้ามได้ หรือทำให้ผ่านเพื่อนับเป็นความคืบหน้า'
               : 'ต้องผ่านแบบทดสอบนี้เพื่อดูวิดีโอต่อ'}
-          </p>
+          </DialogDescription>
+        </DialogHeader>
 
+        {quiz && (
           <QuizTaker
             quiz={quiz}
             showToast={showToast}
@@ -37,26 +46,20 @@ export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempte
               onAttempted?.(qid, attempt)
             }}
           />
+        )}
 
-          <div className="mt-5 pt-4 border-t border-gray-200 flex gap-2 justify-end flex-wrap">
-            {quiz.can_skip && (
-              <button
-                onClick={onSkip}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg"
-              >
-                ข้ามแบบทดสอบ
-              </button>
-            )}
-            <button
-              onClick={onContinue}
-              disabled={!canContinue}
-              className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-5 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              ดำเนินการต่อ →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        <DialogFooter className="flex-row flex-wrap justify-end gap-2">
+          {quiz?.can_skip && (
+            <Button variant="outline" onClick={onSkip}>
+              {BUTTONS.SKIP_QUIZ}
+            </Button>
+          )}
+          <Button onClick={onContinue} disabled={!canContinue}>
+            {BUTTONS.CONTINUE_WATCHING}
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

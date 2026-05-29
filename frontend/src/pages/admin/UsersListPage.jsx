@@ -1,377 +1,718 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { usersApi } from '../../api/users'
-import AdminLayout from '../../components/AdminLayout'
-import Icon from '../../components/Icon'
-import Toast from '../../components/Toast'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { ROLE_BADGES } from '../../constants/labels'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Ban, KeyRound, Pencil, Plus, Search } from 'lucide-react'
+import { usersApi } from '@/api/users'
+import { ROLE_BADGES, ROLE_LABELS } from '@/constants/labels'
+import { showToast } from '@/lib/toast'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+const emptyForm = {
+  username: '',
+  email: '',
+  full_name: '',
+  password: '',
+  role: 'learner',
+  department: '',
+  position: '',
+  phone: '',
+  responsibility: '',
+  motivation: '',
+}
+
+function UserFormSheet({ open, onOpenChange, userId, onSaved }) {
+  const isEdit = !!userId
+  const [form, setForm] = useState(emptyForm)
+  const [loading, setLoading] = useState(false)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    if (!isEdit) {
+      setForm(emptyForm)
+      return
+    }
+    setLoadingDetail(true)
+    usersApi
+      .getById(userId)
+      .then((data) =>
+        setForm({
+          username: data.username,
+          email: data.email,
+          full_name: data.full_name,
+          password: '',
+          role: data.role,
+          department: data.department || '',
+          position: data.position || '',
+          phone: data.phone || '',
+          responsibility: data.responsibility || '',
+          motivation: data.motivation || '',
+        })
+      )
+      .catch(() => showToast('ไม่พบข้อมูลผู้ใช้', 'error'))
+      .finally(() => setLoadingDetail(false))
+  }, [open, userId, isEdit])
+
+  const update = (key) => (e) => {
+    const value = typeof e === 'string' ? e : e.target.value
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      if (isEdit) {
+        const { password: _pw, ...updateData } = form
+        await usersApi.update(userId, updateData)
+        showToast('บันทึกการแก้ไขสำเร็จ', 'success')
+      } else {
+        await usersApi.create(form)
+        showToast('สร้างผู้ใช้สำเร็จ', 'success')
+      }
+      onSaved?.()
+      onOpenChange(false)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+        <SheetHeader className="mb-4">
+          <SheetTitle>{isEdit ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}</SheetTitle>
+          <SheetDescription>
+            {isEdit
+              ? 'ปรับปรุงข้อมูลและสิทธิ์ของผู้ใช้'
+              : 'กรอกรายละเอียดเพื่อสร้างบัญชีผู้ใช้ใหม่'}
+          </SheetDescription>
+        </SheetHeader>
+
+        {loadingDetail ? (
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4" id="user-form">
+            <div className="space-y-1.5">
+              <Label htmlFor="u-username">
+                Username <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="u-username"
+                required
+                disabled={isEdit}
+                minLength={3}
+                maxLength={20}
+                value={form.username}
+                onChange={update('username')}
+                placeholder="เช่น EMP001"
+              />
+              {isEdit && (
+                <p className="text-xs text-muted-foreground">username ไม่สามารถแก้ไขได้</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="u-fullname">
+                ชื่อ-นามสกุล <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="u-fullname"
+                required
+                minLength={2}
+                value={form.full_name}
+                onChange={update('full_name')}
+                placeholder="นายสมชาย ใจดี"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="u-email">
+                อีเมล <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="u-email"
+                type="email"
+                required
+                value={form.email}
+                onChange={update('email')}
+                placeholder="somchai@forest.go.th"
+              />
+            </div>
+
+            {!isEdit && (
+              <div className="space-y-1.5">
+                <Label htmlFor="u-password">
+                  รหัสผ่าน <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="u-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={form.password}
+                  onChange={update('password')}
+                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                />
+                <p className="text-xs text-muted-foreground">
+                  ผู้ใช้สามารถเปลี่ยนรหัสผ่านได้หลัง login ครั้งแรก
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="u-role">
+                บทบาท <span className="text-destructive">*</span>
+              </Label>
+              <Select value={form.role} onValueChange={update('role')}>
+                <SelectTrigger id="u-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="learner">เจ้าหน้าที่ผู้เรียน</SelectItem>
+                  <SelectItem value="manager">หัวหน้างาน</SelectItem>
+                  <SelectItem value="instructor">วิทยากร</SelectItem>
+                  <SelectItem value="admin">ผู้ดูแลระบบ</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="u-phone">
+                เบอร์โทรศัพท์ <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="u-phone"
+                type="tel"
+                required
+                minLength={9}
+                value={form.phone}
+                onChange={update('phone')}
+                placeholder="081-234-5678"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="u-department">หน่วยงาน</Label>
+                <Input
+                  id="u-department"
+                  value={form.department}
+                  onChange={update('department')}
+                  placeholder="สำนักจัดการป่าไม้ภาคที่ 1"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="u-position">ตำแหน่ง</Label>
+                <Input
+                  id="u-position"
+                  value={form.position}
+                  onChange={update('position')}
+                  placeholder="เจ้าพนักงานป่าไม้"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="u-responsibility">
+                หน้าที่รับผิดชอบ <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="u-responsibility"
+                required
+                minLength={5}
+                maxLength={1000}
+                rows={3}
+                value={form.responsibility}
+                onChange={update('responsibility')}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="u-motivation">
+                เหตุผลในการเรียน <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="u-motivation"
+                required
+                minLength={5}
+                maxLength={1000}
+                rows={3}
+                value={form.motivation}
+                onChange={update('motivation')}
+              />
+            </div>
+          </form>
+        )}
+
+        <SheetFooter className="mt-6 flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="user-form" disabled={loading || loadingDetail}>
+            {loading ? 'กำลังบันทึก...' : isEdit ? 'บันทึกการแก้ไข' : 'สร้างผู้ใช้'}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function ResetPasswordDialog({ target, onClose }) {
+  const [pw1, setPw1] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!target) {
+      setPw1('')
+      setPw2('')
+    }
+  }, [target])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (pw1 !== pw2) {
+      showToast('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน', 'error')
+      return
+    }
+    if (pw1.length < 6) {
+      showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error')
+      return
+    }
+    setLoading(true)
+    try {
+      await usersApi.resetPassword(target.id, pw1)
+      showToast(`รีเซ็ตรหัสผ่านของ ${target.full_name} สำเร็จ`, 'success')
+      onClose()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={!!target} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>รีเซ็ตรหัสผ่าน</DialogTitle>
+          <DialogDescription>
+            สำหรับ <span className="font-medium text-foreground">{target?.full_name}</span> ·{' '}
+            <span className="font-mono text-xs">@{target?.username}</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
+          การกระทำนี้จะเปลี่ยนรหัสผ่านทันที กรุณาแจ้งรหัสใหม่ให้ผู้ใช้
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4" id="reset-pw-form">
+          <div className="space-y-1.5">
+            <Label htmlFor="rp-new">
+              รหัสผ่านใหม่ <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="rp-new"
+              type="text"
+              required
+              minLength={6}
+              autoFocus
+              value={pw1}
+              onChange={(e) => setPw1(e.target.value)}
+              className="font-mono"
+              placeholder="อย่างน้อย 6 ตัวอักษร"
+            />
+            <p className="text-xs text-muted-foreground">
+              เห็นเป็นข้อความเพื่อให้คัดลอกแจ้งผู้ใช้ได้
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rp-confirm">
+              ยืนยันรหัสผ่าน <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="rp-confirm"
+              type="text"
+              required
+              minLength={6}
+              value={pw2}
+              onChange={(e) => setPw2(e.target.value)}
+              className="font-mono"
+            />
+          </div>
+        </form>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="reset-pw-form" disabled={loading}>
+            {loading ? 'กำลังบันทึก...' : 'รีเซ็ตรหัสผ่าน'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export default function UsersListPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
-  
-  // State สำหรับ modal reset password
-  const [resetTarget, setResetTarget] = useState(null)  // user object
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [resetError, setResetError] = useState('')
-  const [resetLoading, setResetLoading] = useState(false)
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
 
-  // Confirm + toast
-  const [toast, setToast] = useState({ message: '', type: 'success' })
-  const [confirmState, setConfirmState] = useState({ open: false })
-  const showToast = (m, t = 'success') => setToast({ message: m, type: t })
+  const editId = params.get('id')
+  const isAdding = params.get('new') === '1'
+
+  const [resetTarget, setResetTarget] = useState(null)
+  const [confirmDeactivate, setConfirmDeactivate] = useState(null)
 
   const loadUsers = async () => {
     setLoading(true)
     try {
-      const data = await usersApi.list({ search, role: roleFilter || undefined })
+      const data = await usersApi.list({
+        search,
+        role: roleFilter === 'all' ? undefined : roleFilter,
+      })
       setUsers(data)
     } catch (err) {
-      console.error(err)
+      showToast(err.response?.data?.detail || 'โหลดรายการไม่สำเร็จ', 'error')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadUsers()
-    // eslint-disable-next-line
-  }, [roleFilter])
+    const t = setTimeout(loadUsers, search ? 400 : 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, roleFilter])
 
-  useEffect(() => {
-    const timer = setTimeout(() => loadUsers(), 400)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line
-  }, [search])
-
-  const handleDeactivate = (userId, name) => {
-    setConfirmState({
-      open: true,
-      title: 'ระงับบัญชี',
-      message: `ต้องการระงับบัญชี "${name}" ใช่หรือไม่?`,
-      danger: true,
-      onConfirm: async () => {
-        setConfirmState({ open: false })
-        try {
-          await usersApi.deactivate(userId)
-          showToast('ระงับบัญชีเรียบร้อย')
-          loadUsers()
-        } catch (err) {
-          showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
-        }
-      },
-    })
-  }
-
-  // เปิด modal
-  const openResetModal = (user) => {
-    setResetTarget(user)
-    setNewPassword('')
-    setConfirmPassword('')
-    setResetError('')
-  }
-
-  // ปิด modal
-  const closeResetModal = () => {
-    setResetTarget(null)
-    setNewPassword('')
-    setConfirmPassword('')
-    setResetError('')
-  }
-
-  // ส่งคำขอ reset password
-  const handleResetPassword = async (e) => {
-    e.preventDefault()
-    setResetError('')
-
-    if (newPassword !== confirmPassword) {
-      setResetError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน')
-      return
-    }
-
-    if (newPassword.length < 6) {
-      setResetError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร')
-      return
-    }
-
-    setResetLoading(true)
+  const handleDeactivate = async () => {
+    if (!confirmDeactivate) return
+    const target = confirmDeactivate
+    setConfirmDeactivate(null)
     try {
-      await usersApi.resetPassword(resetTarget.id, newPassword)
-      alert(`รีเซ็ตรหัสผ่านของ ${resetTarget.full_name} สำเร็จ`)
-      closeResetModal()
+      await usersApi.deactivate(target.id)
+      showToast('ระงับบัญชีเรียบร้อย', 'success')
+      loadUsers()
     } catch (err) {
-      setResetError(err.response?.data?.detail || 'เกิดข้อผิดพลาด')
-    } finally {
-      setResetLoading(false)
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
     }
+  }
+
+  const openEdit = (userId) => {
+    setParams({ id: String(userId) })
+  }
+
+  const openAdd = () => {
+    setParams({ new: '1' })
+  }
+
+  const closeSheet = () => {
+    navigate('/admin/users', { replace: true })
   }
 
   return (
-    <AdminLayout>
-      <div className="p-4 sm:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">จัดการผู้ใช้</h1>
-            <p className="text-gray-500 text-sm mt-1">รายการเจ้าหน้าที่ทั้งหมดในระบบ</p>
-          </div>
-          <Link
-            to="/admin/users/new"
-            className="bg-forest-500 hover:bg-forest-600 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 w-full sm:w-auto justify-center"
-          >
-            <span>+</span>
-            <span>เพิ่มผู้ใช้</span>
-          </Link>
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
+      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">จัดการผู้ใช้</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            รายการเจ้าหน้าที่ทั้งหมดในระบบ
+          </p>
         </div>
-
-        {/* Filter bar */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            placeholder="ค้นหาชื่อ username หรืออีเมล..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-          />
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-          >
-            <option value="">ทุกบทบาท</option>
-            <option value="learner">เจ้าหน้าที่ผู้เรียน</option>
-            <option value="manager">หัวหน้างาน</option>
-            <option value="instructor">วิทยากร</option>
-            <option value="admin">ผู้ดูแลระบบ</option>
-          </select>
-        </div>
-
-        {/* Desktop table view */}
-        <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center text-gray-500">กำลังโหลด...</div>
-          ) : users.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">ไม่พบข้อมูล</div>
-          ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">อีเมล</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">บทบาท</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">หน่วยงาน</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {users.map((u) => {
-                  const role = ROLE_BADGES[u.role] || { label: u.role, color: 'bg-gray-100' }
-                  return (
-                    <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-mono max-w-[200px] break-words">{u.username}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-800 max-w-[150px]">{u.full_name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600 max-w-[150px]">{u.email}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${role.color}`}>
-                          {role.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{u.department || '-'}</td>
-                      <td className="px-6 py-4">
-                        {u.is_active ? (
-                          <span className="text-green-600 text-sm">● ใช้งาน</span>
-                        ) : (
-                          <span className="text-gray-400 text-sm">● ระงับ</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm whitespace-nowrap">
-                        <Link to={`/admin/users/${u.id}/edit`} className="text-forest-600 hover:text-forest-700 mr-3">
-                          แก้ไข
-                        </Link>
-                        <button onClick={() => openResetModal(u)} className="text-amber-600 hover:text-amber-700 mr-3">
-                          รีเซ็ตรหัส
-                        </button>
-                        {u.is_active && (
-                          <button onClick={() => handleDeactivate(u.id, u.full_name)} className="text-red-600 hover:text-red-700">
-                            ระงับ
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Mobile card view */}
-        <div className="md:hidden space-y-3">
-          {loading ? (
-            <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">กำลังโหลด...</div>
-          ) : users.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">ไม่พบข้อมูล</div>
-          ) : (
-            users.map((u) => {
-              const role = ROLE_BADGES[u.role] || { label: u.role, color: 'bg-gray-100' }
-              return (
-                <div key={u.id} className="bg-white rounded-xl shadow-sm p-4">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-gray-800 max-w-[150px] truncate">{u.full_name}</div>
-                      <div className="text-sm font-mono text-gray-500 max-w-[200px] break-words ">@{u.username}</div>
-                    </div>
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${role.color}`}>
-                      {role.label}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-1 text-sm mb-3">
-                    <div className="text-gray-600 max-w-[200px] break-all">{u.email}</div>
-                    <div className="text-gray-500 max-w-[200px] break-words">{u.department || '-'}</div>
-                    <div>
-                      {u.is_active ? (
-                        <span className="text-green-600">● ใช้งาน</span>
-                      ) : (
-                        <span className="text-gray-400">● ระงับ</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-3 border-t border-gray-100">
-                    <Link
-                      to={`/admin/users/${u.id}/edit`}
-                      className="flex-1 text-center py-2 bg-forest-50 text-forest-700 rounded-lg text-sm font-medium"
-                    >
-                      แก้ไข
-                    </Link>
-                    <button
-                      onClick={() => openResetModal(u)}
-                      className="flex-1 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium"
-                    >
-                      รีเซ็ตรหัส
-                    </button>
-                    {u.is_active && (
-                      <button
-                        onClick={() => handleDeactivate(u.id, u.full_name)}
-                        className="flex-1 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium"
-                      >
-                        ระงับ
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        <div className="mt-4 text-sm text-gray-500">
-          แสดง {users.length} รายการ
-        </div>
+        <Button onClick={openAdd} className="w-full sm:w-auto">
+          <Plus className="mr-1 h-4 w-4" />
+          เพิ่มผู้ใช้
+        </Button>
       </div>
 
-      {/* Modal Reset Password — เหมือนเดิม */}
-      {resetTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-800">รีเซ็ตรหัสผ่าน</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  สำหรับ <span className="font-medium text-gray-700">{resetTarget.full_name}</span>
-                  <br />
-                  <span className="font-mono text-xs">@{resetTarget.username}</span>
-                </p>
-              </div>
-              <button
-                onClick={closeResetModal}
-                className="text-gray-400 hover:text-gray-600 text-xl"
-              >
-                <Icon name="close" className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm mb-4">
-              การกระทำนี้จะเปลี่ยนรหัสผ่านทันที กรุณาแจ้งรหัสใหม่ให้ผู้ใช้
-            </div>
-
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  รหัสผ่านใหม่ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  autoFocus
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none font-mono"
-                  placeholder="อย่างน้อย 6 ตัวอักษร"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  เห็นเป็นข้อความเพื่อให้คัดลอกแจ้งผู้ใช้ได้
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ยืนยันรหัสผ่าน <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none font-mono"
-                  placeholder="พิมพ์รหัสผ่านอีกครั้ง"
-                />
-              </div>
-
-              {resetError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-                  {resetError}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={resetLoading}
-                  className="flex-1 bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 rounded-lg transition disabled:opacity-50"
-                >
-                  {resetLoading ? 'กำลังบันทึก...' : 'รีเซ็ตรหัสผ่าน'}
-                </button>
-                <button
-                  type="button"
-                  onClick={closeResetModal}
-                  className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg transition"
-                >
-                  ยกเลิก
-                </button>
-              </div>
-            </form>
+      <Card className="mb-4 border-border/60">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="ค้นหาชื่อ username หรืออีเมล..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
           </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทุกบทบาท</SelectItem>
+              <SelectItem value="learner">เจ้าหน้าที่ผู้เรียน</SelectItem>
+              <SelectItem value="manager">หัวหน้างาน</SelectItem>
+              <SelectItem value="instructor">วิทยากร</SelectItem>
+              <SelectItem value="admin">ผู้ดูแลระบบ</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
         </div>
+      ) : users.length === 0 ? (
+        <Card className="border-dashed border-border/60">
+          <CardContent className="p-12 text-center text-sm text-muted-foreground">
+            ไม่พบข้อมูล
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <Card className="hidden border-border/60 md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Username</TableHead>
+                  <TableHead>ชื่อ-นามสกุล</TableHead>
+                  <TableHead>อีเมล</TableHead>
+                  <TableHead>บทบาท</TableHead>
+                  <TableHead>หน่วยงาน</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="text-right">การจัดการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => {
+                  const roleMeta = ROLE_BADGES[u.role]
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-mono text-xs">{u.username}</TableCell>
+                      <TableCell className="font-medium text-foreground">{u.full_name}</TableCell>
+                      <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-normal">
+                          {roleMeta?.label ?? ROLE_LABELS[u.role] ?? u.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {u.department || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {u.is_active ? (
+                          <span className="inline-flex items-center gap-1.5 text-sm text-success">
+                            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                            ใช้งาน
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                            ระงับ
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEdit(u.id)}
+                            title="แก้ไข"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span className="sr-only">แก้ไข</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setResetTarget(u)}
+                            title="รีเซ็ตรหัสผ่าน"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            <span className="sr-only">รีเซ็ตรหัสผ่าน</span>
+                          </Button>
+                          {u.is_active && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setConfirmDeactivate(u)}
+                              className="text-destructive hover:text-destructive"
+                              title="ระงับบัญชี"
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                              <span className="sr-only">ระงับ</span>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {users.map((u) => {
+              const roleMeta = ROLE_BADGES[u.role]
+              return (
+                <Card key={u.id} className="border-border/60">
+                  <CardContent className="p-4">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-foreground">
+                          {u.full_name}
+                        </div>
+                        <div className="truncate font-mono text-xs text-muted-foreground">
+                          @{u.username}
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="flex-shrink-0 font-normal">
+                        {roleMeta?.label ?? u.role}
+                      </Badge>
+                    </div>
+                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                      <div className="truncate">{u.email}</div>
+                      <div className="truncate">{u.department || '-'}</div>
+                      <div>
+                        {u.is_active ? (
+                          <span className="text-success">● ใช้งาน</span>
+                        ) : (
+                          <span>● ระงับ</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex gap-2 border-t border-border/60 pt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openEdit(u.id)}
+                      >
+                        <Pencil className="mr-1 h-3 w-3" />
+                        แก้ไข
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setResetTarget(u)}
+                      >
+                        <KeyRound className="mr-1 h-3 w-3" />
+                        รีเซ็ตรหัส
+                      </Button>
+                      {u.is_active && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-destructive hover:text-destructive"
+                          onClick={() => setConfirmDeactivate(u)}
+                        >
+                          <Ban className="mr-1 h-3 w-3" />
+                          ระงับ
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </>
       )}
 
-      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        danger={confirmState.danger}
-        onConfirm={confirmState.onConfirm}
-        onCancel={() => setConfirmState({ open: false })}
+      <div className="mt-4 text-sm text-muted-foreground">
+        แสดง {users.length} รายการ
+      </div>
+
+      <UserFormSheet
+        open={!!editId || isAdding}
+        onOpenChange={(open) => !open && closeSheet()}
+        userId={editId}
+        onSaved={loadUsers}
       />
-    </AdminLayout>
+
+      <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
+
+      <AlertDialog
+        open={!!confirmDeactivate}
+        onOpenChange={(open) => !open && setConfirmDeactivate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ระงับบัญชี</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการระงับบัญชี &ldquo;{confirmDeactivate?.full_name}&rdquo; ใช่หรือไม่?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeactivate}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              ยืนยันระงับ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }

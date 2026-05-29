@@ -1,22 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { authApi } from '../api/auth'
-import Icon from '../components/Icon'
-import LearnerHeader from '../components/LearnerHeader'
-import MyCourses from '../components/MyCourses'
-import { ROLE_LABELS } from '../constants/labels'
+import { BookOpen, CheckCircle2, Pencil, Trophy } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { authApi } from '@/api/auth'
+import { coursesApi } from '@/api/courses'
+import { certificatesApi } from '@/api/certificates'
+import { mediaUrl } from '@/utils/media'
+import { ROLE_LABELS } from '@/constants/labels'
+import { showToast } from '@/lib/toast'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 
-export default function ProfilePage() {
+function initials(name) {
+  if (!name) return 'U'
+  const parts = name.trim().split(/\s+/)
+  return (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')
+}
+
+function ViewField({ label, value, mono }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`text-sm font-medium text-foreground ${mono ? 'font-mono' : ''} whitespace-pre-wrap`}>
+        {value || '-'}
+      </div>
+    </div>
+  )
+}
+
+function ProfileTab() {
   const { user, updateUser } = useAuth()
-  
-  // โหมด edit/view
-  const [isEditing, setIsEditing] = useState(false)
-  const [profileMessage, setProfileMessage] = useState({ type: '', text: '' })
-  const [profileLoading, setProfileLoading] = useState(false)
-  
-  // ฟอร์มแก้ไข profile
-  const [profileForm, setProfileForm] = useState({
+  const [editing, setEditing] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState({
     full_name: user?.full_name || '',
     phone: user?.phone || '',
     department: user?.department || '',
@@ -25,26 +49,10 @@ export default function ProfilePage() {
     motivation: user?.motivation || '',
   })
 
-  // ฟอร์มเปลี่ยนรหัสผ่าน
-  const [passwordData, setPasswordData] = useState({
-    current_password: '',
-    new_password: '',
-    confirm_new_password: '',
-  })
-  const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' })
-  const [passwordLoading, setPasswordLoading] = useState(false)
+  const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
-  const handleProfileChange = (e) => {
-    setProfileForm({ ...profileForm, [e.target.name]: e.target.value })
-  }
-
-  const handlePasswordChange = (e) => {
-    setPasswordData({ ...passwordData, [e.target.name]: e.target.value })
-  }
-
-  // เริ่มแก้ไข
   const startEdit = () => {
-    setProfileForm({
+    setForm({
       full_name: user?.full_name || '',
       phone: user?.phone || '',
       department: user?.department || '',
@@ -52,369 +60,411 @@ export default function ProfilePage() {
       responsibility: user?.responsibility || '',
       motivation: user?.motivation || '',
     })
-    setProfileMessage({ type: '', text: '' })
-    setIsEditing(true)
+    setEditing(true)
   }
 
-  // ยกเลิกแก้ไข
-  const cancelEdit = () => {
-    setIsEditing(false)
-    setProfileMessage({ type: '', text: '' })
-  }
-
-  // บันทึก profile
-  const handleProfileSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setProfileMessage({ type: '', text: '' })
-    setProfileLoading(true)
-
+    setLoading(true)
     try {
-      const updated = await authApi.updateMe(profileForm)
+      const updated = await authApi.updateMe(form)
       updateUser(updated)
-      setProfileMessage({ type: 'success', text: 'บันทึกข้อมูลสำเร็จ' })
-      setIsEditing(false)
+      showToast('บันทึกข้อมูลสำเร็จ', 'success')
+      setEditing(false)
     } catch (err) {
       const detail = err.response?.data?.detail
-      if (Array.isArray(detail)) {
-        const messages = detail.map(d => `${d.loc[1]}: ${d.msg}`).join(', ')
-        setProfileMessage({ type: 'error', text: messages })
-      } else {
-        setProfileMessage({ type: 'error', text: detail || 'เกิดข้อผิดพลาด' })
-      }
+      const msg = Array.isArray(detail)
+        ? detail.map((d) => `${d.loc[1]}: ${d.msg}`).join(', ')
+        : detail || 'เกิดข้อผิดพลาด'
+      showToast(msg, 'error')
     } finally {
-      setProfileLoading(false)
+      setLoading(false)
     }
   }
 
-  // เปลี่ยนรหัสผ่าน
-  const handlePasswordSubmit = async (e) => {
+  if (!editing) {
+    return (
+      <Card className="border-border/60">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div>
+            <h3 className="text-base font-semibold">ข้อมูลส่วนตัว</h3>
+            <p className="text-sm text-muted-foreground">รายละเอียดบัญชีของคุณ</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={startEdit}>
+            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+            แก้ไข
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <ViewField label="ชื่อผู้ใช้" value={user?.username} mono />
+            <ViewField label="บทบาท" value={ROLE_LABELS[user?.role]} />
+            <ViewField label="ชื่อ-นามสกุล" value={user?.full_name} />
+            <ViewField label="อีเมล" value={user?.email} />
+            <ViewField label="เบอร์โทรศัพท์" value={user?.phone} />
+            <ViewField label="หน่วยงาน" value={user?.department} />
+            <div className="sm:col-span-2">
+              <ViewField label="ตำแหน่ง" value={user?.position} />
+            </div>
+            <div className="sm:col-span-2">
+              <ViewField label="หน้าที่รับผิดชอบ" value={user?.responsibility} />
+            </div>
+            <div className="sm:col-span-2">
+              <ViewField label="เหตุผลในการเรียน" value={user?.motivation} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader className="pb-4">
+        <h3 className="text-base font-semibold">แก้ไขข้อมูลส่วนตัว</h3>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="rounded-md border border-dashed border-border bg-muted/40 p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ViewField label="ชื่อผู้ใช้ (แก้ไขไม่ได้)" value={user?.username} mono />
+              <ViewField label="อีเมล (แก้ไขไม่ได้)" value={user?.email} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="prof-fullname">ชื่อ-นามสกุล <span className="text-destructive">*</span></Label>
+              <Input id="prof-fullname" required value={form.full_name} onChange={update('full_name')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prof-phone">เบอร์โทรศัพท์ <span className="text-destructive">*</span></Label>
+              <Input id="prof-phone" type="tel" required value={form.phone} onChange={update('phone')} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prof-dept">หน่วยงาน/สังกัด <span className="text-destructive">*</span></Label>
+              <Input id="prof-dept" required value={form.department} onChange={update('department')} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="prof-position">ตำแหน่ง <span className="text-destructive">*</span></Label>
+              <Input id="prof-position" required value={form.position} onChange={update('position')} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="prof-responsibility">หน้าที่รับผิดชอบ <span className="text-destructive">*</span></Label>
+              <Textarea
+                id="prof-responsibility"
+                required
+                rows={3}
+                maxLength={1000}
+                value={form.responsibility}
+                onChange={update('responsibility')}
+              />
+              <p className="text-xs text-muted-foreground">{form.responsibility.length}/1000 ตัวอักษร</p>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="prof-motivation">เหตุผลในการเรียน <span className="text-destructive">*</span></Label>
+              <Textarea
+                id="prof-motivation"
+                required
+                rows={3}
+                maxLength={1000}
+                value={form.motivation}
+                onChange={update('motivation')}
+              />
+              <p className="text-xs text-muted-foreground">{form.motivation.length}/1000 ตัวอักษร</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 border-t border-border/60 pt-4">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setEditing(false)}>
+              ยกเลิก
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+function SecurityTab() {
+  const [data, setData] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_new_password: '',
+  })
+  const [loading, setLoading] = useState(false)
+
+  const update = (k) => (e) => setData({ ...data, [k]: e.target.value })
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setPasswordMessage({ type: '', text: '' })
-
-    if (passwordData.new_password !== passwordData.confirm_new_password) {
-      setPasswordMessage({ type: 'error', text: 'รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน' })
+    if (data.new_password !== data.confirm_new_password) {
+      showToast('รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน', 'error')
       return
     }
-
-    if (passwordData.new_password.length < 6) {
-      setPasswordMessage({ type: 'error', text: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร' })
+    if (data.new_password.length < 6) {
+      showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร', 'error')
       return
     }
-
-    setPasswordLoading(true)
+    setLoading(true)
     try {
-      await authApi.changePassword(passwordData.current_password, passwordData.new_password)
-      setPasswordMessage({ type: 'success', text: 'เปลี่ยนรหัสผ่านสำเร็จ' })
-      setPasswordData({
-        current_password: '',
-        new_password: '',
-        confirm_new_password: '',
-      })
+      await authApi.changePassword(data.current_password, data.new_password)
+      showToast('เปลี่ยนรหัสผ่านสำเร็จ', 'success')
+      setData({ current_password: '', new_password: '', confirm_new_password: '' })
     } catch (err) {
-      setPasswordMessage({
-        type: 'error',
-        text: err.response?.data?.detail || 'เกิดข้อผิดพลาด',
-      })
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
     } finally {
-      setPasswordLoading(false)
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <LearnerHeader />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <h2 className="text-lg font-bold text-gray-800">ข้อมูลส่วนตัว</h2>
-            {!isEditing && (
-              <button
-                onClick={startEdit}
-                className="bg-forest-500 hover:bg-forest-600 text-white px-4 py-2 rounded-lg font-medium text-sm transition w-full sm:w-auto"
-              >
-                แก้ไขข้อมูล
-              </button>
-            )}
+    <Card className="border-border/60">
+      <CardHeader className="pb-4">
+        <h3 className="text-base font-semibold">เปลี่ยนรหัสผ่าน</h3>
+        <p className="text-sm text-muted-foreground">
+          กรอกรหัสผ่านปัจจุบันและตั้งรหัสผ่านใหม่
+        </p>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="max-w-md space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="cur-pw">รหัสผ่านปัจจุบัน</Label>
+            <Input
+              id="cur-pw"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={data.current_password}
+              onChange={update('current_password')}
+            />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-pw">รหัสผ่านใหม่</Label>
+            <Input
+              id="new-pw"
+              type="password"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              value={data.new_password}
+              onChange={update('new_password')}
+              placeholder="อย่างน้อย 6 ตัวอักษร"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm-pw">ยืนยันรหัสผ่านใหม่</Label>
+            <Input
+              id="confirm-pw"
+              type="password"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              value={data.confirm_new_password}
+              onChange={update('confirm_new_password')}
+            />
+          </div>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
 
-          {/* แสดงผลแบบ readonly */}
-          {!isEditing && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">ชื่อผู้ใช้</div>
-                  <div className="font-medium font-mono">{user?.username}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">บทบาท</div>
-                  <div className="font-medium">{ROLE_LABELS[user?.role]}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">ชื่อ-นามสกุล</div>
-                  <div className="font-medium">{user?.full_name}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">อีเมล</div>
-                  <div className="font-medium">{user?.email}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">เบอร์โทรศัพท์</div>
-                  <div className="font-medium">{user?.phone || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">หน่วยงาน</div>
-                  <div className="font-medium">{user?.department || '-'}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs text-gray-500 uppercase mb-1">ตำแหน่ง</div>
-                  <div className="font-medium">{user?.position || '-'}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs text-gray-500 uppercase mb-1">หน้าที่รับผิดชอบ</div>
-                  <div className="font-medium whitespace-pre-wrap">{user?.responsibility || '-'}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-xs text-gray-500 uppercase mb-1">เหตุผลในการเรียน</div>
-                  <div className="font-medium whitespace-pre-wrap">{user?.motivation || '-'}</div>
-                </div>
+function MyCoursesTab() {
+  const [items, setItems] = useState(null)
+
+  useEffect(() => {
+    coursesApi.myEnrollments().then(setItems).catch(() => setItems([]))
+  }, [])
+
+  if (items === null) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-44 w-full rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <Card className="border-dashed border-border/60">
+        <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+          <BookOpen className="h-10 w-10 text-muted-foreground/60" />
+          <p className="text-sm text-muted-foreground">คุณยังไม่ได้ลงทะเบียนหลักสูตรใด</p>
+          <Button asChild>
+            <Link to="/courses">ไปดูหลักสูตรทั้งหมด</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((e) => {
+        const progress = e.progress_percent ?? 0
+        const id = e.course?.id ?? e.course_id
+        const title = e.course?.title ?? e.title
+        const coverField = e.course?.cover_image ?? e.cover_image
+        const cover = coverField ? mediaUrl(coverField) : '/elearning/forest_logo.png'
+        return (
+          <Card key={id} className="overflow-hidden border-border/60">
+            <Link to={`/courses/${id}/learn`} className="block group">
+              <div className="aspect-video w-full overflow-hidden bg-muted">
+                <img
+                  src={cover}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                />
               </div>
-
-              {profileMessage.text && profileMessage.type === 'success' && (
-                <div className="flex items-center gap-2">
-                  <Icon name="check" className="w-4 h-4 flex-shrink-0" />
-                  <span>{profileMessage.text}</span>
+              <CardContent className="space-y-2 p-4">
+                <div className="flex flex-wrap gap-1">
+                  {progress >= 100 && (
+                    <Badge className="bg-success text-success-foreground hover:bg-success">
+                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                      เสร็จสิ้น
+                    </Badge>
+                  )}
+                  {e.is_mandatory && <Badge variant="destructive">บังคับ</Badge>}
                 </div>
-              )}
-            </>
-          )}
-
-          {/* โหมดแก้ไข */}
-          {isEditing && (
-            <form onSubmit={handleProfileSubmit} className="space-y-4">
-              {/* Readonly fields */}
-              <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">ชื่อผู้ใช้ (แก้ไขไม่ได้)</div>
-                  <div className="font-medium font-mono text-gray-600">{user?.username}</div>
+                <h3 className="line-clamp-2 text-sm font-semibold text-foreground">{title}</h3>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">
+                      {e.completed_lessons ?? 0}/{e.total_lessons ?? 0} บทเรียน
+                    </span>
+                    <span className="font-medium tabular-nums text-foreground">
+                      {Math.round(progress)}%
+                    </span>
+                  </div>
+                  <Progress value={progress} className="h-1.5" />
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase mb-1">อีเมล (แก้ไขไม่ได้)</div>
-                  <div className="font-medium text-gray-600">{user?.email}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ชื่อ-นามสกุล <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="full_name"
-                    value={profileForm.full_name}
-                    onChange={handleProfileChange}
-                    required
-                    minLength={2}
-                    maxLength={150}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    เบอร์โทรศัพท์ <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={profileForm.phone}
-                    onChange={handleProfileChange}
-                    required
-                    minLength={9}
-                    maxLength={20}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                    placeholder="081-234-5678"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    หน่วยงาน/สังกัด <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="department"
-                    value={profileForm.department}
-                    onChange={handleProfileChange}
-                    required
-                    minLength={2}
-                    maxLength={150}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ตำแหน่ง <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="position"
-                    value={profileForm.position}
-                    onChange={handleProfileChange}
-                    required
-                    minLength={2}
-                    maxLength={100}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    หน้าที่รับผิดชอบ <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    name="responsibility"
-                    value={profileForm.responsibility}
-                    onChange={handleProfileChange}
-                    required
-                    minLength={5}
-                    maxLength={1000}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none resize-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {profileForm.responsibility.length}/1000 ตัวอักษร
-                  </p>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    เหตุผลในการเรียน <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    name="motivation"
-                    value={profileForm.motivation}
-                    onChange={handleProfileChange}
-                    required
-                    minLength={5}
-                    maxLength={1000}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none resize-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {profileForm.motivation.length}/1000 ตัวอักษร
-                  </p>
-                </div>
-              </div>
-
-              {profileMessage.text && profileMessage.type === 'error' && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-                  {profileMessage.text}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="submit"
-                  disabled={profileLoading}
-                  className="bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 px-6 rounded-lg transition disabled:opacity-50"
-                >
-                  {profileLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-6 rounded-lg transition"
-                >
-                  ยกเลิก
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-
-        {/* my enrolled courses */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800">หลักสูตรของฉัน</h2>
-            <Link to="/courses" className="text-sm text-forest-600 hover:text-forest-700 font-medium">
-              ดูคอร์สทั้งหมด →
+              </CardContent>
             </Link>
-          </div>
-          <MyCourses />
-        </div>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
 
-        {/* เปลี่ยนรหัสผ่าน */}
-        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">เปลี่ยนรหัสผ่าน</h2>
-          
-          <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-md">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                รหัสผ่านปัจจุบัน
-              </label>
-              <input
-                type="password"
-                name="current_password"
-                value={passwordData.current_password}
-                onChange={handlePasswordChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-              />
-            </div>
+function CertificatesTab() {
+  const [certs, setCerts] = useState(null)
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                รหัสผ่านใหม่
-              </label>
-              <input
-                type="password"
-                name="new_password"
-                value={passwordData.new_password}
-                onChange={handlePasswordChange}
-                required
-                minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-                placeholder="อย่างน้อย 6 ตัวอักษร"
-              />
-            </div>
+  useEffect(() => {
+    certificatesApi.mine().then(setCerts).catch(() => setCerts([]))
+  }, [])
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                ยืนยันรหัสผ่านใหม่
-              </label>
-              <input
-                type="password"
-                name="confirm_new_password"
-                value={passwordData.confirm_new_password}
-                onChange={handlePasswordChange}
-                required
-                minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-              />
-            </div>
+  if (certs === null) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Skeleton className="h-24 w-full rounded-lg" />
+        <Skeleton className="h-24 w-full rounded-lg" />
+      </div>
+    )
+  }
 
-            {passwordMessage.text && (
-              <div className={`px-4 py-2 rounded-lg text-sm border ${
-                passwordMessage.type === 'success'
-                  ? 'bg-green-50 border-green-200 text-green-700'
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
-                {passwordMessage.text}
+  if (certs.length === 0) {
+    return (
+      <Card className="border-dashed border-border/60">
+        <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+          <Trophy className="h-10 w-10 text-muted-foreground/60" />
+          <p className="text-sm text-muted-foreground">
+            ยังไม่มีใบรับรอง — เรียนจบหลักสูตรเพื่อรับใบรับรอง
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2">
+      {certs.map((c) => (
+        <li key={c.id}>
+          <Card className="border-border/60">
+            <CardContent className="flex items-start gap-3 p-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Trophy className="h-5 w-5" />
               </div>
-            )}
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-1 text-sm font-medium text-foreground">
+                  {c.course?.title}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  เลขที่ {c.certificate_number}
+                  {c.final_score != null && <span> · คะแนน {Math.round(c.final_score)}%</span>}
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <a
+                  href={certificatesApi.downloadUrl(c.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ดาวน์โหลด
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
-            <button
-              type="submit"
-              disabled={passwordLoading}
-              className="w-full sm:w-auto bg-forest-500 hover:bg-forest-600 text-white font-medium py-2 px-6 rounded-lg transition disabled:opacity-50"
-            >
-              {passwordLoading ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}
-            </button>
-          </form>
-        </div>
-      </main>
+export default function ProfilePage() {
+  const { user } = useAuth()
+
+  return (
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+      {/* Profile header */}
+      <Card className="mb-6 border-border/60">
+        <CardContent className="flex items-center gap-4 p-5">
+          <Avatar className="h-14 w-14">
+            <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
+              {initials(user?.full_name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold text-foreground">
+              {user?.full_name}
+            </h1>
+            <p className="truncate text-sm text-muted-foreground">
+              {user?.email} · {ROLE_LABELS[user?.role]}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="mb-6 w-full justify-start overflow-x-auto sm:w-auto">
+          <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
+          <TabsTrigger value="security">ความปลอดภัย</TabsTrigger>
+          <TabsTrigger value="courses">หลักสูตรของฉัน</TabsTrigger>
+          <TabsTrigger value="certificates">ใบรับรอง</TabsTrigger>
+        </TabsList>
+        <TabsContent value="profile">
+          <ProfileTab />
+        </TabsContent>
+        <TabsContent value="security">
+          <SecurityTab />
+        </TabsContent>
+        <TabsContent value="courses">
+          <MyCoursesTab />
+        </TabsContent>
+        <TabsContent value="certificates">
+          <CertificatesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

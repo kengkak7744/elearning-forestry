@@ -1,18 +1,25 @@
-import { useState, useEffect } from 'react'
-import { quizzesApi } from '../api/quizzes'
+import { useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
+import { quizzesApi } from '@/api/quizzes'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import QuizEditor from './QuizEditor'
-import ConfirmDialog from './ConfirmDialog'
 
 export default function QuizManager({ lessonId, courseId, scope, showToast }) {
   // scope: "lesson" or "final"
   const [quizzes, setQuizzes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [confirmState, setConfirmState] = useState({ open: false })
-
-  useEffect(() => {
-    loadQuizzes()
-    // eslint-disable-next-line
-  }, [lessonId, courseId])
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   const loadQuizzes = async () => {
     setLoading(true)
@@ -35,6 +42,11 @@ export default function QuizManager({ lessonId, courseId, scope, showToast }) {
     }
   }
 
+  useEffect(() => {
+    loadQuizzes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId, courseId])
+
   const handleAddQuiz = async (placement) => {
     try {
       const payload = {
@@ -51,83 +63,99 @@ export default function QuizManager({ lessonId, courseId, scope, showToast }) {
 
       const newQuiz = await quizzesApi.create(payload)
       setQuizzes([...quizzes, { ...newQuiz, questions: [] }])
-      showToast('เพิ่มแบบทดสอบสำเร็จ')
+      showToast('เพิ่มแบบทดสอบสำเร็จ', 'success')
     } catch (err) {
       showToast(err.response?.data?.detail || 'เพิ่มไม่สำเร็จ', 'error')
     }
   }
 
   const handleUpdateQuiz = (quizId, updates) => {
-    setQuizzes(quizzes.map(q => q.id === quizId ? { ...q, ...updates } : q))
+    setQuizzes(quizzes.map((q) => (q.id === quizId ? { ...q, ...updates } : q)))
   }
 
-  const handleDeleteQuiz = (quizId) => {
-    setConfirmState({
-      open: true,
-      title: 'ลบแบบทดสอบ',
-      message: 'ต้องการลบแบบทดสอบนี้และคำถามทั้งหมดในแบบทดสอบ?',
-      danger: true,
-      onConfirm: async () => {
-        try {
-          await quizzesApi.delete(quizId)
-          setQuizzes(quizzes.filter(q => q.id !== quizId))
-          showToast('ลบแบบทดสอบสำเร็จ')
-        } catch (err) {
-          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
-        }
-        setConfirmState({ open: false })
-      },
-    })
+  const handleDeleteQuiz = async () => {
+    if (!confirmDelete) return
+    const quizId = confirmDelete.id
+    setConfirmDelete(null)
+    try {
+      await quizzesApi.delete(quizId)
+      setQuizzes(quizzes.filter((q) => q.id !== quizId))
+      showToast('ลบแบบทดสอบสำเร็จ', 'success')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+    }
   }
 
-  if (loading) return <p className="text-sm text-gray-400 text-center py-2">กำลังโหลด...</p>
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-16 w-full rounded-lg" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">
-      {quizzes.map(quiz => (
+      {quizzes.map((quiz) => (
         <QuizEditor
           key={quiz.id}
           quiz={quiz}
           onUpdate={(updates) => handleUpdateQuiz(quiz.id, updates)}
-          onDelete={() => handleDeleteQuiz(quiz.id)}
+          onDelete={() => setConfirmDelete(quiz)}
           showToast={showToast}
         />
       ))}
 
       {scope === 'lesson' && (
-        <div className="flex gap-2 flex-wrap">
-          <button
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => handleAddQuiz('mid_video')}
-            className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-200"
           >
-            + แบบทดสอบกลางวิดีโอ
-          </button>
-          <button
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            แบบทดสอบกลางวิดีโอ
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => handleAddQuiz('end_of_lesson')}
-            className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-200"
           >
-            + แบบทดสอบท้ายบท
-          </button>
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            แบบทดสอบท้ายบท
+          </Button>
         </div>
       )}
 
       {scope === 'final' && quizzes.length === 0 && (
-        <button
-          onClick={() => handleAddQuiz('final')}
-          className="text-sm bg-forest-100 text-forest-700 px-4 py-2 rounded hover:bg-forest-200"
-        >
-          + สร้างแบบทดสอบสุดท้าย
-        </button>
+        <Button onClick={() => handleAddQuiz('final')}>
+          <Plus className="mr-1 h-4 w-4" />
+          สร้างแบบทดสอบสุดท้าย
+        </Button>
       )}
 
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        danger={confirmState.danger}
-        onConfirm={confirmState.onConfirm}
-        onCancel={() => setConfirmState({ open: false })}
-      />
+      <AlertDialog
+        open={!!confirmDelete}
+        onOpenChange={(o) => !o && setConfirmDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบแบบทดสอบ</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการลบแบบทดสอบ &ldquo;{confirmDelete?.title}&rdquo; และคำถามทั้งหมดในแบบทดสอบ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteQuiz}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              ยืนยันลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { quizzesApi } from '../api/quizzes'
+import { ChevronDown, ChevronRight, Plus, Save, Trash2 } from 'lucide-react'
+import { quizzesApi } from '@/api/quizzes'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 const typeLabels = {
   single_choice: 'เลือกข้อเดียว',
@@ -21,7 +27,7 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
       const updated = await quizzesApi.updateQuestion(question.id, draft)
       onUpdate(updated)
       setExpanded(false)
-      showToast('บันทึกคำถามสำเร็จ')
+      showToast('บันทึกคำถามสำเร็จ', 'success')
     } catch (err) {
       showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
     }
@@ -30,9 +36,11 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
   const updateChoice = (idx, field, value) => {
     const next = [...draft.choices]
     next[idx] = { ...next[idx], [field]: value }
-
-    // For single_choice, ensure only one is_correct
-    if (question.question_type === 'single_choice' && field === 'is_correct' && value) {
+    if (
+      question.question_type === 'single_choice' &&
+      field === 'is_correct' &&
+      value
+    ) {
       next.forEach((c, i) => {
         if (i !== idx) c.is_correct = false
       })
@@ -43,7 +51,10 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
   const addChoice = () => {
     setDraft({
       ...draft,
-      choices: [...draft.choices, { text: `ตัวเลือก ${draft.choices.length + 1}`, is_correct: false }]
+      choices: [
+        ...draft.choices,
+        { text: `ตัวเลือก ${draft.choices.length + 1}`, is_correct: false },
+      ],
     })
   }
 
@@ -52,108 +63,136 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
   }
 
   return (
-    <div className="border border-gray-200 rounded bg-gray-50">
-      <div className="p-2 flex items-center gap-2">
-        <button
+    <div className="rounded-md border border-border bg-muted/30">
+      <div className="flex items-center gap-2 p-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
           onClick={() => setExpanded(!expanded)}
-          className="text-gray-400 text-sm w-5 flex-shrink-0"
         >
-          {expanded ? '−' : '+'}
-        </button>
-        <span className="text-xs text-gray-500 font-mono flex-shrink-0">Q{index + 1}</span>
-        <span className="text-xs bg-white px-2 py-0.5 rounded flex-shrink-0">
-          {typeLabels[question.question_type]}
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+        </Button>
+        <span className="flex-shrink-0 font-mono text-xs text-muted-foreground">
+          Q{index + 1}
         </span>
-        <span className="flex-1 text-sm text-gray-800 truncate">{question.question_text}</span>
-        <button
+        <Badge variant="secondary" className="flex-shrink-0 bg-background font-normal">
+          {typeLabels[question.question_type]}
+        </Badge>
+        <span className="flex-1 truncate text-sm text-foreground">
+          {question.question_text}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onDelete}
-          className="text-xs text-red-600 hover:text-red-700 flex-shrink-0"
+          className="h-7 w-7 text-destructive hover:text-destructive"
         >
-          ลบ
-        </button>
+          <Trash2 className="h-3 w-3" />
+          <span className="sr-only">ลบ</span>
+        </Button>
       </div>
 
       {expanded && (
-        <div className="bg-white p-3 space-y-3 border-t border-gray-200">
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">คำถาม</label>
-            <textarea
-              value={draft.question_text}
-              onChange={(e) => setDraft({ ...draft, question_text: e.target.value })}
+        <div className="space-y-3 border-t border-border bg-card p-3">
+          <div className="space-y-1">
+            <Label htmlFor={`qe-text-${question.id}`} className="text-xs">
+              คำถาม
+            </Label>
+            <Textarea
+              id={`qe-text-${question.id}`}
               rows={2}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm resize-none"
+              value={draft.question_text}
+              onChange={(e) =>
+                setDraft({ ...draft, question_text: e.target.value })
+              }
             />
           </div>
 
-          {/* Choices for single/multiple choice */}
-          {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
+          {(question.question_type === 'single_choice' ||
+            question.question_type === 'multiple_choice') && (
             <div>
-              <label className="block text-xs text-gray-600 mb-2">ตัวเลือก</label>
-              <div className="space-y-2">
+              <Label className="text-xs">ตัวเลือก</Label>
+              <div className="mt-2 space-y-2">
                 {draft.choices.map((choice, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <input
-                      type={question.question_type === 'single_choice' ? 'radio' : 'checkbox'}
+                      type={
+                        question.question_type === 'single_choice'
+                          ? 'radio'
+                          : 'checkbox'
+                      }
                       name={`q-${question.id}-correct`}
                       checked={choice.is_correct}
-                      onChange={(e) => updateChoice(idx, 'is_correct', e.target.checked)}
+                      onChange={(e) =>
+                        updateChoice(idx, 'is_correct', e.target.checked)
+                      }
+                      className="h-4 w-4 accent-primary"
                     />
-                    <input
-                      type="text"
+                    <Input
                       value={choice.text}
                       onChange={(e) => updateChoice(idx, 'text', e.target.value)}
-                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm"
+                      className="flex-1"
                     />
                     {draft.choices.length > 2 && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => removeChoice(idx)}
-                        className="text-xs text-red-600 hover:text-red-700"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
                       >
-                        ลบ
-                      </button>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only">ลบตัวเลือก</span>
+                      </Button>
                     )}
                   </div>
                 ))}
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={addChoice}
-                className="mt-2 text-xs text-forest-600 hover:text-forest-700"
+                className="mt-2 text-primary hover:text-primary"
               >
-                + เพิ่มตัวเลือก
-              </button>
-              <p className="text-xs text-gray-500 mt-1">
+                <Plus className="mr-1 h-3 w-3" />
+                เพิ่มตัวเลือก
+              </Button>
+              <p className="mt-1 text-xs text-muted-foreground">
                 ติ๊กเครื่องหมายหน้าตัวเลือกที่ถูกต้อง
               </p>
             </div>
           )}
 
-          {/* Written answer */}
           {question.question_type === 'written' && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">คำตอบที่ถูกต้อง</label>
-              <input
-                type="text"
+            <div className="space-y-1">
+              <Label htmlFor={`qe-correct-${question.id}`} className="text-xs">
+                คำตอบที่ถูกต้อง
+              </Label>
+              <Input
+                id={`qe-correct-${question.id}`}
                 value={draft.correct_text}
-                onChange={(e) => setDraft({ ...draft, correct_text: e.target.value })}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+                onChange={(e) =>
+                  setDraft({ ...draft, correct_text: e.target.value })
+                }
                 placeholder="คำตอบที่ถูก (เปรียบเทียบแบบไม่สนตัวพิมพ์เล็ก-ใหญ่)"
               />
             </div>
           )}
 
-          {/* Opinion — no correct answer */}
           {question.question_type === 'opinion' && (
-            <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded p-2">
+            <p className="rounded-md border border-primary/20 bg-primary/5 p-2 text-xs text-foreground">
               คำถามแบบความคิดเห็น — ผู้เรียนตอบอะไรก็ได้ (หรือเว้นว่าง) จะถูกนับว่าตอบถูกเสมอ
             </p>
           )}
 
-          <button
-            onClick={handleSave}
-            className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-4 py-1.5 rounded"
-          >
+          <Button size="sm" onClick={handleSave}>
+            <Save className="mr-1 h-3.5 w-3.5" />
             บันทึก
-          </button>
+          </Button>
         </div>
       )}
     </div>

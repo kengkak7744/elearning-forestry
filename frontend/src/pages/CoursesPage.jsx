@@ -1,182 +1,220 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { coursesApi } from '../api/courses'
-import { useAuth } from '../contexts/AuthContext'
-import Icon from '../components/Icon'
-import LearnerHeader from '../components/LearnerHeader'
-import { CATEGORY_BADGES } from '../constants/labels'
-import { mediaUrl } from '../utils/media'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { BookOpen, Search } from 'lucide-react'
+import { coursesApi } from '@/api/courses'
+import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import CourseCard from '@/components/learner/CourseCard'
+import { cn } from '@/lib/utils'
 
-const categoryIcons = {
-  compliance: '',
-  technical: '',
-  safety: '',
-  skill: '',
-}
+const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
+  value,
+  label: meta.label,
+}))
 
 export default function CoursesPage() {
-  const { user } = useAuth()
-  const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [mandatoryOnly, setMandatoryOnly] = useState(false)
+  const [params, setParams] = useSearchParams()
 
+  // Read filters from URL as stable primitives. Parsing into arrays must
+  // happen via useMemo, otherwise every render produces a new reference and
+  // useEffect below loops forever.
+  const search = params.get('q') ?? ''
+  const catParam = params.get('cat') ?? ''
+  const mandatoryOnly = params.get('m') === '1'
+  const selectedCategories = useMemo(
+    () => (catParam ? catParam.split(',').filter(Boolean) : []),
+    [catParam]
+  )
+
+  const updateParam = useCallback(
+    (key, value) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (value) next.set(key, value)
+          else next.delete(key)
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setParams]
+  )
+
+  const setSearch = (v) => updateParam('q', v)
+  const setMandatoryOnly = (v) => updateParam('m', v ? '1' : '')
+  const toggleCategory = (value) => {
+    const next = selectedCategories.includes(value)
+      ? selectedCategories.filter((v) => v !== value)
+      : [...selectedCategories, value]
+    updateParam('cat', next.join(','))
+  }
+  const clearFilters = () => {
+    setParams({}, { replace: true })
+  }
+
+  const [courses, setCourses] = useState([])
+  const [progressMap, setProgressMap] = useState({})
+  const [loading, setLoading] = useState(true)
+
+  // Fetch enrollments once on mount — used to badge cards with progress %.
   useEffect(() => {
-    const params = {}
-    if (search) params.search = search
-    if (categoryFilter) params.category = categoryFilter
-    if (mandatoryOnly) params.is_mandatory = true
+    coursesApi
+      .myEnrollments()
+      .then((list) => {
+        const map = {}
+        list.forEach((e) => {
+          const id = e.course?.id ?? e.course_id
+          const pct = e.progress_percent ?? e.progress_percentage ?? 0
+          if (id != null) map[id] = pct
+        })
+        setProgressMap(map)
+      })
+      .catch(() => setProgressMap({}))
+  }, [])
+
+  // Server filters by single category; for multi-select fetch unfiltered and
+  // narrow client-side. Depend on stable primitive `catParam`, not the
+  // parsed array — derived arrays get new refs every render.
+  useEffect(() => {
+    const reqParams = {}
+    if (search) reqParams.search = search
+    const cats = catParam ? catParam.split(',').filter(Boolean) : []
+    if (cats.length === 1) reqParams.category = cats[0]
+    if (mandatoryOnly) reqParams.is_mandatory = true
 
     setLoading(true)
-    // Debounce so text input doesn't fire per-keystroke; filters use the same path
-    // so changing a filter and typing doesn't double-fire.
     const timer = setTimeout(() => {
-      coursesApi.list(params)
+      coursesApi
+        .list(reqParams)
         .then(setCourses)
-        .catch(err => console.error(err))
+        .catch(() => setCourses([]))
         .finally(() => setLoading(false))
-    }, search ? 400 : 0)
+    }, search ? 350 : 0)
     return () => clearTimeout(timer)
-  }, [search, categoryFilter, mandatoryOnly])
+  }, [search, catParam, mandatoryOnly])
+
+  const visibleCourses = useMemo(() => {
+    if (selectedCategories.length <= 1) return courses
+    return courses.filter((c) => selectedCategories.includes(c.category))
+  }, [courses, selectedCategories])
+
+  const hasFilter =
+    !!search || selectedCategories.length > 0 || mandatoryOnly
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <LearnerHeader />
-
-      {/* Page header */}
-      <div className="bg-gradient-to-br from-forest-500 to-forest-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2">หลักสูตรทั้งหมด</h2>
-          <p className="text-sm sm:text-base text-forest-50">
-            สวัสดี {user?.full_name} เริ่มต้นเรียนรู้กับหลักสูตรของกรมป่าไม้
-          </p>
-        </div>
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">หลักสูตรทั้งหมด</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          เลือกหลักสูตรที่สนใจเพื่อเริ่มเรียนรู้
+        </p>
       </div>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-4 sm:mb-6">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
+      {/* Filter bar */}
+      <div className="sticky top-16 z-20 -mx-4 mb-6 border-y border-border/60 bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:px-4">
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
               placeholder="ค้นหาหลักสูตร..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
+              className="pl-9"
             />
-            
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-            >
-              <option value="">ทุกหมวดหมู่</option>
-              <option value="compliance">บังคับตามกฎหมาย</option>
-              <option value="technical">วิชาชีพ</option>
-              <option value="safety">ความปลอดภัย</option>
-              <option value="skill">ทักษะทั่วไป</option>
-            </select>
-            
-            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-              <input
-                type="checkbox"
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {categories.map((c) => {
+              const active = selectedCategories.includes(c.value)
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => toggleCategory(c.value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-foreground hover:bg-muted'
+                  )}
+                  aria-pressed={active}
+                >
+                  {c.label}
+                </button>
+              )
+            })}
+            {hasFilter && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {BUTTONS.CLEAR_FILTERS}
+              </button>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <Switch
+                id="mandatory-only"
                 checked={mandatoryOnly}
-                onChange={(e) => setMandatoryOnly(e.target.checked)}
-                className="w-4 h-4 text-forest-500 rounded"
+                onCheckedChange={setMandatoryOnly}
               />
-              <span className="text-sm text-gray-700 whitespace-nowrap">เฉพาะหลักสูตรบังคับ</span>
-            </label>
+              <Label htmlFor="mandatory-only" className="cursor-pointer text-sm">
+                เฉพาะหลักสูตรบังคับ
+              </Label>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Course list */}
-        {loading ? (
-          <div className="text-center py-16 text-gray-500">กำลังโหลด...</div>
-        ) : courses.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-            <Icon name="book" className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">ไม่พบหลักสูตร</p>
+      {/* Results */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-64 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : visibleCourses.length === 0 ? (
+        <Card className="border-dashed border-border/60">
+          <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
+            <BookOpen className="h-10 w-10 text-muted-foreground/60" />
+            <p className="text-sm text-muted-foreground">
+              {hasFilter
+                ? 'ไม่พบหลักสูตรตรงกับตัวกรอง — ลองปรับการค้นหา'
+                : 'ยังไม่มีหลักสูตร'}
+            </p>
+            {hasFilter && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                {BUTTONS.CLEAR_FILTERS}
+              </button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="mb-3 text-xs text-muted-foreground">
+            พบ {visibleCourses.length} หลักสูตร
           </div>
-        ) : (
-          <>
-            <div className="mb-4 text-sm text-gray-600">
-              พบ {courses.length} หลักสูตร
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {courses.map((course) => {
-                const cat = CATEGORY_BADGES[course.category] || { label: course.category, color: 'bg-gray-100' }
-                const icon = categoryIcons[course.category] || 'รูป'
-                
-                return (
-                  <Link
-                    key={course.id}
-                    to={`/courses/${course.id}`}
-                    className="relative h-72 rounded-xl shadow-sm hover:shadow-lg transition overflow-hidden border border-gray-100 block"
-                  >
-                    {/* Full-card background image */}
-                    {course.cover_image ? (
-                      <img
-                        src={mediaUrl(course.cover_image)}
-                        alt={course.title}
-                        loading="lazy"
-                        decoding="async"
-                        className="absolute inset-0 w-full h-full object-cover object-top"
-                      />
-                    ) : (
-                      <img
-                        src="/elearning/forest_logo.png"
-                        alt={course.title}
-                        loading="lazy"
-                        decoding="async"
-                        className="absolute inset-0 w-full h-full object-cover object-top"
-                      />
-                    )}
-
-                    {/* Badges — top left */}
-                    <div className="absolute top-3 left-3 flex gap-1 z-10">
-                      {course.is_mandatory && (
-                        <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                          บังคับ
-                        </span>
-                      )}
-                      {!course.is_published && (
-                        <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-full font-medium">
-                          ฉบับร่าง
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Content panel — covers bottom half */}
-                    <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-white rounded-t-2xl p-4 flex flex-col justify-between">
-                      <div>
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mb-1 ${cat.color}`}>
-                          {cat.label}
-                        </span>
-                        <h3 className="font-bold text-gray-800 line-clamp-2 text-sm leading-snug">
-                          {course.title}
-                        </h3>
-                      </div>
-                      {course.description && (
-                        <p className="text-sm text-gray-600 break-words line-clamp-3 mb-3">
-                          {course.description}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          {course.estimated_hours ? `${course.estimated_hours} ชั่วโมง` : ''}
-                        </span>
-                        <span className="text-xs text-forest-600 font-medium">เริ่มเรียน →</span>
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </>
-        )}
-      </main>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visibleCourses.map((course) => (
+              <CourseCard
+                key={course.id}
+                course={course}
+                progress={progressMap[course.id]}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

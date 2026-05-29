@@ -1,23 +1,41 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import AdminLayout from '../../components/AdminLayout'
-import Icon from '../../components/Icon'
-import { adminStatsApi } from '../../api/adminStats'
-import { CATEGORY_BADGES, ROLE_LABELS } from '../../constants/labels'
+import {
+  Award,
+  BookOpen,
+  Building2,
+  TrendingUp,
+  Users,
+} from 'lucide-react'
+import { adminStatsApi } from '@/api/adminStats'
+import { CATEGORY_BADGES, ROLE_LABELS } from '@/constants/labels'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
-function StatCard({ label, value, sublabel, accent = 'forest' }) {
-  const accents = {
-    forest: 'from-forest-500 to-forest-700 text-white',
-    blue: 'from-blue-500 to-blue-700 text-white',
-    amber: 'from-amber-500 to-amber-600 text-white',
-    purple: 'from-purple-500 to-purple-700 text-white',
-  }
+function KPICard({ icon: Icon, label, value, hint }) {
   return (
-    <div className={`bg-gradient-to-br ${accents[accent] || accents.forest} rounded-xl shadow-sm p-5`}>
-      <div className="text-xs uppercase tracking-wider opacity-80 mb-1">{label}</div>
-      <div className="text-3xl font-bold tabular-nums">{value}</div>
-      {sublabel && <div className="text-xs opacity-80 mt-1">{sublabel}</div>}
-    </div>
+    <Card className="border-border/60">
+      <CardContent className="flex items-start gap-4 p-5">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
+          {hint && <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -45,142 +63,193 @@ export default function AdminDashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="p-8 text-center text-gray-500">กำลังโหลด...</div>
-      </AdminLayout>
-    )
-  }
-
-  const maxCourseEnroll = Math.max(1, ...topCourses.map(c => c.enrolled_count))
-  const maxDeptEnroll = Math.max(1, ...topDepartments.map(d => d.enrolled_count))
+  const maxCourseEnroll = Math.max(1, ...topCourses.map((c) => c.enrolled_count))
+  const maxDeptEnroll = Math.max(1, ...topDepartments.map((d) => d.enrolled_count))
 
   return (
-    <AdminLayout>
-      <div className="p-4 sm:p-8 max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">แดชบอร์ดผู้ดูแลระบบ</h1>
-          <p className="text-sm text-gray-500 mt-1">ภาพรวมการใช้งานระบบ e-Learning</p>
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+          แดชบอร์ดผู้ดูแลระบบ
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          ภาพรวมการใช้งานระบบ e-Learning
+        </p>
+      </div>
+
+      {/* KPI cards */}
+      {loading ? (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
         </div>
+      ) : overview ? (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <KPICard
+            icon={Users}
+            label="ผู้ใช้ทั้งหมด"
+            value={overview.total_users}
+            hint={`ใช้งานอยู่ ${overview.active_users} คน`}
+          />
+          <KPICard
+            icon={BookOpen}
+            label="หลักสูตรทั้งหมด"
+            value={overview.total_courses}
+            hint={`เผยแพร่ ${overview.published_courses} หลักสูตร`}
+          />
+          <KPICard
+            icon={TrendingUp}
+            label="การลงทะเบียน"
+            value={overview.total_enrollments}
+            hint={`จบหลักสูตร ${overview.completed_enrollments} ครั้ง`}
+          />
+          <KPICard
+            icon={Award}
+            label="อัตราการเรียนจบ"
+            value={`${overview.completion_rate}%`}
+            hint="ของผู้ลงทะเบียน"
+          />
+        </div>
+      ) : null}
 
-        {/* Stat cards */}
-        {overview && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <StatCard label="ผู้ใช้ทั้งหมด" value={overview.total_users} sublabel={`ใช้งานอยู่ ${overview.active_users} คน`} accent="blue" />
-            <StatCard label="หลักสูตรทั้งหมด" value={overview.total_courses} sublabel={`เผยแพร่ ${overview.published_courses} หลักสูตร`} accent="forest" />
-            <StatCard label="การลงทะเบียน" value={overview.total_enrollments} sublabel={`จบหลักสูตร ${overview.completed_enrollments} ครั้ง`} accent="amber" />
-            <StatCard label="อัตราการเรียนจบ" value={`${overview.completion_rate}%`} sublabel="ของผู้ลงทะเบียน" accent="purple" />
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {/* Top courses */}
-          <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6">
-            <h2 className="font-bold text-gray-800 mb-4">หลักสูตรยอดนิยม</h2>
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+        {/* Top courses */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <h2 className="text-base font-semibold text-foreground">หลักสูตรยอดนิยม</h2>
+          </CardHeader>
+          <CardContent>
             {topCourses.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีข้อมูล</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">ยังไม่มีข้อมูล</p>
             ) : (
-              <div className="space-y-3">
-                {topCourses.map(c => {
-                  const cat = CATEGORY_BADGES[c.category] || { label: c.category, color: 'bg-gray-100' }
+              <div className="space-y-4">
+                {topCourses.map((c) => {
+                  const cat = CATEGORY_BADGES[c.category]
                   const pct = (c.enrolled_count / maxCourseEnroll) * 100
                   return (
                     <div key={c.id}>
-                      <div className="flex items-center justify-between text-sm mb-1 gap-3">
-                        <Link to={`/admin/courses/${c.id}/edit`} className="font-medium text-gray-800 hover:text-forest-700 truncate">
+                      <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                        <Link
+                          to={`/admin/courses/${c.id}/edit`}
+                          className="truncate font-medium text-foreground hover:text-primary"
+                        >
                           {c.title}
                         </Link>
-                        <span className="text-gray-500 tabular-nums flex-shrink-0">{c.enrolled_count} คน</span>
-                      </div>
-                      <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-forest-500 to-forest-700 h-2 transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <div className="mt-1">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${cat.color}`}>
-                          {cat.label}
+                        <span className="flex-shrink-0 tabular-nums text-muted-foreground">
+                          {c.enrolled_count} คน
                         </span>
                       </div>
+                      <Progress value={pct} className="h-2" />
+                      {cat && (
+                        <div className="mt-1.5">
+                          <Badge variant="secondary" className="font-normal">
+                            {cat.label}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
               </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Top departments */}
-          <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6">
-            <h2 className="font-bold text-gray-800 mb-4">หน่วยงานที่ลงทะเบียนมากที่สุด</h2>
+        {/* Top departments */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <h2 className="text-base font-semibold text-foreground">
+              <span className="inline-flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                หน่วยงานที่ลงทะเบียนมากที่สุด
+              </span>
+            </h2>
+          </CardHeader>
+          <CardContent>
             {topDepartments.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีข้อมูล</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">ยังไม่มีข้อมูล</p>
             ) : (
-              <div className="space-y-3">
-                {topDepartments.map(d => {
+              <div className="space-y-4">
+                {topDepartments.map((d) => {
                   const pct = (d.enrolled_count / maxDeptEnroll) * 100
                   return (
                     <div key={d.department}>
-                      <div className="flex items-center justify-between text-sm mb-1 gap-3">
-                        <span className="font-medium text-gray-800 truncate">{d.department}</span>
-                        <span className="text-gray-500 tabular-nums flex-shrink-0">
+                      <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate font-medium text-foreground">
+                          {d.department}
+                        </span>
+                        <span className="flex-shrink-0 tabular-nums text-muted-foreground">
                           {d.enrolled_count} ครั้ง · {d.user_count} คน
                         </span>
                       </div>
-                      <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-blue-500 to-blue-700 h-2 transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                      <Progress value={pct} className="h-2" />
                     </div>
                   )
                 })}
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Recent enrollments */}
-        <div className="bg-white rounded-xl shadow-sm p-5 sm:p-6 mt-4 sm:mt-6">
-          <h2 className="font-bold text-gray-800 mb-4">การลงทะเบียนล่าสุด</h2>
+      {/* Recent enrollments */}
+      <Card className="mt-4 border-border/60 sm:mt-6">
+        <CardHeader className="pb-3">
+          <h2 className="text-base font-semibold text-foreground">การลงทะเบียนล่าสุด</h2>
+        </CardHeader>
+        <CardContent>
           {recent.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีข้อมูล</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">ยังไม่มีข้อมูล</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                    <th className="py-2 pr-3">ผู้เรียน</th>
-                    <th className="py-2 pr-3">หน่วยงาน</th>
-                    <th className="py-2 pr-3">บทบาท</th>
-                    <th className="py-2 pr-3">หลักสูตร</th>
-                    <th className="py-2 pr-3 whitespace-nowrap">วันที่</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {recent.map(r => (
-                    <tr key={r.id}>
-                      <td className="py-2 pr-3 font-medium text-gray-800">{r.user.full_name}</td>
-                      <td className="py-2 pr-3 text-gray-600">{r.user.department || '-'}</td>
-                      <td className="py-2 pr-3 text-gray-600">{ROLE_LABELS[r.user.role] || r.user.role}</td>
-                      <td className="py-2 pr-3">
-                        <Link to={`/admin/courses/${r.course.id}/edit`} className="text-forest-700 hover:underline">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ผู้เรียน</TableHead>
+                    <TableHead>หน่วยงาน</TableHead>
+                    <TableHead>บทบาท</TableHead>
+                    <TableHead>หลักสูตร</TableHead>
+                    <TableHead className="whitespace-nowrap">วันที่</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recent.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium text-foreground">
+                        {r.user.full_name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {r.user.department || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {ROLE_LABELS[r.user.role] || r.user.role}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          to={`/admin/courses/${r.course.id}/edit`}
+                          className="text-primary hover:underline"
+                        >
                           {r.course.title}
                         </Link>
-                      </td>
-                      <td className="py-2 pr-3 text-gray-500 whitespace-nowrap">
-                        {r.enrolled_at ? new Date(r.enrolled_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {r.enrolled_at
+                          ? new Date(r.enrolled_at).toLocaleDateString('th-TH', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '-'}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
-        </div>
-      </div>
-    </AdminLayout>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

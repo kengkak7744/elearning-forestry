@@ -1,14 +1,21 @@
 import { useState } from 'react'
-import { quizzesApi } from '../api/quizzes'
-import Icon from './Icon'
+import { Check, ClipboardList, RotateCcw, Send, X as XIcon } from 'lucide-react'
+import { quizzesApi } from '@/api/quizzes'
+import { BUTTONS } from '@/constants/labels'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 
 export default function QuizTaker({ quiz, onAttempted, showToast }) {
   const [started, setStarted] = useState(false)
   const [answers, setAnswers] = useState({})
   const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState(null) // { score, is_passed, results: {qid: {correct, correct_answer}} }
-  // When the learner hits "เริ่ม", freeze the random subset so subsequent parent
-  // refetches can't change which questions they're answering mid-attempt.
+  const [result, setResult] = useState(null)
+  // Freeze the random subset when the learner starts so a parent refetch
+  // doesn't swap questions mid-attempt.
   const [lockedQuestions, setLockedQuestions] = useState(null)
 
   const passedBefore = quiz.is_passed
@@ -28,7 +35,6 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
   const reset = () => {
     setAnswers({})
     setResult(null)
-    // New attempt → take whatever the latest random subset is.
     setLockedQuestions(quiz.questions || [])
     setStarted(true)
   }
@@ -45,7 +51,10 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
       if (data.is_passed) {
         showToast?.(`ผ่านแบบทดสอบ! คะแนน ${data.score}%`, 'success')
       } else {
-        showToast?.(`ยังไม่ผ่าน คะแนน ${data.score}% (ต้องการ ${quiz.passing_score}%)`, 'error')
+        showToast?.(
+          `ยังไม่ผ่าน คะแนน ${data.score}% (ต้องการ ${quiz.passing_score}%)`,
+          'error'
+        )
       }
       onAttempted?.(quiz.id, data)
     } catch (err) {
@@ -56,198 +65,248 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-white">
-      <div className="flex items-center gap-2 flex-wrap mb-1">
-        <span className="text-base sm:text-lg font-bold text-gray-800 inline-flex items-center gap-1.5">
-          <Icon name="note" className="w-5 h-5 text-forest-600" />
-          {quiz.title}
-        </span>
-        {currentlyPassed ? (
-          <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
-            <Icon name="check" className="w-3 h-3" /> ผ่านแล้ว
+    <Card className="border-border/60">
+      <CardContent className="space-y-3 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-base font-semibold text-foreground sm:text-lg">
+            <ClipboardList className="h-5 w-5 text-primary" />
+            {quiz.title}
           </span>
-        ) : quiz.can_skip ? (
-          <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
-            ไม่บังคับ
-          </span>
-        ) : (
-          <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
-            ต้องผ่านเพื่อไปต่อ
-          </span>
+          {currentlyPassed ? (
+            <Badge className="bg-success text-success-foreground hover:bg-success">
+              <Check className="mr-0.5 h-3 w-3" />
+              ผ่านแล้ว
+            </Badge>
+          ) : quiz.can_skip ? (
+            <Badge variant="secondary" className="font-normal">
+              ไม่บังคับ
+            </Badge>
+          ) : (
+            <Badge className="bg-warning text-warning-foreground hover:bg-warning">
+              ต้องผ่านเพื่อไปต่อ
+            </Badge>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          คำถาม {activeQuestions.length} ข้อ
+          {quiz.randomize_questions && (
+            <span className="ml-1 text-primary">(สุ่มคำถาม)</span>
+          )}
+          {' · '}เกณฑ์ผ่าน {quiz.passing_score}%
+          {quiz.best_score !== null && quiz.best_score !== undefined && (
+            <span className="ml-2">· คะแนนสูงสุดของคุณ: {quiz.best_score}%</span>
+          )}
+        </p>
+
+        {!hasQuestions && (
+          <p className="text-sm italic text-muted-foreground">
+            ยังไม่มีคำถามในแบบทดสอบนี้
+          </p>
         )}
-      </div>
 
-      <p className="text-xs text-gray-500 mb-3">
-        คำถาม {activeQuestions.length} ข้อ
-        {quiz.randomize_questions && (
-          <span className="ml-1 text-forest-700">(สุ่มคำถาม)</span>
+        {hasQuestions && !started && !result && (
+          <Button onClick={start}>
+            {currentlyPassed ? (
+              <>
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                {BUTTONS.RETRY_QUIZ}
+              </>
+            ) : (
+              BUTTONS.START_QUIZ
+            )}
+          </Button>
         )}
-        {' · '}เกณฑ์ผ่าน {quiz.passing_score}%
-        {quiz.best_score !== null && quiz.best_score !== undefined && (
-          <span className="ml-2">· คะแนนสูงสุดของคุณ: {quiz.best_score}%</span>
-        )}
-      </p>
 
-      {!hasQuestions && (
-        <p className="text-sm text-gray-400 italic">ยังไม่มีคำถามในแบบทดสอบนี้</p>
-      )}
+        {hasQuestions && (started || result) && (
+          <div className="space-y-3 pt-1">
+            {activeQuestions.map((q, idx) => {
+              const qResult = result?.results?.[q.id]
+              const isOpinion = q.question_type === 'opinion'
+              const stateClass =
+                qResult && !isOpinion
+                  ? qResult.correct
+                    ? 'border-success/40 bg-success/5'
+                    : 'border-destructive/40 bg-destructive/5'
+                  : 'border-border bg-card'
 
-      {hasQuestions && !started && !result && (
-        <button
-          onClick={start}
-          className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-4 py-2 rounded-lg font-medium"
-        >
-          {currentlyPassed ? 'ทำใหม่' : 'เริ่มทำแบบทดสอบ'}
-        </button>
-      )}
+              return (
+                <div
+                  key={q.id}
+                  className={cn('space-y-2 rounded-lg border p-3', stateClass)}
+                >
+                  <p className="break-words text-sm font-medium text-foreground">
+                    {idx + 1}. {q.question_text}
+                    {isOpinion && (
+                      <Badge variant="secondary" className="ml-2 font-normal">
+                        ไม่บังคับ
+                      </Badge>
+                    )}
+                    {qResult && !isOpinion && (
+                      <span
+                        className={cn(
+                          'ml-2 inline-flex items-center gap-0.5 text-xs',
+                          qResult.correct ? 'text-success' : 'text-destructive'
+                        )}
+                      >
+                        {qResult.correct ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <XIcon className="h-3.5 w-3.5" />
+                        )}
+                        {qResult.correct ? 'ถูกต้อง' : 'ผิด'}
+                      </span>
+                    )}
+                  </p>
 
-      {hasQuestions && (started || result) && (
-        <div className="space-y-4 mt-2">
-          {activeQuestions.map((q, idx) => {
-            const qResult = result?.results?.[q.id]
-            const isOpinion = q.question_type === 'opinion'
-            // Opinions are always scored as correct but shouldn't visually flag
-            // as right/wrong — they're feedback, not a test.
-            const stateClass = qResult && !isOpinion
-              ? qResult.correct
-                ? 'border-green-300 bg-green-50'
-                : 'border-red-300 bg-red-50'
-              : 'border-gray-200'
-
-            return (
-              <div key={q.id} className={`p-3 rounded-lg border ${stateClass}`}>
-                <p className="font-medium text-sm text-gray-800 mb-2 break-words">
-                  {idx + 1}. {q.question_text}
-                  {isOpinion && (
-                    <span className="ml-2 text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
-                      ไม่บังคับ
-                    </span>
+                  {q.question_type === 'single_choice' && (
+                    <div className="space-y-1.5">
+                      {q.choices?.map((c, ci) => {
+                        const isCorrectChoice = qResult?.correct_answer === ci
+                        return (
+                          <label
+                            key={ci}
+                            className="flex cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="radio"
+                              name={`q-${q.id}`}
+                              checked={answers[q.id] === ci}
+                              onChange={() => setAnswer(q.id, ci)}
+                              disabled={!!result}
+                              className="mt-1 h-4 w-4 accent-primary"
+                            />
+                            <span
+                              className={cn(
+                                'break-words text-sm',
+                                isCorrectChoice
+                                  ? 'font-semibold text-success'
+                                  : 'text-foreground'
+                              )}
+                            >
+                              {c.text}
+                              {isCorrectChoice && (
+                                <Check className="ml-1 inline h-3.5 w-3.5 text-success" />
+                              )}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
                   )}
-                  {qResult && !isOpinion && (
-                    <span className={`ml-2 text-xs inline-flex items-center gap-0.5 ${qResult.correct ? 'text-green-700' : 'text-red-700'}`}>
-                      <Icon name={qResult.correct ? 'check' : 'xmark'} className="w-3.5 h-3.5" />
-                      {qResult.correct ? 'ถูกต้อง' : 'ผิด'}
-                    </span>
+
+                  {q.question_type === 'multiple_choice' && (
+                    <div className="space-y-1.5">
+                      {q.choices?.map((c, ci) => {
+                        const selected = (answers[q.id] || []).includes(ci)
+                        const isCorrectChoice = qResult?.correct_answer?.includes?.(ci)
+                        return (
+                          <label
+                            key={ci}
+                            className="flex cursor-pointer items-start gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => {
+                                const current = answers[q.id] || []
+                                const next = selected
+                                  ? current.filter((x) => x !== ci)
+                                  : [...current, ci]
+                                setAnswer(q.id, next)
+                              }}
+                              disabled={!!result}
+                              className="mt-1 h-4 w-4 accent-primary"
+                            />
+                            <span
+                              className={cn(
+                                'break-words text-sm',
+                                isCorrectChoice
+                                  ? 'font-semibold text-success'
+                                  : 'text-foreground'
+                              )}
+                            >
+                              {c.text}
+                              {isCorrectChoice && (
+                                <Check className="ml-1 inline h-3.5 w-3.5 text-success" />
+                              )}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
                   )}
-                </p>
 
-                {q.question_type === 'single_choice' && (
-                  <div className="space-y-1.5">
-                    {q.choices?.map((c, ci) => {
-                      const isCorrectChoice = qResult?.correct_answer === ci
-                      return (
-                        <label key={ci} className="flex items-start gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name={`q-${q.id}`}
-                            checked={answers[q.id] === ci}
-                            onChange={() => setAnswer(q.id, ci)}
-                            disabled={!!result}
-                            className="mt-1"
-                          />
-                          <span className={`text-sm break-words ${isCorrectChoice ? 'font-bold text-green-700' : 'text-gray-700'}`}>
-                            {c.text}
-                            {isCorrectChoice && <Icon name="check" className="w-3.5 h-3.5 ml-1 inline text-green-700" />}
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                )}
+                  {q.question_type === 'written' && (
+                    <div className="space-y-1">
+                      <Input
+                        type="text"
+                        value={answers[q.id] || ''}
+                        onChange={(e) => setAnswer(q.id, e.target.value)}
+                        disabled={!!result}
+                        placeholder="พิมพ์คำตอบ..."
+                      />
+                      {qResult && qResult.correct_answer && (
+                        <p className="text-xs text-success">
+                          เฉลย: {qResult.correct_answer}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                {q.question_type === 'multiple_choice' && (
-                  <div className="space-y-1.5">
-                    {q.choices?.map((c, ci) => {
-                      const selected = (answers[q.id] || []).includes(ci)
-                      const isCorrectChoice = qResult?.correct_answer?.includes?.(ci)
-                      return (
-                        <label key={ci} className="flex items-start gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => {
-                              const current = answers[q.id] || []
-                              const next = selected ? current.filter((x) => x !== ci) : [...current, ci]
-                              setAnswer(q.id, next)
-                            }}
-                            disabled={!!result}
-                            className="mt-1"
-                          />
-                          <span className={`text-sm break-words ${isCorrectChoice ? 'font-bold text-green-700' : 'text-gray-700'}`}>
-                            {c.text}
-                            {isCorrectChoice && <Icon name="check" className="w-3.5 h-3.5 ml-1 inline text-green-700" />}
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {q.question_type === 'written' && (
-                  <div>
-                    <input
-                      type="text"
+                  {q.question_type === 'opinion' && (
+                    <Textarea
                       value={answers[q.id] || ''}
                       onChange={(e) => setAnswer(q.id, e.target.value)}
                       disabled={!!result}
-                      placeholder="พิมพ์คำตอบ..."
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+                      placeholder="พิมพ์ความคิดเห็น... (จะเว้นว่างก็ได้)"
+                      rows={3}
                     />
-                    {qResult && qResult.correct_answer && (
-                      <p className="text-xs text-green-700 mt-1">เฉลย: {qResult.correct_answer}</p>
-                    )}
-                  </div>
-                )}
-
-                {q.question_type === 'opinion' && (
-                  <textarea
-                    value={answers[q.id] || ''}
-                    onChange={(e) => setAnswer(q.id, e.target.value)}
-                    disabled={!!result}
-                    placeholder="พิมพ์ความคิดเห็น... (จะเว้นว่างก็ได้)"
-                    rows={3}
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm resize-y"
-                  />
-                )}
-              </div>
-            )
-          })}
-
-          <div className="flex gap-2 pt-1 flex-wrap">
-            {!result ? (
-              <>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-5 py-2 rounded-lg font-medium disabled:opacity-50"
-                >
-                  {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ'}
-                </button>
-                <button
-                  onClick={() => { setStarted(false); setAnswers({}); }}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg"
-                >
-                  ยกเลิก
-                </button>
-              </>
-            ) : (
-              <>
-                <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  result.is_passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}>
-                  คะแนน: {result.score}% {result.is_passed ? '· ผ่านเกณฑ์' : '· ไม่ผ่านเกณฑ์'}
+                  )}
                 </div>
-                <button
-                  onClick={reset}
-                  className="bg-forest-500 hover:bg-forest-600 text-white text-sm px-4 py-2 rounded-lg font-medium"
-                >
-                  ทำใหม่
-                </button>
-              </>
-            )}
+              )
+            })}
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {!result ? (
+                <>
+                  <Button onClick={handleSubmit} disabled={submitting}>
+                    <Send className="mr-1.5 h-4 w-4" />
+                    {submitting ? BUTTONS.SUBMITTING_ANSWERS : BUTTONS.SUBMIT_ANSWERS}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setStarted(false)
+                      setAnswers({})
+                    }}
+                  >
+                    {BUTTONS.CANCEL}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Badge
+                    className={cn(
+                      'px-4 py-2 text-sm',
+                      result.is_passed
+                        ? 'bg-success text-success-foreground hover:bg-success'
+                        : 'bg-destructive text-destructive-foreground hover:bg-destructive'
+                    )}
+                  >
+                    คะแนน: {result.score}%{' '}
+                    {result.is_passed ? '· ผ่านเกณฑ์' : '· ไม่ผ่านเกณฑ์'}
+                  </Badge>
+                  <Button onClick={reset}>
+                    <RotateCcw className="mr-1.5 h-4 w-4" />
+                    {BUTTONS.RETRY_QUIZ}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

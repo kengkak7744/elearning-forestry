@@ -1,27 +1,73 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import AdminLayout from '../../components/AdminLayout'
-import Toast from '../../components/Toast'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { coursesApi } from '../../api/courses'
-import { CATEGORY_BADGES } from '../../constants/labels'
-import { mediaUrl } from '../../utils/media'
-import Icon from '../../components/Icon'
+import { ImageIcon, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { coursesApi } from '@/api/courses'
+import { CATEGORY_BADGES } from '@/constants/labels'
+import { mediaUrl } from '@/utils/media'
+import { showToast } from '@/lib/toast'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { cn } from '@/lib/utils'
+
+const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
+  value,
+  label: meta.label,
+}))
+
+function CoverThumb({ src, alt }) {
+  return (
+    <div className="h-12 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <ImageIcon className="h-4 w-4 text-muted-foreground/60" />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function CoursesListPage() {
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [toast, setToast] = useState({ message: '', type: 'success' })
-  const [confirmState, setConfirmState] = useState({ open: false })
-
-  const showToast = (message, type = 'success') => setToast({ message, type })
-  const closeToast = () => setToast({ message: '', type: 'success' })
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState(null)
 
   const load = async () => {
     setLoading(true)
     try {
-      const data = await coursesApi.list({ search })
+      const params = {}
+      if (search) params.search = search
+      if (categoryFilter) params.category = categoryFilter
+      const data = await coursesApi.list(params)
       setCourses(data)
     } catch (err) {
       showToast(err.response?.data?.detail || 'โหลดรายการไม่สำเร็จ', 'error')
@@ -31,138 +77,272 @@ export default function CoursesListPage() {
   }
 
   useEffect(() => {
-    const t = setTimeout(load, 300)
+    const t = setTimeout(load, search ? 350 : 0)
     return () => clearTimeout(t)
-    // eslint-disable-next-line
-  }, [search])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, categoryFilter])
 
-  const handleDelete = (course) => {
-    setConfirmState({
-      open: true,
-      title: 'ลบหลักสูตร',
-      message: `ต้องการลบหลักสูตร "${course.title}" และข้อมูลทั้งหมด?`,
-      danger: true,
-      onConfirm: async () => {
-        try {
-          await coursesApi.delete(course.id)
-          showToast('ลบหลักสูตรเรียบร้อย')
-          load()
-        } catch (err) {
-          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
-        }
-        setConfirmState({ open: false })
-      },
-    })
+  const handleDelete = async () => {
+    if (!confirmTarget) return
+    const target = confirmTarget
+    setConfirmTarget(null)
+    try {
+      await coursesApi.delete(target.id)
+      showToast('ลบหลักสูตรเรียบร้อย', 'success')
+      load()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+    }
   }
 
   return (
-    <AdminLayout>
-      <div className="p-4 sm:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">จัดการหลักสูตร</h1>
-            <p className="text-gray-500 text-sm mt-1">รายการหลักสูตรทั้งหมด</p>
-          </div>
-          <Link
-            to="/admin/courses/new/edit"
-            className="bg-forest-500 hover:bg-forest-600 text-white px-4 py-2 rounded-lg font-medium transition w-full sm:w-auto text-center"
-          >
-            + สร้างหลักสูตรใหม่
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
+      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+            จัดการหลักสูตร
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            รายการหลักสูตรทั้งหมด
+          </p>
+        </div>
+        <Button asChild className="w-full sm:w-auto">
+          <Link to="/admin/courses/new/edit">
+            <Plus className="mr-1 h-4 w-4" />
+            สร้างหลักสูตรใหม่
           </Link>
-        </div>
+        </Button>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <input
-            type="text"
-            placeholder="ค้นหาหลักสูตร..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 outline-none"
-          />
-        </div>
+      <Card className="mb-4 border-border/60">
+        <CardContent className="space-y-3 p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="ค้นหาหลักสูตร..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-        {loading ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">กำลังโหลด...</div>
-        ) : courses.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">ไม่พบหลักสูตร</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {courses.map(c => {
-              const cat = CATEGORY_BADGES[c.category] || { label: c.category, color: 'bg-gray-100' }
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('')}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                categoryFilter === ''
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:bg-muted'
+              )}
+            >
+              ทั้งหมด
+            </button>
+            {categories.map((c) => {
+              const active = categoryFilter === c.value
               return (
-                <div key={c.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  {/* Cover image */}
-                  <div className="aspect-square w-full overflow-hidden bg-gray-100">
-                    {c.cover_image ? (
-                      <img
-                        src={mediaUrl(c.cover_image)}
-                        alt={c.title}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover object-top"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Icon name="image" className="w-12 h-12 text-gray-300" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-5">
-                  <div className="flex items-start gap-2 mb-3">
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${cat.color}`}>
-                      {cat.label}
-                    </span>
-                    {c.is_mandatory && (
-                      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">บังคับ</span>
-                    )}
-                    {!c.is_published && (
-                      <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded">ฉบับร่าง</span>
-                    )}
-                  </div>
-
-                  <h3 className="font-bold text-gray-800 mb-2 line-clamp-2 h-12">{c.title}</h3>
-
-                  {c.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-3 h-10 break-words">{c.description}</p>
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setCategoryFilter(active ? '' : c.value)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-foreground hover:bg-muted'
                   )}
-
-                  <div className="text-xs text-gray-500 mb-3">
-                    {c.instructor_name && <div>วิทยากร: {c.instructor_name}</div>}
-                    {c.estimated_hours && <div>{c.estimated_hours} ชั่วโมง</div>}
-                  </div>
-
-                  <div className="flex gap-2 pt-3 border-t border-gray-100">
-                    <Link
-                      to={`/admin/courses/${c.id}/edit`}
-                      className="flex-1 text-center py-2 bg-forest-50 text-forest-700 rounded text-sm font-medium"
-                    >
-                      แก้ไข
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(c)}
-                      className="px-4 py-2 bg-red-50 text-red-700 rounded text-sm font-medium"
-                    >
-                      ลบ
-                    </button>
-                  </div>
-                  </div>
-                </div>
+                  aria-pressed={active}
+                >
+                  {c.label}
+                </button>
               )
             })}
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
-      <Toast message={toast.message} type={toast.type} onClose={closeToast} />
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        danger={confirmState.danger}
-        onConfirm={confirmState.onConfirm}
-        onCancel={() => setConfirmState({ open: false })}
-      />
-    </AdminLayout>
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : courses.length === 0 ? (
+        <Card className="border-dashed border-border/60">
+          <CardContent className="p-12 text-center text-sm text-muted-foreground">
+            ไม่พบหลักสูตร
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <Card className="hidden border-border/60 md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[64px]">ปก</TableHead>
+                  <TableHead>ชื่อหลักสูตร</TableHead>
+                  <TableHead>หมวด</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="text-right">ผู้ลงทะเบียน</TableHead>
+                  <TableHead className="text-right">การจัดการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {courses.map((c) => {
+                  const cat = CATEGORY_BADGES[c.category]
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <CoverThumb
+                          src={c.cover_image ? mediaUrl(c.cover_image) : null}
+                          alt={c.title}
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[240px] max-w-[420px]">
+                        <Link
+                          to={`/admin/courses/${c.id}/edit`}
+                          className="block truncate font-medium text-foreground hover:text-primary"
+                        >
+                          {c.title}
+                        </Link>
+                        {c.instructor_name && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            วิทยากร: {c.instructor_name}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {cat && (
+                          <Badge variant="secondary" className="font-normal">
+                            {cat.label}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {c.is_published ? (
+                            <Badge variant="outline" className="border-success/40 text-success">
+                              เผยแพร่
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">ฉบับร่าง</Badge>
+                          )}
+                          {c.is_mandatory && (
+                            <Badge variant="destructive">บังคับ</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {c.enrolled_count ?? 0}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link to={`/admin/courses/${c.id}/edit`}>
+                              <Pencil className="h-3.5 w-3.5" />
+                              <span className="sr-only">แก้ไข</span>
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirmTarget(c)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span className="sr-only">ลบ</span>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Mobile stacked cards */}
+          <div className="space-y-3 md:hidden">
+            {courses.map((c) => {
+              const cat = CATEGORY_BADGES[c.category]
+              return (
+                <Card key={c.id} className="border-border/60">
+                  <CardContent className="flex items-start gap-3 p-3">
+                    <CoverThumb
+                      src={c.cover_image ? mediaUrl(c.cover_image) : null}
+                      alt={c.title}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to={`/admin/courses/${c.id}/edit`}
+                        className="block text-sm font-medium text-foreground hover:text-primary"
+                      >
+                        {c.title}
+                      </Link>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {cat && (
+                          <Badge variant="secondary" className="font-normal">
+                            {cat.label}
+                          </Badge>
+                        )}
+                        {c.is_mandatory && <Badge variant="destructive">บังคับ</Badge>}
+                        {!c.is_published && <Badge variant="secondary">ฉบับร่าง</Badge>}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        ผู้ลงทะเบียน {c.enrolled_count ?? 0} คน
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Button asChild variant="ghost" size="icon">
+                        <Link to={`/admin/courses/${c.id}/edit`}>
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">แก้ไข</span>
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setConfirmTarget(c)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">ลบ</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      <AlertDialog
+        open={!!confirmTarget}
+        onOpenChange={(open) => !open && setConfirmTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบหลักสูตร</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการลบหลักสูตร &ldquo;{confirmTarget?.title}&rdquo; และข้อมูลทั้งหมด?
+              การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              ยืนยันลบ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
