@@ -7,9 +7,9 @@ export const coursesApi = {
     if (category) params.category = category
     if (is_mandatory !== undefined) params.is_mandatory = is_mandatory
     if (search) params.search = search
-    
+
     const response = await apiClient.get('/courses', { params })
-    return response.data
+    return Array.isArray(response.data) ? response.data : []
   },
 
   /** รายละเอียดหลักสูตร */
@@ -39,7 +39,10 @@ export const coursesApi = {
   /** หลักสูตรของฉัน + ความคืบหน้า */
   myEnrollments: async () => {
     const response = await apiClient.get('/courses/me/enrollments')
-    return response.data
+    // Always hand callers an array. A proxy returning HTML, a stale cached
+    // 304 with the wrong body, or any non-array success body would otherwise
+    // crash every consumer that does `.filter`/`.map` on it.
+    return Array.isArray(response.data) ? response.data : []
   },
 
   /** อัปโหลดรูปภาพปกหลักสูตร */

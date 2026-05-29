@@ -29,9 +29,15 @@ export const usersApi = {
     return response.data
   },
 
-  /** ระงับบัญชี (admin) */
-  deactivate: async (userId) => {
+  /** ลบบัญชีผู้ใช้ถาวร (admin) — ลบประวัติการเรียน, ใบรับรอง, การลงทะเบียนทั้งหมด */
+  delete: async (userId) => {
     const response = await apiClient.delete(`/users/${userId}`)
+    return response.data
+  },
+
+  /** สรุปการเรียนของผู้ใช้ (admin) — enrollments, certificates, quiz stats */
+  getLearningSummary: async (userId) => {
+    const response = await apiClient.get(`/users/${userId}/learning-summary`)
     return response.data
   },
 

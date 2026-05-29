@@ -33,15 +33,16 @@ export function AdminShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex flex-shrink-0">
+    <div className="flex h-screen bg-background">
+      {/* Desktop sidebar — sticky to viewport so footer (back/logout) is always
+          visible regardless of main-content scroll. */}
+      <div className="hidden h-screen flex-shrink-0 lg:flex">
         <AdminSidebar />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-screen min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="flex h-14 items-center gap-3 border-b border-border bg-background/95 px-3 lg:hidden">
+        <div className="flex h-14 flex-shrink-0 items-center gap-3 border-b border-border bg-background/95 px-3 lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="เปิดเมนู">
@@ -57,7 +58,7 @@ export function AdminShell() {
           </Sheet>
           <span className="text-sm font-semibold text-foreground">จัดการระบบ</span>
           {user && (
-            <span className="ml-auto text-xs text-muted-foreground truncate max-w-[8rem]">
+            <span className="ml-auto max-w-[8rem] truncate text-xs text-muted-foreground">
               {user.full_name}
             </span>
           )}

@@ -1,14 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Ban, KeyRound, Pencil, Plus, Search } from 'lucide-react'
+import {
+  Award,
+  BookOpen,
+  CheckCircle2,
+  ClipboardList,
+  KeyRound,
+  LineChart,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Trophy,
+} from 'lucide-react'
 import { usersApi } from '@/api/users'
-import { ROLE_BADGES, ROLE_LABELS } from '@/constants/labels'
+import { BUTTONS, CATEGORY_BADGES, ROLE_BADGES, ROLE_LABELS } from '@/constants/labels'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -408,6 +421,222 @@ function ResetPasswordDialog({ target, onClose }) {
   )
 }
 
+function formatDate(d) {
+  if (!d) return '-'
+  return new Date(d).toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function StatTile({ icon: Icon, label, value, hint }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <div className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+        {value}
+      </div>
+      {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
+    </div>
+  )
+}
+
+function UserSummarySheet({ userId, open, onOpenChange }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open || !userId) return
+    setData(null)
+    setLoading(true)
+    usersApi
+      .getLearningSummary(userId)
+      .then(setData)
+      .catch((err) =>
+        showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+      )
+      .finally(() => setLoading(false))
+  }, [open, userId])
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader className="mb-4">
+          <SheetTitle>ประวัติการเรียนของผู้ใช้</SheetTitle>
+          <SheetDescription>
+            สรุปหลักสูตรที่ลงทะเบียน ความคืบหน้า ใบรับรอง และคะแนนแบบทดสอบ
+          </SheetDescription>
+        </SheetHeader>
+
+        {loading || !data ? (
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-32 w-full rounded-lg" />
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Identity */}
+            <Card className="border-border/60">
+              <CardContent className="space-y-1 p-4">
+                <div className="text-base font-semibold text-foreground">
+                  {data.user.full_name}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-mono">@{data.user.username}</span>
+                  {' · '}
+                  {data.user.email}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
+                  <Badge variant="secondary" className="font-normal">
+                    {ROLE_LABELS[data.user.role] ?? data.user.role}
+                  </Badge>
+                  <span>{data.user.department || '-'}</span>
+                  {data.user.position && <span>· {data.user.position}</span>}
+                  <span>· เข้าระบบเมื่อ {formatDate(data.user.created_at)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Stat tiles */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatTile
+                icon={BookOpen}
+                label="หลักสูตร"
+                value={data.enrollments.length}
+                hint={`จบ ${
+                  data.enrollments.filter((e) => e.progress_percent >= 100).length
+                } หลักสูตร`}
+              />
+              <StatTile
+                icon={Trophy}
+                label="ใบรับรอง"
+                value={data.certificates.length}
+              />
+              <StatTile
+                icon={ClipboardList}
+                label="ทำแบบทดสอบ"
+                value={data.quiz_stats.unique_quizzes}
+                hint={`${data.quiz_stats.total_attempts} ครั้งทั้งหมด`}
+              />
+              <StatTile
+                icon={LineChart}
+                label="คะแนนเฉลี่ย"
+                value={`${data.quiz_stats.average_score}%`}
+                hint={`ผ่าน ${data.quiz_stats.passed_count}/${data.quiz_stats.unique_quizzes} ชุด`}
+              />
+            </div>
+
+            {/* Enrollments */}
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-foreground">
+                หลักสูตรที่ลงทะเบียน
+              </h3>
+              {data.enrollments.length === 0 ? (
+                <Card className="border-dashed border-border/60">
+                  <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                    ยังไม่ได้ลงทะเบียนหลักสูตรใด
+                  </CardContent>
+                </Card>
+              ) : (
+                <ul className="space-y-2">
+                  {data.enrollments.map((e) => {
+                    const cat = CATEGORY_BADGES[e.category]
+                    const done = e.progress_percent >= 100
+                    return (
+                      <li key={e.course_id}>
+                        <Card className="border-border/60">
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="line-clamp-1 text-sm font-medium text-foreground">
+                                  {e.title}
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap gap-1 text-[11px] text-muted-foreground">
+                                  {cat && (
+                                    <Badge variant="secondary" className="font-normal">
+                                      {cat.label}
+                                    </Badge>
+                                  )}
+                                  {e.is_mandatory && (
+                                    <Badge variant="destructive">บังคับ</Badge>
+                                  )}
+                                  {done && (
+                                    <Badge className="bg-success text-success-foreground hover:bg-success">
+                                      <CheckCircle2 className="mr-0.5 h-3 w-3" />
+                                      เรียนจบ
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0 text-right">
+                                <div className="text-sm font-semibold tabular-nums text-foreground">
+                                  {e.progress_percent}%
+                                </div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  {e.completed_lessons}/{e.total_lessons} บท
+                                </div>
+                              </div>
+                            </div>
+                            <Progress value={e.progress_percent} className="mt-2 h-1.5" />
+                            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                              <span>ลงทะเบียน {formatDate(e.enrolled_at)}</span>
+                              {e.last_accessed_at && (
+                                <span>ล่าสุด {formatDate(e.last_accessed_at)}</span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Certificates */}
+            {data.certificates.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium text-foreground">
+                  ใบรับรอง
+                </h3>
+                <ul className="space-y-2">
+                  {data.certificates.map((c) => (
+                    <li key={c.id}>
+                      <Card className="border-border/60">
+                        <CardContent className="flex items-center gap-3 p-3">
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <Award className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="line-clamp-1 text-sm font-medium text-foreground">
+                              {c.course_title}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              เลขที่ {c.certificate_number}
+                              {c.final_score != null &&
+                                ` · คะแนน ${Math.round(c.final_score)}%`}
+                              {c.issued_at && ` · ${formatDate(c.issued_at)}`}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 export default function UsersListPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -420,7 +649,8 @@ export default function UsersListPage() {
   const isAdding = params.get('new') === '1'
 
   const [resetTarget, setResetTarget] = useState(null)
-  const [confirmDeactivate, setConfirmDeactivate] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [summaryUserId, setSummaryUserId] = useState(null)
 
   const loadUsers = async () => {
     setLoading(true)
@@ -443,16 +673,16 @@ export default function UsersListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, roleFilter])
 
-  const handleDeactivate = async () => {
-    if (!confirmDeactivate) return
-    const target = confirmDeactivate
-    setConfirmDeactivate(null)
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    const target = confirmDelete
+    setConfirmDelete(null)
     try {
-      await usersApi.deactivate(target.id)
-      showToast('ระงับบัญชีเรียบร้อย', 'success')
+      await usersApi.delete(target.id)
+      showToast(`ลบบัญชี ${target.full_name} เรียบร้อย`, 'success')
       loadUsers()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
     }
   }
 
@@ -534,7 +764,6 @@ export default function UsersListPage() {
                   <TableHead>อีเมล</TableHead>
                   <TableHead>บทบาท</TableHead>
                   <TableHead>หน่วยงาน</TableHead>
-                  <TableHead>สถานะ</TableHead>
                   <TableHead className="text-right">การจัดการ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -543,8 +772,24 @@ export default function UsersListPage() {
                   const roleMeta = ROLE_BADGES[u.role]
                   return (
                     <TableRow key={u.id}>
-                      <TableCell className="font-mono text-xs">{u.username}</TableCell>
-                      <TableCell className="font-medium text-foreground">{u.full_name}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setSummaryUserId(u.id)}
+                          className="text-left text-foreground hover:text-primary hover:underline"
+                        >
+                          {u.username}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => setSummaryUserId(u.id)}
+                          className="text-left font-medium text-foreground hover:text-primary hover:underline"
+                        >
+                          {u.full_name}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="font-normal">
@@ -554,51 +799,36 @@ export default function UsersListPage() {
                       <TableCell className="text-muted-foreground">
                         {u.department || '-'}
                       </TableCell>
-                      <TableCell>
-                        {u.is_active ? (
-                          <span className="inline-flex items-center gap-1.5 text-sm text-success">
-                            <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                            ใช้งาน
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                            ระงับ
-                          </span>
-                        )}
-                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => openEdit(u.id)}
-                            title="แก้ไข"
+                            title={BUTTONS.EDIT}
                           >
                             <Pencil className="h-3.5 w-3.5" />
-                            <span className="sr-only">แก้ไข</span>
+                            <span className="sr-only">{BUTTONS.EDIT}</span>
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setResetTarget(u)}
-                            title="รีเซ็ตรหัสผ่าน"
+                            title={BUTTONS.RESET_PASSWORD}
                           >
                             <KeyRound className="h-3.5 w-3.5" />
-                            <span className="sr-only">รีเซ็ตรหัสผ่าน</span>
+                            <span className="sr-only">{BUTTONS.RESET_PASSWORD}</span>
                           </Button>
-                          {u.is_active && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setConfirmDeactivate(u)}
-                              className="text-destructive hover:text-destructive"
-                              title="ระงับบัญชี"
-                            >
-                              <Ban className="h-3.5 w-3.5" />
-                              <span className="sr-only">ระงับ</span>
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirmDelete(u)}
+                            className="text-destructive hover:text-destructive"
+                            title={BUTTONS.DELETE}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span className="sr-only">{BUTTONS.DELETE}</span>
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -616,14 +846,18 @@ export default function UsersListPage() {
                 <Card key={u.id} className="border-border/60">
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-foreground">
+                      <button
+                        type="button"
+                        onClick={() => setSummaryUserId(u.id)}
+                        className="min-w-0 text-left"
+                      >
+                        <div className="truncate font-medium text-foreground hover:text-primary hover:underline">
                           {u.full_name}
                         </div>
                         <div className="truncate font-mono text-xs text-muted-foreground">
                           @{u.username}
                         </div>
-                      </div>
+                      </button>
                       <Badge variant="secondary" className="flex-shrink-0 font-normal">
                         {roleMeta?.label ?? u.role}
                       </Badge>
@@ -631,13 +865,6 @@ export default function UsersListPage() {
                     <div className="space-y-0.5 text-xs text-muted-foreground">
                       <div className="truncate">{u.email}</div>
                       <div className="truncate">{u.department || '-'}</div>
-                      <div>
-                        {u.is_active ? (
-                          <span className="text-success">● ใช้งาน</span>
-                        ) : (
-                          <span>● ระงับ</span>
-                        )}
-                      </div>
                     </div>
                     <div className="mt-3 flex gap-2 border-t border-border/60 pt-3">
                       <Button
@@ -647,7 +874,7 @@ export default function UsersListPage() {
                         onClick={() => openEdit(u.id)}
                       >
                         <Pencil className="mr-1 h-3 w-3" />
-                        แก้ไข
+                        {BUTTONS.EDIT}
                       </Button>
                       <Button
                         variant="outline"
@@ -658,17 +885,15 @@ export default function UsersListPage() {
                         <KeyRound className="mr-1 h-3 w-3" />
                         รีเซ็ตรหัส
                       </Button>
-                      {u.is_active && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-destructive hover:text-destructive"
-                          onClick={() => setConfirmDeactivate(u)}
-                        >
-                          <Ban className="mr-1 h-3 w-3" />
-                          ระงับ
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-destructive hover:text-destructive"
+                        onClick={() => setConfirmDelete(u)}
+                      >
+                        <Trash2 className="mr-1 h-3 w-3" />
+                        {BUTTONS.DELETE}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -689,26 +914,38 @@ export default function UsersListPage() {
         onSaved={loadUsers}
       />
 
+      <UserSummarySheet
+        userId={summaryUserId}
+        open={!!summaryUserId}
+        onOpenChange={(open) => !open && setSummaryUserId(null)}
+      />
+
       <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
 
       <AlertDialog
-        open={!!confirmDeactivate}
-        onOpenChange={(open) => !open && setConfirmDeactivate(null)}
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ระงับบัญชี</AlertDialogTitle>
+            <AlertDialogTitle>ลบผู้ใช้</AlertDialogTitle>
             <AlertDialogDescription>
-              ต้องการระงับบัญชี &ldquo;{confirmDeactivate?.full_name}&rdquo; ใช่หรือไม่?
+              ต้องการลบบัญชี &ldquo;{confirmDelete?.full_name}&rdquo; ออกจากระบบ?
+              <br />
+              <span className="mt-2 block font-medium text-destructive">
+                การกระทำนี้จะลบประวัติการเรียน ใบรับรอง และการลงทะเบียนทั้งหมดของผู้ใช้
+                <br />
+                และไม่สามารถย้อนกลับได้
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogCancel>{BUTTONS.CANCEL}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeactivate}
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              ยืนยันระงับ
+              {BUTTONS.CONFIRM_DELETE}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

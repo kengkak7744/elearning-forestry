@@ -59,8 +59,10 @@ export default function DashboardPage() {
   }, [])
 
   const progressOf = (e) => e?.progress_percent ?? e?.progress_percentage ?? 0
-  const inProgress = enrollments?.filter((e) => progressOf(e) < 100) ?? []
-  const completed = enrollments?.filter((e) => progressOf(e) >= 100) ?? []
+  // Tolerate the API returning anything non-array — never crash the dashboard.
+  const enrollmentList = Array.isArray(enrollments) ? enrollments : []
+  const inProgress = enrollmentList.filter((e) => progressOf(e) < 100)
+  const completed = enrollmentList.filter((e) => progressOf(e) >= 100)
   const continueLearning = inProgress[0]
 
   const continueId = continueLearning?.course?.id ?? continueLearning?.course_id
@@ -154,8 +156,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* My courses row */}
-      {inProgress.length > 1 && (
+      {/* My courses row — in-progress first, then completed */}
+      {enrollmentList.length > 0 && (
         <section className="mt-10">
           <div className="mb-3 flex items-end justify-between gap-3">
             <h3 className="text-lg font-semibold text-foreground">หลักสูตรของฉัน</h3>
@@ -168,7 +170,7 @@ export default function DashboardPage() {
           </div>
           <div className="-mx-4 overflow-x-auto px-4 pb-2">
             <div className="flex gap-4">
-              {inProgress.slice(0, 6).map((e) => {
+              {[...inProgress, ...completed].slice(0, 8).map((e) => {
                 const c = e.course ?? {
                   id: e.course_id,
                   title: e.title,

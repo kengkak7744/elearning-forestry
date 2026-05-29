@@ -96,5 +96,4 @@ export const BUTTONS = {
   ADD_MODULE: 'เพิ่มโมดูล',
   ADD_LESSON: 'เพิ่มบทเรียน',
   RESET_PASSWORD: 'รีเซ็ตรหัสผ่าน',
-  DEACTIVATE: 'ระงับ',
 }
