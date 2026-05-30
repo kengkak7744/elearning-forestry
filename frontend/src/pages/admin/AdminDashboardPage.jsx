@@ -4,11 +4,13 @@ import {
   Award,
   BookOpen,
   Building2,
+  ShieldCheck,
   TrendingUp,
   Users,
 } from 'lucide-react'
 import { adminStatsApi } from '@/api/adminStats'
 import { CATEGORY_BADGES, ROLE_LABELS } from '@/constants/labels'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -40,10 +42,12 @@ function KPICard({ icon: Icon, label, value, hint }) {
 }
 
 export default function AdminDashboardPage() {
+  useDocumentTitle('แดชบอร์ดผู้ดูแลระบบ')
   const [overview, setOverview] = useState(null)
   const [topCourses, setTopCourses] = useState([])
   const [topDepartments, setTopDepartments] = useState([])
   const [recent, setRecent] = useState([])
+  const [compliance, setCompliance] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -52,12 +56,14 @@ export default function AdminDashboardPage() {
       adminStatsApi.topCourses(10),
       adminStatsApi.topDepartments(10),
       adminStatsApi.recentEnrollments(20),
+      adminStatsApi.departmentCompliance().catch(() => null),
     ])
-      .then(([o, c, d, r]) => {
+      .then(([o, c, d, r, comp]) => {
         setOverview(o)
         setTopCourses(c)
         setTopDepartments(d)
         setRecent(r)
+        setCompliance(comp)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -194,6 +200,74 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Recent enrollments */}
+      {/* Department compliance — % of department staff that hold non-expired
+          certs for ALL mandatory courses. Sorted worst-first so high-priority
+          departments surface immediately. */}
+      <Card className="mt-4 border-border/60 sm:mt-6">
+        <CardHeader className="pb-3">
+          <h2 className="inline-flex items-center gap-2 text-base font-semibold text-foreground">
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            ภาพรวมการอบรมหลักสูตรบังคับตามหน่วยงาน
+          </h2>
+          {compliance?.mandatory_courses_count !== undefined && (
+            <p className="text-sm text-muted-foreground">
+              จากหลักสูตรบังคับ {compliance.mandatory_courses_count} หลักสูตร
+              (นับเฉพาะใบรับรองที่ยังไม่หมดอายุ)
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!compliance || compliance.mandatory_courses_count === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              ยังไม่มีหลักสูตรบังคับในระบบ
+            </p>
+          ) : compliance.departments.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              ยังไม่มีข้อมูลหน่วยงาน
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {compliance.departments.map((d) => {
+                const rate = d.completion_rate
+                const tone =
+                  rate >= 80 ? 'success' : rate >= 50 ? 'warning' : 'destructive'
+                const barColor =
+                  tone === 'success'
+                    ? '[&>div]:bg-success'
+                    : tone === 'warning'
+                    ? '[&>div]:bg-warning'
+                    : '[&>div]:bg-destructive'
+                return (
+                  <div key={d.department}>
+                    <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate font-medium text-foreground">{d.department}</span>
+                      <span className="flex-shrink-0 tabular-nums text-muted-foreground">
+                        {d.actual_completions}/{d.required_completions} ครั้ง ·{' '}
+                        <span
+                          className={
+                            tone === 'success'
+                              ? 'font-semibold text-success'
+                              : tone === 'warning'
+                              ? 'font-semibold text-warning'
+                              : 'font-semibold text-destructive'
+                          }
+                        >
+                          {rate}%
+                        </span>
+                      </span>
+                    </div>
+                    <Progress value={rate} className={`h-2 ${barColor}`} />
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {d.staff_count} คน
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="mt-4 border-border/60 sm:mt-6">
         <CardHeader className="pb-3">
           <h2 className="text-base font-semibold text-foreground">การลงทะเบียนล่าสุด</h2>

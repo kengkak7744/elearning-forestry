@@ -86,3 +86,23 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Skip-to-content link — visually hidden until focused via Tab.
+   WCAG 2.4.1 Bypass Blocks. Keyboard users land on the first nav link by
+   default; this gives them a one-key escape into the main content area. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -10rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 0.5rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+.skip-link:focus {
+  top: 1rem;
+}

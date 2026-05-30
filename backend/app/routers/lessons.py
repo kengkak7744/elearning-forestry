@@ -1,15 +1,23 @@
+import logging
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.course import Module
-from app.models.lesson import Lesson, ContentType
+from app.models.lesson import Lesson, LessonResource, ContentType
 from app.models.user import User
-from app.schemas.lesson import LessonCreate, LessonUpdate, LessonResponse
-from app.dependencies import require_instructor_or_admin
+from app.schemas.lesson import (
+    LessonCreate,
+    LessonResourceCreate,
+    LessonResourceResponse,
+    LessonUpdate,
+    LessonResponse,
+)
+from app.dependencies import get_current_user, require_instructor_or_admin
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/lessons", tags=["Lessons"])
 
 # Storage paths
@@ -116,8 +124,8 @@ def delete_lesson(
             
             if file_path.exists():
                 file_path.unlink()
-        except Exception as e:
-            print(f"Failed to delete file: {e}")
+        except Exception:
+            logger.exception("Failed to delete lesson file for lesson_id=%s", lesson_id)
     
     db.delete(lesson)
     db.commit()
@@ -197,4 +205,113 @@ async def upload_pdf(
     return lesson
 
 
+# =====================================================================
+# Lesson resources (supplementary downloads / external links)
+# =====================================================================
+
+@router.get("/{lesson_id}/resources", response_model=list[LessonResourceResponse])
+def list_lesson_resources(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """List supplementary materials for a lesson — visible to any logged-in learner."""
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    return (
+        db.query(LessonResource)
+        .filter(LessonResource.lesson_id == lesson_id)
+        .order_by(LessonResource.id)
+        .all()
+    )
+
+
+@router.post(
+    "/{lesson_id}/resources",
+    response_model=LessonResourceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_lesson_resource(
+    lesson_id: int,
+    data: LessonResourceCreate,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    resource = LessonResource(lesson_id=lesson_id, **data.model_dump())
+    db.add(resource)
+    db.commit()
+    db.refresh(resource)
+    return resource
+
+
+@router.delete("/resources/{resource_id}", status_code=status.HTTP_200_OK)
+def delete_lesson_resource(
+    resource_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    resource = db.query(LessonResource).filter(LessonResource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="ไม่พบเอกสาร")
+    db.delete(resource)
+    db.commit()
+    return {"message": "ลบเอกสารเรียบร้อย"}
+
+
 # File serving moved to app.routers.files (with auth and path-traversal hardening).
+
+
+# === Lesson resources (supplementary materials/links) ===
+# Learners read their own enrolled lessons' resources via the embedded list in
+# LessonResponse / course responses. The endpoints below are for admin CRUD.
+
+@router.get("/{lesson_id}/resources", response_model=list[LessonResourceResponse])
+def list_lesson_resources(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """Any logged-in user can read a lesson's resource list."""
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    return lesson.resources
+
+
+@router.post(
+    "/{lesson_id}/resources",
+    response_model=LessonResourceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_lesson_resource(
+    lesson_id: int,
+    data: LessonResourceCreate,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    resource = LessonResource(lesson_id=lesson_id, **data.model_dump())
+    db.add(resource)
+    db.commit()
+    db.refresh(resource)
+    return resource
+
+
+@router.delete("/resources/{resource_id}", status_code=status.HTTP_200_OK)
+def delete_lesson_resource(
+    resource_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    resource = db.query(LessonResource).filter(LessonResource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="ไม่พบเอกสารประกอบ")
+    db.delete(resource)
+    db.commit()
+    return {"message": "ลบเอกสารประกอบเรียบร้อย"}

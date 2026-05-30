@@ -24,6 +24,9 @@ class Course(Base):
     estimated_hours = Column(Integer, nullable=True)
     instructor_name = Column(String(150), nullable=True)
     is_published = Column(Boolean, default=False)
+    # Annual / periodic recertification. NULL = permanent (no recert).
+    # When set, certificates issued for this course get expires_at = issued + N days.
+    recertify_after_days = Column(Integer, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

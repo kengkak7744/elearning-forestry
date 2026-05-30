@@ -54,5 +54,12 @@ const map = {
 export default function Icon({ name, className = 'w-5 h-5', title }) {
   const Cmp = map[name]
   if (!Cmp) return null
-  return <Cmp className={className} aria-label={title} aria-hidden={!title} />
+  // When there's a title, the icon is informative — give it an accessible name
+  // and a role so screen readers announce it. When there isn't, the icon is
+  // decorative and must be fully hidden from AT (otherwise lucide's default
+  // `role="img"` produces an unnamed "image" announcement).
+  if (title) {
+    return <Cmp className={className} role="img" aria-label={title} />
+  }
+  return <Cmp className={className} aria-hidden="true" focusable="false" />
 }

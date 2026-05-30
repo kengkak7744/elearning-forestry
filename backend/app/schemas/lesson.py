@@ -1,7 +1,26 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from app.models.lesson import ContentType
+
+
+class LessonResourceBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    url: str = Field(..., min_length=1, max_length=500)
+    resource_type: Optional[str] = Field(None, max_length=50)
+    file_size: Optional[int] = Field(None, ge=0)
+
+
+class LessonResourceCreate(LessonResourceBase):
+    pass
+
+
+class LessonResourceResponse(LessonResourceBase):
+    id: int
+    lesson_id: int
+
+    class Config:
+        from_attributes = True
 
 
 class LessonBase(BaseModel):
@@ -36,7 +55,8 @@ class LessonResponse(LessonBase):
     id: int
     module_id: int
     created_at: datetime
-    
+    resources: List[LessonResourceResponse] = []
+
     class Config:
         from_attributes = True
 

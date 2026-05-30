@@ -8,19 +8,20 @@ export const ROLE_LABELS = {
   admin: 'ผู้ดูแลระบบ',
 }
 
-// Richer variant with color, used in admin user list badge.
+// Role badges. The redesign renders these via shadcn <Badge variant="secondary"/>
+// for consistent neutral styling, so no `.color` field — keep just the label.
 export const ROLE_BADGES = {
-  learner: { label: 'เจ้าหน้าที่ผู้เรียน', color: 'bg-blue-100 text-blue-700' },
-  manager: { label: 'หัวหน้างาน', color: 'bg-purple-100 text-purple-700' },
-  instructor: { label: 'วิทยากร', color: 'bg-amber-100 text-amber-700' },
-  admin: { label: 'ผู้ดูแลระบบ', color: 'bg-forest-100 text-forest-700' },
+  learner: { label: 'เจ้าหน้าที่ผู้เรียน' },
+  manager: { label: 'หัวหน้างาน' },
+  instructor: { label: 'วิทยากร' },
+  admin: { label: 'ผู้ดูแลระบบ' },
 }
 
 export const CATEGORY_BADGES = {
-  compliance: { label: 'บังคับตามกฎหมาย', color: 'bg-red-100 text-red-700' },
-  technical: { label: 'วิชาชีพ', color: 'bg-blue-100 text-blue-700' },
-  safety: { label: 'ความปลอดภัย', color: 'bg-amber-100 text-amber-700' },
-  skill: { label: 'ทักษะทั่วไป', color: 'bg-purple-100 text-purple-700' },
+  compliance: { label: 'บังคับตามกฎหมาย' },
+  technical: { label: 'วิชาชีพ' },
+  safety: { label: 'ความปลอดภัย' },
+  skill: { label: 'ทักษะทั่วไป' },
 }
 
 export const CATEGORY_OPTIONS = Object.entries(CATEGORY_BADGES).map(

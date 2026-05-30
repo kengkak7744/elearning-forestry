@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  AlertTriangle,
   Award,
   BookOpen,
   ChevronRight,
@@ -14,6 +15,7 @@ import { certificatesApi } from '@/api/certificates'
 import { coursesApi } from '@/api/courses'
 import { mediaUrl } from '@/utils/media'
 import { BUTTONS } from '@/constants/labels'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -49,13 +51,18 @@ function StatCard({ icon: Icon, label, value, hint }) {
 }
 
 export default function DashboardPage() {
+  useDocumentTitle('หน้าหลัก')
   const { user } = useAuth()
   const [enrollments, setEnrollments] = useState(null)
   const [certs, setCerts] = useState(null)
+  const [mandatory, setMandatory] = useState(null)
 
   useEffect(() => {
     coursesApi.myEnrollments().then(setEnrollments).catch(() => setEnrollments([]))
     certificatesApi.mine().then(setCerts).catch(() => setCerts([]))
+    // All mandatory courses in the catalog — joined client-side against
+    // enrollments to figure out which ones the user still owes.
+    coursesApi.list({ is_mandatory: true }).then(setMandatory).catch(() => setMandatory([]))
   }, [])
 
   const progressOf = (e) => e?.progress_percent ?? e?.progress_percentage ?? 0
@@ -71,12 +78,97 @@ export default function DashboardPage() {
   const cover = continueCoverField ? mediaUrl(continueCoverField) : FALLBACK_COVER
   const continueProgress = progressOf(continueLearning)
 
+  // Mandatory courses still owed:
+  //   - progress < 100%, OR
+  //   - has a certificate that's expired (recertification needed)
+  const enrollmentByCourseId = new Map(
+    enrollmentList.map((e) => [e.course?.id ?? e.course_id, progressOf(e)])
+  )
+  const certList = Array.isArray(certs) ? certs : []
+  // Most-recent cert per course wins (server already orders desc by issued_at).
+  const certByCourseId = new Map()
+  for (const c of certList) {
+    const cid = c.course?.id
+    if (cid && !certByCourseId.has(cid)) certByCourseId.set(cid, c)
+  }
+  const mandatoryList = Array.isArray(mandatory) ? mandatory : []
+  const mandatoryIncomplete = mandatoryList.filter((c) => {
+    if (c.is_published === false) return false
+    const pct = enrollmentByCourseId.get(c.id) ?? 0
+    if (pct < 100) return true
+    const cert = certByCourseId.get(c.id)
+    return cert?.is_expired === true
+  })
+
+  const formatExpiry = (iso) =>
+    iso
+      ? new Date(iso).toLocaleDateString('th-TH', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : ''
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
         <Sparkles className="h-4 w-4 text-primary" />
         สวัสดี {user?.full_name?.split(' ')[0] || 'คุณ'}
       </div>
+
+      {/* Mandatory courses nudge — shown above the hero so it's the first thing
+          a learner sees if they owe required training. Loads independently from
+          enrollments + mandatory list, so we wait for both before deciding. */}
+      {Array.isArray(mandatory) && Array.isArray(enrollments) && mandatoryIncomplete.length > 0 && (
+        <Card className="mb-6 border-warning/40 bg-warning/5">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-warning/20 text-warning">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-foreground">
+                หลักสูตรบังคับที่ยังไม่จบ ({mandatoryIncomplete.length})
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                หลักสูตรเหล่านี้เป็นข้อบังคับสำหรับเจ้าหน้าที่ของคุณ
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {mandatoryIncomplete.slice(0, 5).map((c) => {
+                  const pct = enrollmentByCourseId.get(c.id)
+                  const enrolled = pct !== undefined
+                  const cert = certByCourseId.get(c.id)
+                  const expired = cert?.is_expired === true
+                  let statusLabel = enrolled ? `${Math.round(pct)}%` : 'ยังไม่ลงทะเบียน'
+                  if (expired) statusLabel = 'ใบรับรองหมดอายุ'
+                  return (
+                    <li key={c.id}>
+                      <Link
+                        to={enrolled ? `/courses/${c.id}/learn` : `/courses/${c.id}`}
+                        className="flex items-center gap-2 rounded-md border border-warning/30 bg-background px-3 py-2 text-sm transition-colors hover:bg-warning/10"
+                      >
+                        <span className="line-clamp-1 flex-1 text-foreground">{c.title}</span>
+                        <span
+                          className={`flex-shrink-0 text-[11px] tabular-nums ${
+                            expired ? 'font-medium text-destructive' : 'text-muted-foreground'
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+              {mandatoryIncomplete.length > 5 && (
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  และอีก {mandatoryIncomplete.length - 5} หลักสูตร
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hero: Continue learning OR get started */}
       {enrollments === null ? (
@@ -217,9 +309,17 @@ export default function DashboardPage() {
           <ul className="grid gap-3 sm:grid-cols-2">
             {certs.map((c) => (
               <li key={c.id}>
-                <Card className="border-border/60">
+                <Card
+                  className={c.is_expired ? 'border-destructive/40 opacity-90' : 'border-border/60'}
+                >
                   <CardContent className="flex items-start gap-3 p-4">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <div
+                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
+                        c.is_expired
+                          ? 'bg-destructive/10 text-destructive'
+                          : 'bg-primary/10 text-primary'
+                      }`}
+                    >
                       <Trophy className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -235,6 +335,12 @@ export default function DashboardPage() {
                       {c.issued_at && (
                         <p className="text-[11px] text-muted-foreground/80">
                           ออกเมื่อ {formatThaiDate(c.issued_at)}
+                          {c.expires_at && (
+                            <span className={c.is_expired ? 'text-destructive font-medium' : ''}>
+                              {' · '}
+                              {c.is_expired ? 'หมดอายุแล้ว' : `หมดอายุ ${formatExpiry(c.expires_at)}`}
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>

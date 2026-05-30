@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { cloneElement, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { authApi } from '@/api/auth'
 import { showToast } from '@/lib/toast'
 import { BUTTONS } from '@/constants/labels'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -97,17 +98,30 @@ function StepIndicator({ current }) {
 }
 
 function Field({ id, label, error, required, children, hint }) {
+  // Wire aria-invalid + aria-describedby onto the child input so screen readers
+  // hear "X has an error: <message>" when focused, instead of just reading the
+  // label. The describedby points to whichever message is currently visible
+  // (error takes precedence over hint).
+  const describedById = error ? `${id}-error` : hint ? `${id}-hint` : undefined
+  const input = cloneElement(children, {
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedById,
+  })
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
-      {children}
+      {input}
       {error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p id={`${id}-error`} className="text-xs text-destructive">
+          {error}
+        </p>
       ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
       ) : null}
     </div>
   )
@@ -123,6 +137,8 @@ function SummaryRow({ label, value }) {
 }
 
 export default function RegisterPage() {
+  useDocumentTitle('สมัครสมาชิก')
+
   const [form, setForm] = useState(initialForm)
   const [step, setStep] = useState(0)
   const [errors, setErrors] = useState({})

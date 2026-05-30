@@ -3,12 +3,15 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { showToast } from '@/lib/toast'
 import { BUTTONS } from '@/constants/labels'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
+  useDocumentTitle('เข้าสู่ระบบ')
+
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)

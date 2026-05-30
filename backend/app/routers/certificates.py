@@ -5,7 +5,7 @@ AND (the course's final quiz, if any, has been passed by this user).
 """
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -98,6 +98,30 @@ def _course_completion(db: Session, user_id: int, course_id: int):
 
 def _gen_certificate_number() -> str:
     return f"CERT-{datetime.utcnow():%Y%m%d}-{secrets.token_hex(3).upper()}"
+
+
+def _compute_expires_at(course: Course, issued_at: datetime | None = None) -> datetime | None:
+    """Snapshot expiry for a freshly-issued certificate.
+
+    None when the course has no recertification policy (permanent cert).
+    Always uses UTC; comparisons elsewhere also use UTC-aware datetimes.
+    """
+    days = course.recertify_after_days
+    if not days or days <= 0:
+        return None
+    base = issued_at or datetime.now(timezone.utc)
+    if base.tzinfo is None:
+        base = base.replace(tzinfo=timezone.utc)
+    return base + timedelta(days=days)
+
+
+def _is_expired(cert: Certificate) -> bool:
+    if not cert.expires_at:
+        return False
+    exp = cert.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    return exp < datetime.now(timezone.utc)
 
 
 def _render_certificate_pdf(cert: Certificate, user: User, course: Course) -> Path:
@@ -194,13 +218,17 @@ def eligibility(
     current_user: User = Depends(get_current_user),
 ):
     """Tell the client whether the learner can claim a certificate for this course,
-    and whether one was already issued."""
+    and whether one was already issued (and whether it's still valid)."""
     eligible, final_score, reason = _course_completion(db, current_user.id, course_id)
+    # The "current" cert is the most recent one — recertification flows can
+    # have multiple historical certs per (user, course).
     existing = (
         db.query(Certificate)
         .filter(Certificate.user_id == current_user.id, Certificate.course_id == course_id)
+        .order_by(Certificate.issued_at.desc())
         .first()
     )
+    cert_expired = bool(existing) and _is_expired(existing)
     return {
         "eligible": eligible,
         "reason": reason,
@@ -208,6 +236,8 @@ def eligibility(
         "has_certificate": existing is not None,
         "certificate_id": existing.id if existing else None,
         "certificate_number": existing.certificate_number if existing else None,
+        "expires_at": existing.expires_at.isoformat() if existing and existing.expires_at else None,
+        "is_expired": cert_expired,
     }
 
 
@@ -217,8 +247,12 @@ def issue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Idempotent: returns the existing certificate if one was already issued,
-    otherwise creates and renders a new one."""
+    """Idempotent w.r.t. valid certificates: returns the existing cert if it's
+    still valid, otherwise (no cert, or cert expired) creates a new one.
+
+    For recertifiable courses, the old expired cert is kept in the DB as an
+    audit-trail record; the new cert just shadows it for "current" lookups.
+    """
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
@@ -226,9 +260,10 @@ def issue(
     existing = (
         db.query(Certificate)
         .filter(Certificate.user_id == current_user.id, Certificate.course_id == course_id)
+        .order_by(Certificate.issued_at.desc())
         .first()
     )
-    if existing:
+    if existing and not _is_expired(existing):
         # Regenerate the PDF if it's missing on disk (e.g. fresh container).
         if not existing.pdf_path or not Path(existing.pdf_path).exists():
             path = _render_certificate_pdf(existing, current_user, course)
@@ -239,9 +274,13 @@ def issue(
             "certificate_number": existing.certificate_number,
             "final_score": existing.final_score,
             "issued_at": existing.issued_at.isoformat() if existing.issued_at else None,
+            "expires_at": existing.expires_at.isoformat() if existing.expires_at else None,
             "already_existed": True,
         }
 
+    # Either no cert yet, or the most recent one expired → issue fresh.
+    # Re-check eligibility — they may have retaken the final quiz between expiry
+    # and now.
     eligible, final_score, reason = _course_completion(db, current_user.id, course_id)
     if not eligible:
         raise HTTPException(status_code=400, detail=reason or "ยังไม่มีสิทธิ์รับใบรับรอง")
@@ -251,6 +290,7 @@ def issue(
         course_id=course_id,
         certificate_number=_gen_certificate_number(),
         final_score=final_score,
+        expires_at=_compute_expires_at(course),
     )
     db.add(cert)
     db.commit()
@@ -265,6 +305,7 @@ def issue(
         "certificate_number": cert.certificate_number,
         "final_score": cert.final_score,
         "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
+        "expires_at": cert.expires_at.isoformat() if cert.expires_at else None,
         "already_existed": False,
     }
 
@@ -288,6 +329,8 @@ def my_certificates(
             "certificate_number": c.certificate_number,
             "final_score": c.final_score,
             "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+            "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+            "is_expired": _is_expired(c),
             "course": {"id": course.id, "title": course.title},
         }
         for c, course in rows
@@ -347,6 +390,8 @@ def admin_list(
             "certificate_number": c.certificate_number,
             "final_score": c.final_score,
             "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+            "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+            "is_expired": _is_expired(c),
             "user": {"id": u.id, "full_name": u.full_name, "department": u.department},
             "course": {"id": course.id, "title": course.title},
         }

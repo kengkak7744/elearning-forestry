@@ -16,6 +16,10 @@ class Certificate(Base):
     pdf_path = Column(String(500), nullable=True)                         # ที่อยู่ไฟล์ PDF
     
     issued_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Snapshot from course.recertify_after_days at issue time. NULL = permanent.
+    # Recorded as a snapshot so changing the course policy later doesn't
+    # retroactively invalidate previously-issued certificates.
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     
     user = relationship("User", back_populates="certificates")
     course = relationship("Course", back_populates="certificates")

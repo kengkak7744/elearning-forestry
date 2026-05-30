@@ -180,3 +180,87 @@ def recent_enrollments(
         }
         for e, u, c in rows
     ]
+
+
+@router.get("/department-compliance")
+def department_compliance(
+    response: Response,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Per-department completion rate against published mandatory courses.
+
+    "Completed" = the user holds a non-expired certificate for that course.
+    (Strict measure — what regulators / HR audit against.)
+
+    Returns a list sorted by completion_rate ascending (worst-compliance
+    departments surfaced first) so admins can prioritise nudging.
+    """
+    from datetime import datetime, timezone
+    from app.models.certificate import Certificate
+
+    response.headers["Cache-Control"] = _STATS_CACHE
+
+    mandatory_course_ids = [
+        cid
+        for (cid,) in db.query(Course.id)
+        .filter(Course.is_published == True, Course.is_mandatory == True)
+        .all()
+    ]
+    mandatory_count = len(mandatory_course_ids)
+
+    # Per-department staff count (active users only).
+    dept_rows = (
+        db.query(User.department, func.count(User.id))
+        .filter(User.is_active == True, User.department.isnot(None), User.department != "")
+        .group_by(User.department)
+        .all()
+    )
+
+    if mandatory_count == 0 or not dept_rows:
+        return {
+            "mandatory_courses_count": mandatory_count,
+            "departments": [],
+        }
+
+    now = datetime.now(timezone.utc)
+
+    # Per-(department, user) count of distinct mandatory courses they hold a
+    # non-expired cert for. Aggregated up to department.
+    valid_certs_per_dept = dict(
+        db.query(
+            User.department,
+            func.count(func.distinct(Certificate.course_id)),
+        )
+        .join(Certificate, Certificate.user_id == User.id)
+        .filter(
+            User.is_active == True,
+            User.department.isnot(None),
+            User.department != "",
+            Certificate.course_id.in_(mandatory_course_ids),
+        )
+        # NULL expires_at = permanent. expires_at > now = still valid.
+        .filter((Certificate.expires_at.is_(None)) | (Certificate.expires_at > now))
+        .group_by(User.department)
+        .all()
+    )
+
+    departments = []
+    for dept_name, staff_count in dept_rows:
+        required = staff_count * mandatory_count
+        actual = valid_certs_per_dept.get(dept_name, 0)
+        rate = int(round((actual / required) * 100)) if required > 0 else 0
+        departments.append({
+            "department": dept_name,
+            "staff_count": staff_count,
+            "required_completions": required,
+            "actual_completions": int(actual),
+            "completion_rate": rate,
+        })
+
+    departments.sort(key=lambda d: (d["completion_rate"], -d["staff_count"]))
+
+    return {
+        "mandatory_courses_count": mandatory_count,
+        "departments": departments,
+    }

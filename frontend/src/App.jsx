@@ -24,8 +24,14 @@ const CourseEditPage = lazy(() => import('./pages/admin/CourseEditPage'))
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
 
 function PageFallback() {
+  // role=status + aria-live=polite announces the wait state to screen readers
+  // without interrupting whatever's already being read.
   return (
-    <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground"
+    >
       กำลังโหลด...
     </div>
   )

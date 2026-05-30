@@ -40,11 +40,14 @@ def get_current_user(
     if payload is None:
         raise credentials_exception
 
-    user_id = payload.get("sub")
-    if user_id is None:
+    # A forged JWT can put anything in `sub` — coerce defensively. ValueError
+    # on non-integer must NOT bubble as a 500.
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
 
@@ -87,21 +90,6 @@ def require_manager_or_above(current_user: User = Depends(get_current_user)) -> 
     return current_user
 
 
-def is_staff(user: User) -> bool:
-    """เช็คว่าเป็นเจ้าหน้าที่กรมป่าไม้หรือไม่ (ไม่ใช่บุคคลทั่วไป)"""
-    return user.role != UserRole.PUBLIC
-
-
-def require_staff(current_user: User = Depends(get_current_user)) -> User:
-    """อนุญาตเฉพาะเจ้าหน้าที่ (ไม่ใช่บุคคลทั่วไป)"""
-    if current_user.role == UserRole.PUBLIC:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="หลักสูตรนี้สำหรับเจ้าหน้าที่กรมป่าไม้เท่านั้น"
-        )
-    return current_user
-
-
 def require_media_token(
     t: Optional[str] = Query(None, description="Optional JWT for non-cookie clients"),
     authorization: Optional[str] = Header(None),
@@ -124,7 +112,12 @@ def require_media_token(
     if not payload or not payload.get("sub"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="โทเค็นไม่ถูกต้องหรือหมดอายุ")
 
-    user = db.query(User).filter(User.id == int(payload["sub"])).first()
+    try:
+        user_id = int(payload["sub"])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="โทเค็นไม่ถูกต้องหรือหมดอายุ")
+
+    user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ผู้ใช้ไม่พร้อมใช้งาน")
     return user

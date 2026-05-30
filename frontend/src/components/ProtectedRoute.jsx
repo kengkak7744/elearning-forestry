@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -7,8 +7,12 @@ export default function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-forest-600">กำลังโหลด...</div>
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex min-h-screen items-center justify-center text-sm text-muted-foreground"
+      >
+        กำลังโหลด...
       </div>
     )
   }

@@ -12,6 +12,8 @@ class CourseBase(BaseModel):
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = Field(None, ge=0)
     instructor_name: Optional[str] = Field(None, max_length=150)
+    # Periodic recertification window in days. None / 0 → permanent certificate.
+    recertify_after_days: Optional[int] = Field(None, ge=0)
 
 
 class CourseCreate(CourseBase):
@@ -27,6 +29,7 @@ class CourseUpdate(BaseModel):
     estimated_hours: Optional[int] = Field(None, ge=0)
     instructor_name: Optional[str] = Field(None, max_length=150)
     is_published: Optional[bool] = None
+    recertify_after_days: Optional[int] = Field(None, ge=0)
 
 
 class CourseResponse(CourseBase):
@@ -38,7 +41,7 @@ class CourseResponse(CourseBase):
     total_modules: int = 0
     enrolled_count: int = 0
     is_enrolled: bool = False
-    
+
     class Config:
         from_attributes = True
 
@@ -54,6 +57,7 @@ class CourseListItem(BaseModel):
     is_published: bool
     instructor_name: Optional[str] = None
     created_at: datetime
-    
+    recertify_after_days: Optional[int] = None
+
     class Config:
         from_attributes = True

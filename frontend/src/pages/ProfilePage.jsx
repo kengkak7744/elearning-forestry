@@ -8,6 +8,7 @@ import { certificatesApi } from '@/api/certificates'
 import { mediaUrl } from '@/utils/media'
 import { ROLE_LABELS } from '@/constants/labels'
 import { showToast } from '@/lib/toast'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -386,13 +387,30 @@ function CertificatesTab() {
     )
   }
 
+  const fmtExpiry = (iso) =>
+    iso
+      ? new Date(iso).toLocaleDateString('th-TH', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : ''
+
   return (
     <ul className="grid gap-3 sm:grid-cols-2">
       {certs.map((c) => (
         <li key={c.id}>
-          <Card className="border-border/60">
+          <Card
+            className={c.is_expired ? 'border-destructive/40' : 'border-border/60'}
+          >
             <CardContent className="flex items-start gap-3 p-4">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <div
+                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
+                  c.is_expired
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-primary/10 text-primary'
+                }`}
+              >
                 <Trophy className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -403,6 +421,17 @@ function CertificatesTab() {
                   เลขที่ {c.certificate_number}
                   {c.final_score != null && <span> · คะแนน {Math.round(c.final_score)}%</span>}
                 </p>
+                {c.expires_at && (
+                  <p
+                    className={`text-[11px] ${
+                      c.is_expired
+                        ? 'font-medium text-destructive'
+                        : 'text-muted-foreground/80'
+                    }`}
+                  >
+                    {c.is_expired ? 'หมดอายุแล้ว — ต้องอบรมใหม่' : `หมดอายุ ${fmtExpiry(c.expires_at)}`}
+                  </p>
+                )}
               </div>
               <Button asChild size="sm" variant="outline">
                 <a
@@ -422,6 +451,7 @@ function CertificatesTab() {
 }
 
 export default function ProfilePage() {
+  useDocumentTitle('โปรไฟล์')
   const { user } = useAuth()
 
   return (

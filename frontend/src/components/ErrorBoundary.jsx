@@ -1,4 +1,6 @@
 import { Component } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 export default class ErrorBoundary extends Component {
   state = { hasError: false }
@@ -25,20 +27,18 @@ export default class ErrorBoundary extends Component {
     if (!this.state.hasError) return this.props.children
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
-          <h1 className="text-xl font-bold text-gray-800 mb-2">เกิดข้อผิดพลาด</h1>
-          <p className="text-sm text-gray-600 mb-5">
-            ไม่สามารถแสดงหน้านี้ได้ กรุณาลองโหลดใหม่อีกครั้ง
-          </p>
-          <button
-            type="button"
-            onClick={this.handleReload}
-            className="bg-forest-500 hover:bg-forest-600 text-white px-4 py-2 rounded-lg font-medium transition min-h-[44px]"
-          >
-            โหลดใหม่
-          </button>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md border-border/60">
+          <CardContent className="space-y-3 p-8 text-center">
+            <h1 className="text-xl font-semibold text-foreground">เกิดข้อผิดพลาด</h1>
+            <p className="text-sm text-muted-foreground">
+              ไม่สามารถแสดงหน้านี้ได้ กรุณาลองโหลดใหม่อีกครั้ง
+            </p>
+            <Button type="button" onClick={this.handleReload} className="mt-2">
+              โหลดใหม่
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }

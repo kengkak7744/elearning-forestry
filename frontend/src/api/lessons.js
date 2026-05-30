@@ -39,4 +39,23 @@ export const lessonsApi = {
     })
     return response.data
   },
+
+  // === Supplementary resources (downloads / external links) ===
+  listResources: async (lessonId) => {
+    const response = await apiClient.get(`/lessons/${lessonId}/resources`)
+    return Array.isArray(response.data) ? response.data : []
+  },
+  addResource: async (lessonId, { title, url, resource_type, file_size }) => {
+    const response = await apiClient.post(`/lessons/${lessonId}/resources`, {
+      title,
+      url,
+      resource_type: resource_type || null,
+      file_size: file_size ?? null,
+    })
+    return response.data
+  },
+  deleteResource: async (resourceId) => {
+    const response = await apiClient.delete(`/lessons/resources/${resourceId}`)
+    return response.data
+  },
 }

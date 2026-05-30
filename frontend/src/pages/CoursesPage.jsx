@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import CourseCard from '@/components/learner/CourseCard'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { cn } from '@/lib/utils'
 
 const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
@@ -17,6 +18,7 @@ const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
 }))
 
 export default function CoursesPage() {
+  useDocumentTitle('หลักสูตรทั้งหมด')
   const [params, setParams] = useSearchParams()
 
   // Read filters from URL as stable primitives. Parsing into arrays must

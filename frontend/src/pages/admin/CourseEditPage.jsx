@@ -10,7 +10,6 @@ import {
   Plus,
   Save,
   Trash2,
-  Upload,
   Video,
 } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
@@ -54,14 +53,13 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import QuizManager from '@/components/QuizManager'
 import CourseStatsModal from '@/components/CourseStatsModal'
-import { cn } from '@/lib/utils'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 
 function PromptInputDialog({ open, title, label, placeholder, onConfirm, onCancel }) {
   const [value, setValue] = useState('')
@@ -114,6 +112,7 @@ export default function CourseEditPage() {
   const [saving, setSaving] = useState(false)
   const [confirmState, setConfirmState] = useState(null)
   const [promptState, setPromptState] = useState(null)
+
   const [statsOpen, setStatsOpen] = useState(false)
   const [deleteCourseOpen, setDeleteCourseOpen] = useState(false)
 
@@ -129,9 +128,15 @@ export default function CourseEditPage() {
     estimated_hours: '',
     instructor_name: '',
     is_published: false,
+    recertify_after_days: '',
   })
 
   const [modules, setModules] = useState([])
+
+  useDocumentTitle(
+    isNew ? 'สร้างหลักสูตรใหม่' : courseData.title ? `แก้ไข: ${courseData.title}` : 'แก้ไขหลักสูตร'
+  )
+
 
   const loadCourse = async () => {
     setLoading(true)
@@ -145,6 +150,7 @@ export default function CourseEditPage() {
         estimated_hours: data.estimated_hours || '',
         instructor_name: data.instructor_name || '',
         is_published: data.is_published || false,
+        recertify_after_days: data.recertify_after_days ?? '',
       })
       setCoverImage(data.cover_image || null)
       setModules(data.modules || [])
@@ -171,6 +177,9 @@ export default function CourseEditPage() {
       ...courseData,
       estimated_hours: courseData.estimated_hours
         ? parseInt(courseData.estimated_hours)
+        : null,
+      recertify_after_days: courseData.recertify_after_days
+        ? parseInt(courseData.recertify_after_days)
         : null,
     }
     try {
@@ -601,6 +610,26 @@ export default function CourseEditPage() {
                     className="max-w-xs"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ce-recert">
+                    อายุใบรับรอง (วัน)
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      — เว้นว่าง = ใบรับรองไม่หมดอายุ
+                    </span>
+                  </Label>
+                  <Input
+                    id="ce-recert"
+                    type="number"
+                    min={0}
+                    value={courseData.recertify_after_days}
+                    onChange={(e) => updateField('recertify_after_days')(e.target.value)}
+                    placeholder="เช่น 365 = ต้องอบรมใหม่ทุก 1 ปี"
+                    className="max-w-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    เมื่อใบรับรองหมดอายุ ผู้เรียนต้องทำแบบทดสอบสุดท้ายอีกครั้งเพื่อขอใบรับรองใหม่
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -1023,11 +1052,124 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
           </Button>
 
           <div className="border-t border-border pt-3">
+            <h4 className="mb-2 text-sm font-medium text-foreground">เอกสารประกอบ</h4>
+            <LessonResourcesEditor lesson={lesson} onChange={onUpdate} />
+          </div>
+
+          <div className="border-t border-border pt-3">
             <h4 className="mb-2 text-sm font-medium text-foreground">แบบทดสอบ</h4>
             <QuizManager lessonId={lesson.id} scope="lesson" showToast={showToast} />
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function LessonResourcesEditor({ lesson, onChange }) {
+  // `lesson.resources` arrives from the parent's course-loading flow. We treat
+  // it as the source of truth and push optimistic updates back via onChange so
+  // the lesson tree stays consistent with what the learner sees.
+  const resources = lesson.resources ?? []
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftUrl, setDraftUrl] = useState('')
+  const [draftType, setDraftType] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    if (!draftTitle.trim() || !draftUrl.trim()) return
+    setAdding(true)
+    try {
+      const created = await lessonsApi.addResource(lesson.id, {
+        title: draftTitle.trim(),
+        url: draftUrl.trim(),
+        resource_type: draftType.trim() || null,
+      })
+      onChange({ resources: [...resources, created] })
+      setDraftTitle('')
+      setDraftUrl('')
+      setDraftType('')
+      showToast('เพิ่มเอกสารสำเร็จ', 'success')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'เพิ่มไม่สำเร็จ', 'error')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleDelete = async (resourceId) => {
+    try {
+      await lessonsApi.deleteResource(resourceId)
+      onChange({ resources: resources.filter((r) => r.id !== resourceId) })
+      showToast('ลบเอกสารเรียบร้อย', 'success')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {resources.length === 0 ? (
+        <p className="text-xs text-muted-foreground">ยังไม่มีเอกสารประกอบ</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {resources.map((r) => (
+            <li
+              key={r.id}
+              className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-foreground" title={r.url}>
+                {r.title}
+              </span>
+              {r.resource_type && (
+                <Badge variant="secondary" className="font-normal">
+                  {r.resource_type}
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDelete(r.id)}
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                aria-label={`ลบเอกสาร ${r.title}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={handleAdd} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <Input
+          value={draftTitle}
+          onChange={(e) => setDraftTitle(e.target.value)}
+          placeholder="ชื่อเอกสาร เช่น แบบฟอร์ม กฟภ."
+          maxLength={200}
+        />
+        <Input
+          value={draftUrl}
+          onChange={(e) => setDraftUrl(e.target.value)}
+          placeholder="URL หรือ /pdfs/file.pdf"
+          maxLength={500}
+        />
+        <Input
+          value={draftType}
+          onChange={(e) => setDraftType(e.target.value)}
+          placeholder="ประเภท เช่น PDF"
+          maxLength={50}
+          className="sm:w-24"
+        />
+        <Button type="submit" size="sm" disabled={adding || !draftTitle.trim() || !draftUrl.trim()}>
+          <Plus className="mr-1 h-3 w-3" />
+          เพิ่ม
+        </Button>
+      </form>
+      <p className="text-[11px] text-muted-foreground">
+        ใช้ลิงก์ภายนอก (https://...) หรือ path ภายในที่อัปโหลดไว้แล้ว
+      </p>
     </div>
   )
 }

@@ -70,6 +70,8 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
           size="icon"
           className="h-7 w-7"
           onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'ย่อคำถาม' : 'ขยายคำถาม'}
         >
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5" />
@@ -118,39 +120,49 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
             <div>
               <Label className="text-xs">ตัวเลือก</Label>
               <div className="mt-2 space-y-2">
-                {draft.choices.map((choice, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type={
-                        question.question_type === 'single_choice'
-                          ? 'radio'
-                          : 'checkbox'
-                      }
-                      name={`q-${question.id}-correct`}
-                      checked={choice.is_correct}
-                      onChange={(e) =>
-                        updateChoice(idx, 'is_correct', e.target.checked)
-                      }
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <Input
-                      value={choice.text}
-                      onChange={(e) => updateChoice(idx, 'text', e.target.value)}
-                      className="flex-1"
-                    />
-                    {draft.choices.length > 2 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeChoice(idx)}
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span className="sr-only">ลบตัวเลือก</span>
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                {draft.choices.map((choice, idx) => {
+                  const correctId = `qe-${question.id}-correct-${idx}`
+                  const textId = `qe-${question.id}-text-${idx}`
+                  return (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        id={correctId}
+                        type={
+                          question.question_type === 'single_choice'
+                            ? 'radio'
+                            : 'checkbox'
+                        }
+                        name={`q-${question.id}-correct`}
+                        checked={choice.is_correct}
+                        onChange={(e) =>
+                          updateChoice(idx, 'is_correct', e.target.checked)
+                        }
+                        aria-label={`ตัวเลือกที่ ${idx + 1} ถูกต้อง`}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      <Label htmlFor={textId} className="sr-only">
+                        ข้อความตัวเลือกที่ {idx + 1}
+                      </Label>
+                      <Input
+                        id={textId}
+                        value={choice.text}
+                        onChange={(e) => updateChoice(idx, 'text', e.target.value)}
+                        className="flex-1"
+                      />
+                      {draft.choices.length > 2 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeChoice(idx)}
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          aria-label={`ลบตัวเลือกที่ ${idx + 1}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               <Button
                 variant="ghost"

@@ -8,11 +8,20 @@ import LearnerTopBar from './LearnerTopBar'
 import MobileBottomNav from './MobileBottomNav'
 import AdminSidebar from './AdminSidebar'
 
+function SkipLink() {
+  return (
+    <a href="#main-content" className="skip-link">
+      ข้ามไปยังเนื้อหาหลัก
+    </a>
+  )
+}
+
 export function LearnerShell() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <SkipLink />
       <LearnerTopBar />
-      <main className="flex-1 pb-24 md:pb-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 pb-24 md:pb-0">
         <Outlet />
       </main>
       <MobileBottomNav />
@@ -23,7 +32,10 @@ export function LearnerShell() {
 export function ViewerShell() {
   return (
     <div className="min-h-screen bg-background">
-      <Outlet />
+      <SkipLink />
+      <main id="main-content" tabIndex={-1}>
+        <Outlet />
+      </main>
     </div>
   )
 }
@@ -34,6 +46,7 @@ export function AdminShell() {
 
   return (
     <div className="flex h-screen bg-background">
+      <SkipLink />
       {/* Desktop sidebar — sticky to viewport so footer (back/logout) is always
           visible regardless of main-content scroll. */}
       <div className="hidden h-screen flex-shrink-0 lg:flex">
@@ -64,7 +77,7 @@ export function AdminShell() {
           )}
         </div>
 
-        <main className="flex-1 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>

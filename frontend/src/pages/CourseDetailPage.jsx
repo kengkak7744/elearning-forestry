@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import {
   Accordion,
   AccordionContent,
@@ -94,6 +95,9 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [enrollLoading, setEnrollLoading] = useState(false)
+
+  // Drive the tab/bookmark title from the loaded course title once it's known.
+  useDocumentTitle(course?.title)
   const [unenrollOpen, setUnenrollOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [scoresOpen, setScoresOpen] = useState(false)

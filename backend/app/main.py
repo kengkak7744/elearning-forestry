@@ -5,10 +5,17 @@ from app.routers import auth, users, courses, modules, lessons, progress, quizze
 from app.config import settings
 import os
 
+# In prod (COOKIE_SECURE=True), suppress the auto-generated Swagger UI, ReDoc,
+# and openapi.json so the full API surface isn't a public attack reconnaissance
+# document. Dev keeps them for convenience.
+_PROD = settings.COOKIE_SECURE
 app = FastAPI(
     title="ระบบ e-Learning กรมป่าไม้",
     description="API สำหรับระบบการเรียนรู้ออนไลน์ของเจ้าหน้าที่กรมป่าไม้",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None if _PROD else "/docs",
+    redoc_url=None if _PROD else "/redoc",
+    openapi_url=None if _PROD else "/openapi.json",
 )
 
 #React
@@ -26,6 +33,27 @@ app.add_middleware(
 # Compress JSON/text responses ≥ 1 KB. Already-compressed bytes (video/pdf/images) are skipped automatically.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Content-Security-Policy: defense-in-depth against XSS even though React escapes
+# by default. Allows: self, inline styles (Tailwind generated), Sarabun via Google
+# Fonts, YouTube embeds for the course viewer. PDFs are served same-origin so
+# they fall under 'self'. Tighten further by hashing inline <script>s if you
+# ever introduce any — currently the build emits none.
+CSP_VALUE = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: blob:; "
+    "media-src 'self' blob:; "
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'self'"
+)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -37,6 +65,7 @@ async def security_headers(request: Request, call_next):
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
     )
+    response.headers.setdefault("Content-Security-Policy", CSP_VALUE)
     if settings.COOKIE_SECURE:
         response.headers.setdefault(
             "Strict-Transport-Security",
@@ -63,11 +92,10 @@ app.include_router(certificates.router)
 
 @app.get("/")
 def read_root():
-    return {
-        "message": "ระบบ e-Learning กรมป่าไม้",
-        "status": "online",
-        "docs": "/docs"
-    }
+    info = {"message": "ระบบ e-Learning กรมป่าไม้", "status": "online"}
+    if not _PROD:
+        info["docs"] = "/docs"
+    return info
 
 
 @app.get("/health")

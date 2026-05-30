@@ -5,6 +5,7 @@ import { coursesApi } from '@/api/courses'
 import { CATEGORY_BADGES } from '@/constants/labels'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
+import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -55,6 +56,7 @@ function CoverThumb({ src, alt }) {
 }
 
 export default function CoursesListPage() {
+  useDocumentTitle('จัดการหลักสูตร')
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
