@@ -57,6 +57,10 @@ class Question(Base):
     question_type = Column(SQLEnum(QuestionType, name="questiontype"), nullable=False)
     choices = Column(JSON, nullable=True)  # [{"text": "...", "is_correct": true}, ...]
     correct_text = Column(Text, nullable=True)  # for written questions
+    # Rationale shown to learners after they submit (esp. on wrong answers).
+    # Optional — null means "no extra context", display falls back to just the
+    # correct answer markup.
+    explanation = Column(Text, nullable=True)
     points = Column(Integer, default=1)
     order_index = Column(Integer, default=0)
 

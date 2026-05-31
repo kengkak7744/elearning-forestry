@@ -5,3 +5,5 @@ from app.models.progress import LessonProgress
 from app.models.quiz import Quiz, Question, QuizAttempt, QuizPlacement, QuestionType
 from app.models.certificate import Certificate
 from app.models.enrollment import Enrollment
+from app.models.lesson_note import LessonNote
+from app.models.bookmark import Bookmark

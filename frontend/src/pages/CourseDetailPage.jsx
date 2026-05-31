@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
   BookOpen,
   CheckCircle2,
   ChevronRight,
@@ -95,6 +97,7 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [enrollLoading, setEnrollLoading] = useState(false)
+  const [bookmarkBusy, setBookmarkBusy] = useState(false)
 
   // Drive the tab/bookmark title from the loaded course title once it's known.
   useDocumentTitle(course?.title)
@@ -131,6 +134,29 @@ export default function CourseDetailPage() {
       showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setEnrollLoading(false)
+    }
+  }
+
+  const handleToggleBookmark = async () => {
+    if (!course || bookmarkBusy) return
+    const willBookmark = !course.is_bookmarked
+    setBookmarkBusy(true)
+    // Optimistic — flip the visible state so the click feels instant.
+    setCourse((prev) => (prev ? { ...prev, is_bookmarked: willBookmark } : prev))
+    try {
+      if (willBookmark) {
+        await coursesApi.bookmark(course.id)
+        showToast('บันทึกหลักสูตรไว้แล้ว', 'success')
+      } else {
+        await coursesApi.unbookmark(course.id)
+        showToast('ยกเลิกการบันทึกเรียบร้อย', 'success')
+      }
+    } catch (err) {
+      // Revert
+      setCourse((prev) => (prev ? { ...prev, is_bookmarked: !willBookmark } : prev))
+      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+    } finally {
+      setBookmarkBusy(false)
     }
   }
 
@@ -368,6 +394,27 @@ export default function CourseDetailPage() {
                   {BUTTONS.UNENROLL}
                 </Button>
               )}
+
+              {/* Bookmark toggle — available regardless of enrollment so a user
+                  scanning the catalog can save without committing to enroll. */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleToggleBookmark}
+                disabled={bookmarkBusy}
+              >
+                {course.is_bookmarked ? (
+                  <>
+                    <BookmarkCheck className="mr-1.5 h-4 w-4 fill-current text-warning" />
+                    บันทึกไว้แล้ว
+                  </>
+                ) : (
+                  <>
+                    <Bookmark className="mr-1.5 h-4 w-4" />
+                    บันทึกไว้ดูภายหลัง
+                  </>
+                )}
+              </Button>
 
               {isAdmin ? (
                 <Button

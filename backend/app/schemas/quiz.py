@@ -9,6 +9,8 @@ class QuestionBase(BaseModel):
     question_type: QuestionType
     choices: Optional[List[dict]] = None  # [{"text": str, "is_correct": bool}]
     correct_text: Optional[str] = None
+    # Shown to the learner after they submit (esp. on wrong answers). Optional.
+    explanation: Optional[str] = None
     points: int = 1
     order_index: int = 0
 
@@ -22,6 +24,7 @@ class QuestionUpdate(BaseModel):
     question_type: Optional[QuestionType] = None
     choices: Optional[List[dict]] = None
     correct_text: Optional[str] = None
+    explanation: Optional[str] = None
     points: Optional[int] = None
     order_index: Optional[int] = None
 

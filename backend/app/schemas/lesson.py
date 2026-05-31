@@ -4,6 +4,17 @@ from typing import List, Optional
 from app.models.lesson import ContentType
 
 
+class LessonNoteResponse(BaseModel):
+    content: str
+    updated_at: Optional[datetime] = None
+
+
+class LessonNoteUpdate(BaseModel):
+    # 20k char ceiling — generous for a few hours of meeting-style notes but
+    # bounded enough that someone can't paste a novel and tank our DB row size.
+    content: str = Field(..., max_length=20000)
+
+
 class LessonResourceBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     url: str = Field(..., min_length=1, max_length=500)

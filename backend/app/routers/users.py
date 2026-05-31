@@ -10,6 +10,7 @@ from app.models.quiz import Quiz, QuizAttempt
 from app.models.enrollment import Enrollment
 from app.models.course import Course, Module
 from app.models.lesson import Lesson
+from app.models.lesson_note import LessonNote
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, AdminResetPassword
 from app.core.security import hash_password
 from app.dependencies import get_current_user, require_admin
@@ -160,6 +161,9 @@ def delete_user(
     db.query(QuizAttempt).filter(QuizAttempt.user_id == user_id).delete(synchronize_session=False)
     db.query(LessonProgress).filter(LessonProgress.user_id == user_id).delete(synchronize_session=False)
     db.query(Certificate).filter(Certificate.user_id == user_id).delete(synchronize_session=False)
+    # LessonNote has DB-level ON DELETE CASCADE, but we delete explicitly to
+    # match the surrounding pattern and stay defensive against ORM cascade quirks.
+    db.query(LessonNote).filter(LessonNote.user_id == user_id).delete(synchronize_session=False)
     db.delete(user)
     db.commit()
 

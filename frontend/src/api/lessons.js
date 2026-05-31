@@ -58,4 +58,16 @@ export const lessonsApi = {
     const response = await apiClient.delete(`/lessons/resources/${resourceId}`)
     return response.data
   },
+
+  // === Personal notes (per-user, per-lesson, upsert) ===
+  getMyNote: async (lessonId) => {
+    const response = await apiClient.get(`/lessons/${lessonId}/notes/me`)
+    return response.data // { content, updated_at }
+  },
+  saveMyNote: async (lessonId, content) => {
+    const response = await apiClient.put(`/lessons/${lessonId}/notes/me`, {
+      content,
+    })
+    return response.data
+  },
 }

@@ -20,6 +20,7 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
     question_text: question.question_text,
     choices: question.choices || [],
     correct_text: question.correct_text || '',
+    explanation: question.explanation || '',
   })
 
   const handleSave = async () => {
@@ -199,6 +200,25 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
             <p className="rounded-md border border-primary/20 bg-primary/5 p-2 text-xs text-foreground">
               คำถามแบบความคิดเห็น — ผู้เรียนตอบอะไรก็ได้ (หรือเว้นว่าง) จะถูกนับว่าตอบถูกเสมอ
             </p>
+          )}
+
+          {question.question_type !== 'opinion' && (
+            <div className="space-y-1">
+              <Label htmlFor={`qe-explain-${question.id}`} className="text-xs">
+                คำอธิบาย / เฉลย (ตัวเลือก)
+              </Label>
+              <Textarea
+                id={`qe-explain-${question.id}`}
+                rows={2}
+                value={draft.explanation}
+                onChange={(e) => setDraft({ ...draft, explanation: e.target.value })}
+                placeholder="อธิบายว่าทำไมคำตอบนี้ถูก — แสดงให้ผู้เรียนเห็นหลังส่งคำตอบ โดยเฉพาะเมื่อตอบผิด"
+                maxLength={1000}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                เว้นว่าง = ไม่แสดงคำอธิบาย
+              </p>
+            </div>
           )}
 
           <Button size="sm" onClick={handleSave}>

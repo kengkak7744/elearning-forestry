@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import CourseCard from '@/components/learner/CourseCard'
 
 function initials(name) {
   if (!name) return 'U'
@@ -358,6 +359,71 @@ function MyCoursesTab() {
   )
 }
 
+function BookmarksTab() {
+  const [items, setItems] = useState(null)
+
+  const load = () => {
+    coursesApi
+      .myBookmarks()
+      .then(setItems)
+      .catch(() => setItems([]))
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const handleRemove = async (courseId) => {
+    // Optimistic remove
+    setItems((prev) => (prev ?? []).filter((c) => c.id !== courseId))
+    try {
+      await coursesApi.unbookmark(courseId)
+    } catch {
+      load() // revert by re-fetching truth
+    }
+  }
+
+  if (items === null) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-44 w-full rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <Card className="border-dashed border-border/60">
+        <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+          <BookOpen className="h-10 w-10 text-muted-foreground/60" />
+          <p className="text-sm text-muted-foreground">
+            ยังไม่มีบุ๊กมาร์ก — กดไอคอน{' '}
+            <span className="inline-block">🔖</span> บนการ์ดหลักสูตรเพื่อบันทึกไว้ดูภายหลัง
+          </p>
+          <Button asChild>
+            <Link to="/courses">ไปดูหลักสูตรทั้งหมด</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((c) => (
+        <CourseCard
+          key={c.id}
+          course={c}
+          bookmarked
+          onToggleBookmark={() => handleRemove(c.id)}
+        />
+      ))}
+    </div>
+  )
+}
+
 function CertificatesTab() {
   const [certs, setCerts] = useState(null)
 
@@ -480,6 +546,7 @@ export default function ProfilePage() {
           <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
           <TabsTrigger value="security">ความปลอดภัย</TabsTrigger>
           <TabsTrigger value="courses">หลักสูตรของฉัน</TabsTrigger>
+          <TabsTrigger value="bookmarks">บุ๊กมาร์ก</TabsTrigger>
           <TabsTrigger value="certificates">ใบรับรอง</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
@@ -490,6 +557,9 @@ export default function ProfilePage() {
         </TabsContent>
         <TabsContent value="courses">
           <MyCoursesTab />
+        </TabsContent>
+        <TabsContent value="bookmarks">
+          <BookmarksTab />
         </TabsContent>
         <TabsContent value="certificates">
           <CertificatesTab />

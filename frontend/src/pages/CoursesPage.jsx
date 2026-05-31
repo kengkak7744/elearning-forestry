@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { BookOpen, Search } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { BookOpen, ChevronRight, FileText, Search } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
+import { searchApi } from '@/api/search'
 import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -11,6 +12,28 @@ import { Skeleton } from '@/components/ui/skeleton'
 import CourseCard from '@/components/learner/CourseCard'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { cn } from '@/lib/utils'
+
+const MATCH_FIELD_LABELS = {
+  title: 'ชื่อบทเรียน',
+  description: 'คำอธิบาย',
+  notes: 'บันทึก',
+  module: 'ชื่อโมดูล',
+}
+
+function highlightMatch(text, term) {
+  if (!text || !term) return text
+  const idx = text.toLowerCase().indexOf(term.toLowerCase())
+  if (idx < 0) return text
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="rounded-sm bg-warning/40 px-0.5 text-foreground">
+        {text.slice(idx, idx + term.length)}
+      </mark>
+      {text.slice(idx + term.length)}
+    </>
+  )
+}
 
 const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
   value,
@@ -61,7 +84,10 @@ export default function CoursesPage() {
 
   const [courses, setCourses] = useState([])
   const [progressMap, setProgressMap] = useState({})
+  const [bookmarkedIds, setBookmarkedIds] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
+  const [lessonHits, setLessonHits] = useState([])
+  const [lessonSearchLoading, setLessonSearchLoading] = useState(false)
 
   // Fetch enrollments once on mount — used to badge cards with progress %.
   useEffect(() => {
@@ -77,7 +103,37 @@ export default function CoursesPage() {
         setProgressMap(map)
       })
       .catch(() => setProgressMap({}))
+    coursesApi
+      .myBookmarks()
+      .then((list) => setBookmarkedIds(new Set(list.map((c) => c.id))))
+      .catch(() => setBookmarkedIds(new Set()))
   }, [])
+
+  // Optimistic toggle — flip the Set immediately, only revert on API failure.
+  const toggleBookmark = useCallback(
+    async (courseId) => {
+      const wasBookmarked = bookmarkedIds.has(courseId)
+      setBookmarkedIds((prev) => {
+        const next = new Set(prev)
+        if (wasBookmarked) next.delete(courseId)
+        else next.add(courseId)
+        return next
+      })
+      try {
+        if (wasBookmarked) await coursesApi.unbookmark(courseId)
+        else await coursesApi.bookmark(courseId)
+      } catch {
+        // Revert
+        setBookmarkedIds((prev) => {
+          const next = new Set(prev)
+          if (wasBookmarked) next.add(courseId)
+          else next.delete(courseId)
+          return next
+        })
+      }
+    },
+    [bookmarkedIds]
+  )
 
   // Server filters by single category; for multi-select fetch unfiltered and
   // narrow client-side. Depend on stable primitive `catParam`, not the
@@ -99,6 +155,27 @@ export default function CoursesPage() {
     }, search ? 350 : 0)
     return () => clearTimeout(timer)
   }, [search, catParam, mandatoryOnly])
+
+  // Lesson-level search runs in parallel with the course-grid filter. Only
+  // fires for queries ≥2 chars to avoid noisy single-letter hits, and is
+  // debounced for the same reason as the course query.
+  useEffect(() => {
+    const trimmed = (search ?? '').trim()
+    if (trimmed.length < 2) {
+      setLessonHits([])
+      setLessonSearchLoading(false)
+      return
+    }
+    setLessonSearchLoading(true)
+    const timer = setTimeout(() => {
+      searchApi
+        .lessons(trimmed)
+        .then((data) => setLessonHits(data?.lessons ?? []))
+        .catch(() => setLessonHits([]))
+        .finally(() => setLessonSearchLoading(false))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const visibleCourses = useMemo(() => {
     if (selectedCategories.length <= 1) return courses
@@ -174,6 +251,67 @@ export default function CoursesPage() {
         </div>
       </div>
 
+      {/* Lesson-level matches — surfaced above the course grid so a user
+          searching for content buried inside lessons finds it immediately
+          instead of bouncing off an empty/incomplete course-title result. */}
+      {(search?.trim()?.length ?? 0) >= 2 && (lessonSearchLoading || lessonHits.length > 0) && (
+        <Card className="mb-6 border-border/60">
+          <CardContent className="space-y-2 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                พบในบทเรียน
+              </h2>
+              {!lessonSearchLoading && (
+                <span className="text-xs text-muted-foreground">
+                  {lessonHits.length} ผลลัพธ์
+                </span>
+              )}
+            </div>
+            {lessonSearchLoading ? (
+              <Skeleton className="h-16 w-full rounded-md" />
+            ) : (
+              <ul className="space-y-1.5">
+                {lessonHits.map((hit) => {
+                  const fieldLabel = MATCH_FIELD_LABELS[hit.match_field]
+                  return (
+                    <li key={hit.id}>
+                      <Link
+                        to={`/courses/${hit.course.id}`}
+                        className="flex items-start gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted"
+                      >
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="line-clamp-1 font-medium text-foreground">
+                              {highlightMatch(hit.title, search)}
+                            </span>
+                            {fieldLabel && (
+                              <span className="flex-shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                {fieldLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div className="line-clamp-1 text-xs text-muted-foreground">
+                            {hit.course?.title}
+                            {hit.module?.title ? ` · ${hit.module.title}` : ''}
+                          </div>
+                          {hit.snippet && (
+                            <p className="line-clamp-2 text-[11px] text-muted-foreground">
+                              {highlightMatch(hit.snippet, search)}
+                            </p>
+                          )}
+                        </div>
+                        <ChevronRight className="mt-1 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results */}
       {loading ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -212,6 +350,8 @@ export default function CoursesPage() {
                 key={course.id}
                 course={course}
                 progress={progressMap[course.id]}
+                bookmarked={bookmarkedIds.has(course.id)}
+                onToggleBookmark={() => toggleBookmark(course.id)}
               />
             ))}
           </div>

@@ -35,6 +35,7 @@ import MidVideoQuizModal from '@/components/MidVideoQuizModal'
 import CourseScoresModal from '@/components/CourseScoresModal'
 import LessonTree from '@/components/learner/LessonTree'
 import LessonFooter from '@/components/learner/LessonFooter'
+import LessonNotes from '@/components/learner/LessonNotes'
 import { cn } from '@/lib/utils'
 
 function fmtBytes(bytes) {
@@ -944,6 +945,8 @@ export default function CourseViewerPage() {
                           </ul>
                         </div>
                       )}
+
+                    <LessonNotes lessonId={currentLesson.id} />
                   </CardContent>
                 </Card>
 

@@ -6,9 +6,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.course import Module
 from app.models.lesson import Lesson, LessonResource, ContentType
+from app.models.lesson_note import LessonNote
 from app.models.user import User
 from app.schemas.lesson import (
     LessonCreate,
+    LessonNoteResponse,
+    LessonNoteUpdate,
     LessonResourceCreate,
     LessonResourceResponse,
     LessonUpdate,
@@ -260,6 +263,58 @@ def delete_lesson_resource(
     db.delete(resource)
     db.commit()
     return {"message": "ลบเอกสารเรียบร้อย"}
+
+
+# =====================================================================
+# Personal notes (per-user, per-lesson, upsert)
+# =====================================================================
+
+@router.get("/{lesson_id}/notes/me", response_model=LessonNoteResponse)
+def get_my_note(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """My note for this lesson. Returns empty content if I've never written one."""
+    note = (
+        db.query(LessonNote)
+        .filter(LessonNote.user_id == current_user.id, LessonNote.lesson_id == lesson_id)
+        .first()
+    )
+    if not note:
+        return LessonNoteResponse(content="", updated_at=None)
+    return LessonNoteResponse(content=note.content, updated_at=note.updated_at)
+
+
+@router.put("/{lesson_id}/notes/me", response_model=LessonNoteResponse)
+def upsert_my_note(
+    lesson_id: int,
+    data: LessonNoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save my note for this lesson. Idempotent upsert — autosave-friendly."""
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+
+    note = (
+        db.query(LessonNote)
+        .filter(LessonNote.user_id == current_user.id, LessonNote.lesson_id == lesson_id)
+        .first()
+    )
+    if note:
+        note.content = data.content
+    else:
+        note = LessonNote(
+            user_id=current_user.id,
+            lesson_id=lesson_id,
+            content=data.content,
+        )
+        db.add(note)
+    db.commit()
+    db.refresh(note)
+    return LessonNoteResponse(content=note.content, updated_at=note.updated_at)
 
 
 # File serving moved to app.routers.files (with auth and path-traversal hardening).

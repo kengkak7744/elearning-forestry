@@ -71,4 +71,18 @@ export const coursesApi = {
     const response = await apiClient.delete(`/courses/${courseId}/enroll`)
     return response.data
   },
+
+  // ===== Bookmarks (save-for-later) =====
+  myBookmarks: async () => {
+    const response = await apiClient.get('/courses/me/bookmarks')
+    return Array.isArray(response.data) ? response.data : []
+  },
+  bookmark: async (courseId) => {
+    const response = await apiClient.post(`/courses/${courseId}/bookmark`)
+    return response.data
+  },
+  unbookmark: async (courseId) => {
+    const response = await apiClient.delete(`/courses/${courseId}/bookmark`)
+    return response.data
+  },
 }

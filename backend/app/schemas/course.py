@@ -41,6 +41,7 @@ class CourseResponse(CourseBase):
     total_modules: int = 0
     enrolled_count: int = 0
     is_enrolled: bool = False
+    is_bookmarked: bool = False
 
     class Config:
         from_attributes = True

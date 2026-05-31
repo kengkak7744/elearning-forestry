@@ -610,6 +610,10 @@ def submit_quiz(
         results[q.id] = {
             "correct": is_correct,
             "correct_answer": correct_answer if quiz.show_correct_answer else None,
+            # Show explanation when the quiz is configured to reveal answers OR
+            # the learner got it wrong (so they always get the "why" on misses,
+            # even on stricter quizzes that hide the correct answer).
+            "explanation": q.explanation if (quiz.show_correct_answer or not is_correct) else None,
         }
 
     # Score = % of graded (non-opinion) questions answered correctly.

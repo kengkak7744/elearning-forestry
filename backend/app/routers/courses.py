@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 from typing import Optional
 from app.database import get_db
+from app.models.bookmark import Bookmark
 from app.models.course import Course, Module, CourseCategory
 from app.models.lesson import Lesson
 from app.models.enrollment import Enrollment
@@ -49,7 +50,12 @@ def list_courses(
         query = query.filter(Course.is_mandatory == is_mandatory)
     
     if search:
-        query = query.filter(Course.title.ilike(f"%{search}%"))
+        # Match the term against title OR description so a phrase like
+        # "ดับไฟป่า" surfaces courses whose title doesn't mention it directly
+        # but whose summary does.
+        from sqlalchemy import or_ as _or
+        like = f"%{search}%"
+        query = query.filter(_or(Course.title.ilike(like), Course.description.ilike(like)))
     
     return query.order_by(Course.created_at.desc()).offset(skip).limit(limit).all()
 
@@ -80,7 +86,12 @@ def get_course(
         Enrollment.user_id == current_user.id,
         Enrollment.course_id == course_id
     ).first() is not None
-    
+
+    is_bookmarked = db.query(Bookmark).filter(
+        Bookmark.user_id == current_user.id,
+        Bookmark.course_id == course_id,
+    ).first() is not None
+
     modules_data = []
     for module in sorted(course.modules, key=lambda m: m.order_index):
         lessons_data = []
@@ -123,6 +134,7 @@ def get_course(
         "total_lessons": total_lessons,
         "enrolled_count": enrolled_count or 0,
         "is_enrolled": is_enrolled,
+        "is_bookmarked": is_bookmarked,
         "modules": modules_data,
     }
 
@@ -384,3 +396,67 @@ def unenroll_course(
     db.commit()
     
     return {"message": "ยกเลิกการลงทะเบียนเรียบร้อย"}
+
+
+# ============================================================================
+# Bookmarks (save-for-later)
+# ============================================================================
+
+
+@router.get("/me/bookmarks")
+def my_bookmarks(
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Courses I've bookmarked. Returns the same shape as the catalog list."""
+    # Private list, can change without warning — short cache for back-nav only.
+    response.headers["Cache-Control"] = "private, max-age=10"
+    rows = (
+        db.query(Course)
+        .join(Bookmark, Bookmark.course_id == Course.id)
+        .filter(Bookmark.user_id == current_user.id)
+        .order_by(Bookmark.created_at.desc())
+        .all()
+    )
+    # Hide unpublished for learners/managers; a course unpublished after they
+    # bookmarked it shouldn't haunt the list.
+    if current_user.role.value in ("learner", "manager"):
+        rows = [c for c in rows if c.is_published]
+    return rows
+
+
+@router.post("/{course_id}/bookmark", status_code=status.HTTP_201_CREATED)
+def add_bookmark(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Idempotent: bookmarking an already-bookmarked course is a no-op."""
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    existing = (
+        db.query(Bookmark)
+        .filter(Bookmark.user_id == current_user.id, Bookmark.course_id == course_id)
+        .first()
+    )
+    if not existing:
+        db.add(Bookmark(user_id=current_user.id, course_id=course_id))
+        db.commit()
+    return {"message": "บันทึกหลักสูตรไว้แล้ว", "is_bookmarked": True}
+
+
+@router.delete("/{course_id}/bookmark", status_code=status.HTTP_200_OK)
+def remove_bookmark(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Idempotent: removing a non-existent bookmark returns success."""
+    db.query(Bookmark).filter(
+        Bookmark.user_id == current_user.id,
+        Bookmark.course_id == course_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"message": "ยกเลิกการบันทึกเรียบร้อย", "is_bookmarked": False}

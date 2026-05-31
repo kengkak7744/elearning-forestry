@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Clock, GraduationCap } from 'lucide-react'
+import { Bookmark, BookmarkCheck, CheckCircle2, Clock, GraduationCap } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -9,12 +9,48 @@ import { cn } from '@/lib/utils'
 
 const FALLBACK_COVER = '/elearning/forest_logo.png'
 
+function BookmarkToggle({ bookmarked, onToggle }) {
+  if (!onToggle) return null
+  const Icon = bookmarked ? BookmarkCheck : Bookmark
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        // The card itself is an <a>; without preventDefault the browser
+        // navigates before the toggle fires.
+        e.preventDefault()
+        e.stopPropagation()
+        onToggle()
+      }}
+      aria-label={bookmarked ? 'เอาออกจากบุ๊กมาร์ก' : 'บันทึกหลักสูตรนี้ไว้'}
+      title={bookmarked ? 'เอาออกจากบุ๊กมาร์ก' : 'บันทึกหลักสูตรนี้ไว้'}
+      className={cn(
+        'absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full backdrop-blur transition-colors',
+        bookmarked
+          ? 'bg-warning text-warning-foreground shadow hover:bg-warning/90'
+          : 'bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground'
+      )}
+    >
+      <Icon className={cn('h-4 w-4', bookmarked && 'fill-current')} />
+    </button>
+  )
+}
+
 /**
  * variants:
  *  - 'default'  — grid card for courses list (square-ish cover + body)
  *  - 'compact'  — horizontal-friendly card for dashboard row
+ *
+ * `bookmarked` + `onToggleBookmark` are optional. If both are provided, a
+ * bookmark toggle button overlays the top-right corner of the cover image.
  */
-export default function CourseCard({ course, variant = 'default', progress }) {
+export default function CourseCard({
+  course,
+  variant = 'default',
+  progress,
+  bookmarked = false,
+  onToggleBookmark,
+}) {
   const cat = CATEGORY_BADGES[course.category]
   const cover = course.cover_image ? mediaUrl(course.cover_image) : FALLBACK_COVER
 
@@ -25,7 +61,7 @@ export default function CourseCard({ course, variant = 'default', progress }) {
         className="group block w-72 flex-shrink-0 focus:outline-none"
       >
         <Card className="overflow-hidden border-border/60 transition-shadow group-hover:shadow-md">
-          <div className="aspect-video w-full overflow-hidden bg-muted">
+          <div className="relative aspect-video w-full overflow-hidden bg-muted">
             <img
               src={cover}
               alt=""
@@ -33,6 +69,7 @@ export default function CourseCard({ course, variant = 'default', progress }) {
               decoding="async"
               className="h-full w-full object-cover transition-transform group-hover:scale-105"
             />
+            <BookmarkToggle bookmarked={bookmarked} onToggle={onToggleBookmark} />
           </div>
           <CardContent className="p-4">
             {cat && (
@@ -79,6 +116,7 @@ export default function CourseCard({ course, variant = 'default', progress }) {
             decoding="async"
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
+          <BookmarkToggle bookmarked={bookmarked} onToggle={onToggleBookmark} />
           <div className="absolute left-2 top-2 flex gap-1">
             {course.is_mandatory && (
               <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive">

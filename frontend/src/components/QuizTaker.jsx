@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ClipboardList, RotateCcw, Send, X as XIcon } from 'lucide-react'
+import { AlertCircle, Check, ClipboardList, Info, RotateCcw, Send, X as XIcon } from 'lucide-react'
 import { quizzesApi } from '@/api/quizzes'
 import { BUTTONS } from '@/constants/labels'
 import { Badge } from '@/components/ui/badge'
@@ -118,6 +118,54 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
           </Button>
         )}
 
+        {/* Wrong-answer review banner — only after submission, only when there
+            are actual wrong answers (opinions don't count). Links scroll the
+            learner to each missed question so a long quiz stays navigable. */}
+        {result && (() => {
+          const wrong = activeQuestions
+            .map((q, idx) => ({ q, idx }))
+            .filter(({ q }) => {
+              if (q.question_type === 'opinion') return false
+              return result.results?.[q.id]?.correct === false
+            })
+          if (wrong.length === 0) return null
+          const scrollTo = (qid) => {
+            const el = document.getElementById(`q-result-${quiz.id}-${qid}`)
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              el.classList.add('ring-2', 'ring-destructive', 'ring-offset-2')
+              setTimeout(() => {
+                el.classList.remove('ring-2', 'ring-destructive', 'ring-offset-2')
+              }, 1500)
+            }
+          }
+          return (
+            <div
+              role="status"
+              className="flex flex-wrap items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  ตอบผิด {wrong.length} ข้อ — ดูคำอธิบายด้านล่าง
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {wrong.map(({ q, idx }) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => scrollTo(q.id)}
+                      className="rounded border border-destructive/30 bg-background px-2 py-0.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                    >
+                      ข้อ {idx + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
         {hasQuestions && (started || result) && (
           <div className="space-y-3 pt-1">
             {activeQuestions.map((q, idx) => {
@@ -133,7 +181,11 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
               return (
                 <div
                   key={q.id}
-                  className={cn('space-y-2 rounded-lg border p-3', stateClass)}
+                  id={`q-result-${quiz.id}-${q.id}`}
+                  className={cn(
+                    'space-y-2 rounded-lg border p-3 transition-shadow',
+                    stateClass,
+                  )}
                 >
                   <p className="break-words text-sm font-medium text-foreground">
                     {idx + 1}. {q.question_text}
@@ -262,6 +314,35 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                       placeholder="พิมพ์ความคิดเห็น... (จะเว้นว่างก็ได้)"
                       rows={3}
                     />
+                  )}
+
+                  {/* Per-question explanation — shown only after submit, only
+                      when the backend included one (depends on quiz settings
+                      and whether the learner got it wrong). */}
+                  {qResult?.explanation && !isOpinion && (
+                    <div
+                      className={cn(
+                        'mt-1 flex items-start gap-2 rounded-md border p-2.5 text-sm',
+                        qResult.correct
+                          ? 'border-success/30 bg-success/5'
+                          : 'border-warning/40 bg-warning/10',
+                      )}
+                    >
+                      <Info
+                        className={cn(
+                          'mt-0.5 h-4 w-4 flex-shrink-0',
+                          qResult.correct ? 'text-success' : 'text-warning',
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          คำอธิบาย
+                        </p>
+                        <p className="whitespace-pre-wrap break-words text-foreground">
+                          {qResult.explanation}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )

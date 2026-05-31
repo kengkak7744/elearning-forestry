@@ -1,4 +1,14 @@
-import { CheckCircle2, ChevronDown, ChevronRight, FileText, Lock, PlayCircle, Tv, Trophy } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Lock,
+  Paperclip,
+  PlayCircle,
+  Trophy,
+  Tv,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 function LessonRow({
@@ -17,6 +27,8 @@ function LessonRow({
     : lesson.content_type === 'video_youtube'
     ? Tv
     : PlayCircle
+
+  const resourceCount = Array.isArray(lesson.resources) ? lesson.resources.length : 0
 
   return (
     <button
@@ -59,6 +71,16 @@ function LessonRow({
       >
         {lesson.title}
       </span>
+      {resourceCount > 0 && (
+        <span
+          className="inline-flex flex-shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground"
+          title={`มีเอกสารประกอบ ${resourceCount} ไฟล์`}
+          aria-label={`มีเอกสารประกอบ ${resourceCount} ไฟล์`}
+        >
+          <Paperclip className="h-3 w-3" />
+          {resourceCount}
+        </span>
+      )}
       {hasQuiz && (
         <span
           className={cn(
