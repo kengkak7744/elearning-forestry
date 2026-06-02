@@ -861,6 +861,8 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
           size="icon"
           className="h-7 w-7"
           onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? `ย่อบทเรียน ${lesson.title}` : `ขยายบทเรียน ${lesson.title}`}
+          aria-expanded={expanded}
         >
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </Button>

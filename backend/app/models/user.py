@@ -37,5 +37,12 @@ class User(Base):
     
     progresses = relationship("LessonProgress", back_populates="user")
     quiz_attempts = relationship("QuizAttempt", back_populates="user")
-    certificates = relationship("Certificate", back_populates="user")
+    # foreign_keys is needed because Certificate now has two FKs to users
+    # (user_id = holder, revoked_by_id = admin who pulled it). Without this
+    # SQLAlchemy raises AmbiguousForeignKeysError on mapper configuration.
+    certificates = relationship(
+        "Certificate",
+        back_populates="user",
+        foreign_keys="Certificate.user_id",
+    )
     enrollments = relationship("Enrollment", back_populates="user", cascade="all, delete-orphan")

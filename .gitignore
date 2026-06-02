@@ -9,3 +9,4 @@ backend/alembic/versions/
 .claude
 .agents
 skills-lock.json
+FEATURES.txt

@@ -1,5 +1,10 @@
 """Aggregate statistics for the admin dashboard."""
+import csv
+import io
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -9,6 +14,7 @@ from app.models.course import Course, Module
 from app.models.lesson import Lesson
 from app.models.enrollment import Enrollment
 from app.models.progress import LessonProgress
+from app.models.course_feedback import CourseFeedback
 
 
 router = APIRouter(prefix="/api/admin/stats", tags=["Admin Stats"])
@@ -182,6 +188,60 @@ def recent_enrollments(
     ]
 
 
+@router.get("/course-feedback")
+def course_feedback_stats(
+    response: Response,
+    min_count: int = Query(3, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Per-course feedback aggregate, sorted worst-rating first.
+
+    `min_count` is a noise floor — a course with a single 1-star review isn't
+    a meaningful signal, so we only flag underperformance once it has at
+    least N ratings. Courses with fewer ratings still appear in the response
+    but with `is_underperforming=False`.
+
+    "Underperforming" = average rating < 3.0 AND count >= min_count.
+    Threshold of 3.0 because the scale is 1-5 and 3 is the midpoint —
+    anything below means a clear majority of dissatisfied responses.
+    """
+    response.headers["Cache-Control"] = _STATS_CACHE
+    rows = (
+        db.query(
+            Course.id,
+            Course.title,
+            Course.category,
+            Course.is_published,
+            func.count(CourseFeedback.id).label("count"),
+            func.avg(CourseFeedback.rating).label("avg_rating"),
+        )
+        .outerjoin(CourseFeedback, CourseFeedback.course_id == Course.id)
+        .group_by(Course.id, Course.title, Course.category, Course.is_published)
+        .all()
+    )
+    courses = []
+    for r in rows:
+        count = int(r.count or 0)
+        avg = float(r.avg_rating) if r.avg_rating is not None else None
+        courses.append({
+            "id": r.id,
+            "title": r.title,
+            "category": r.category.value if r.category else None,
+            "is_published": r.is_published,
+            "count": count,
+            "average": round(avg, 2) if avg is not None else None,
+            "is_underperforming": (avg is not None and avg < 3.0 and count >= min_count),
+        })
+    # Worst-rating-first ordering for the underperforming card; courses with
+    # no ratings sink to the bottom (sentinel 99 for avg=None).
+    courses.sort(key=lambda c: (c["average"] if c["average"] is not None else 99, -c["count"]))
+    return {
+        "min_count_threshold": min_count,
+        "courses": courses,
+    }
+
+
 @router.get("/department-compliance")
 def department_compliance(
     response: Response,
@@ -264,3 +324,53 @@ def department_compliance(
         "mandatory_courses_count": mandatory_count,
         "departments": departments,
     }
+
+
+@router.get("/department-compliance.csv")
+def department_compliance_csv(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """
+    Same data as /department-compliance but as a downloadable CSV. Thai
+    headers, UTF-8 BOM so Excel double-click opens without garbling.
+    """
+    # Reuse the same logic — call the JSON endpoint helper inline rather than
+    # duplicating the queries. We pass a throwaway Response since the JSON
+    # endpoint sets a Cache-Control on it; the CSV download doesn't need that.
+    payload = department_compliance(response=Response(), db=db, _admin=_admin)
+
+    buf = io.StringIO()
+    # Write UTF-8 BOM so Excel detects encoding correctly on double-click open.
+    buf.write("﻿")
+    writer = csv.writer(buf)
+    writer.writerow([
+        "หน่วยงาน",
+        "จำนวนเจ้าหน้าที่",
+        "หลักสูตรบังคับทั้งหมด",
+        "ต้องผ่าน (ครั้ง)",
+        "ผ่านแล้ว (ครั้ง)",
+        "ร้อยละ",
+    ])
+    mandatory_count = payload["mandatory_courses_count"]
+    for d in payload["departments"]:
+        writer.writerow([
+            d["department"],
+            d["staff_count"],
+            mandatory_count,
+            d["required_completions"],
+            d["actual_completions"],
+            d["completion_rate"],
+        ])
+
+    buf.seek(0)
+    stamp = datetime.now().strftime("%Y%m%d")
+    filename = f"department-compliance-{stamp}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )

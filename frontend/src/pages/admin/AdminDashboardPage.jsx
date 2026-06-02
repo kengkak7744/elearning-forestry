@@ -4,7 +4,10 @@ import {
   Award,
   BookOpen,
   Building2,
+  Download,
+  MessageSquare,
   ShieldCheck,
+  Star,
   TrendingUp,
   Users,
 } from 'lucide-react'
@@ -12,6 +15,7 @@ import { adminStatsApi } from '@/api/adminStats'
 import { CATEGORY_BADGES, ROLE_LABELS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -23,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import CourseFeedbackDialog from '@/components/admin/CourseFeedbackDialog'
 
 function KPICard({ icon: Icon, label, value, hint }) {
   return (
@@ -48,6 +53,8 @@ export default function AdminDashboardPage() {
   const [topDepartments, setTopDepartments] = useState([])
   const [recent, setRecent] = useState([])
   const [compliance, setCompliance] = useState(null)
+  const [feedbackStats, setFeedbackStats] = useState(null)
+  const [feedbackCourse, setFeedbackCourse] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -57,13 +64,15 @@ export default function AdminDashboardPage() {
       adminStatsApi.topDepartments(10),
       adminStatsApi.recentEnrollments(20),
       adminStatsApi.departmentCompliance().catch(() => null),
+      adminStatsApi.courseFeedback(3).catch(() => null),
     ])
-      .then(([o, c, d, r, comp]) => {
+      .then(([o, c, d, r, comp, fb]) => {
         setOverview(o)
         setTopCourses(c)
         setTopDepartments(d)
         setRecent(r)
         setCompliance(comp)
+        setFeedbackStats(fb)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -204,16 +213,30 @@ export default function AdminDashboardPage() {
           certs for ALL mandatory courses. Sorted worst-first so high-priority
           departments surface immediately. */}
       <Card className="mt-4 border-border/60 sm:mt-6">
-        <CardHeader className="pb-3">
-          <h2 className="inline-flex items-center gap-2 text-base font-semibold text-foreground">
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-            ภาพรวมการอบรมหลักสูตรบังคับตามหน่วยงาน
-          </h2>
-          {compliance?.mandatory_courses_count !== undefined && (
-            <p className="text-sm text-muted-foreground">
-              จากหลักสูตรบังคับ {compliance.mandatory_courses_count} หลักสูตร
-              (นับเฉพาะใบรับรองที่ยังไม่หมดอายุ)
-            </p>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3 space-y-0">
+          <div className="min-w-0">
+            <h2 className="inline-flex items-center gap-2 text-base font-semibold text-foreground">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+              ภาพรวมการอบรมหลักสูตรบังคับตามหน่วยงาน
+            </h2>
+            {compliance?.mandatory_courses_count !== undefined && (
+              <p className="text-sm text-muted-foreground">
+                จากหลักสูตรบังคับ {compliance.mandatory_courses_count} หลักสูตร
+                (นับเฉพาะใบรับรองที่ยังไม่หมดอายุ)
+              </p>
+            )}
+          </div>
+          {compliance && compliance.departments?.length > 0 && (
+            <Button asChild variant="outline" size="sm" className="flex-shrink-0">
+              <a
+                href={adminStatsApi.departmentComplianceCsvUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                ดาวน์โหลด CSV
+              </a>
+            </Button>
           )}
         </CardHeader>
         <CardContent>
@@ -267,6 +290,85 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Course feedback — underperforming-first, then the rest below.
+          "Underperforming" = avg < 3.0 AND ≥3 ratings (server-decided so the
+          threshold stays consistent across admin views). */}
+      {feedbackStats && feedbackStats.courses?.length > 0 && (
+        <Card className="mt-4 border-border/60 sm:mt-6">
+          <CardHeader className="pb-3">
+            <h2 className="inline-flex items-center gap-2 text-base font-semibold text-foreground">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              ความคิดเห็นต่อหลักสูตร
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              จัดเรียงจากคะแนนต่ำสุด — คลิกเพื่อดูข้อความที่ผู้เรียนเขียน
+              (ต้องมีอย่างน้อย {feedbackStats.min_count_threshold} ความคิดเห็นจึงจะถูกระบุว่าควรปรับปรุง)
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border/60">
+              {feedbackStats.courses
+                .filter((c) => c.count > 0)
+                .slice(0, 10)
+                .map((c) => {
+                  const tone =
+                    c.average == null
+                      ? 'neutral'
+                      : c.average >= 4
+                      ? 'success'
+                      : c.average >= 3
+                      ? 'warning'
+                      : 'destructive'
+                  const numCls =
+                    tone === 'success'
+                      ? 'text-success'
+                      : tone === 'warning'
+                      ? 'text-warning'
+                      : tone === 'destructive'
+                      ? 'text-destructive'
+                      : 'text-muted-foreground'
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFeedbackCourse({ id: c.id, title: c.title })
+                        }
+                        className="flex w-full items-center justify-between gap-3 py-3 text-left hover:bg-muted/40"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-foreground">
+                            {c.title}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                            {c.is_underperforming && (
+                              <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/15 font-normal">
+                                ควรปรับปรุง
+                              </Badge>
+                            )}
+                            {!c.is_published && (
+                              <Badge variant="secondary" className="font-normal">
+                                ฉบับร่าง
+                              </Badge>
+                            )}
+                            <span>{c.count} ความคิดเห็น</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-1 text-sm">
+                          <Star className={`h-3.5 w-3.5 ${numCls} fill-current`} />
+                          <span className={`font-semibold tabular-nums ${numCls}`}>
+                            {c.average != null ? c.average.toFixed(1) : '—'}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  )
+                })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mt-4 border-border/60 sm:mt-6">
         <CardHeader className="pb-3">
@@ -324,6 +426,13 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      <CourseFeedbackDialog
+        open={!!feedbackCourse}
+        onOpenChange={(o) => !o && setFeedbackCourse(null)}
+        courseId={feedbackCourse?.id}
+        courseTitle={feedbackCourse?.title}
+      />
     </div>
   )
 }

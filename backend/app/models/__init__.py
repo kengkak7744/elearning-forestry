@@ -7,3 +7,5 @@ from app.models.certificate import Certificate
 from app.models.enrollment import Enrollment
 from app.models.lesson_note import LessonNote
 from app.models.bookmark import Bookmark
+from app.models.audit_log import AuditLog
+from app.models.course_feedback import CourseFeedback

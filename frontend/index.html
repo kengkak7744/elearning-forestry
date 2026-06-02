@@ -6,6 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#085041" />
     <link rel="icon" type="image/png" href="/elearning/forest_logo.png" />
+    <!-- LCP image preload for the unauthenticated entry pages (Login,
+         Register, Verify). fetchpriority works in Chrome/Edge but Safari
+         ignores it; this preload covers all browsers. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/elearning/forest_logo.png"
+      fetchpriority="high"
+    />
 
     <!-- Internal staff system — do NOT index in public search engines. -->
     <meta name="robots" content="noindex, nofollow" />
@@ -35,10 +44,58 @@
          discovers it without waiting for the stylesheet to parse. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- YouTube IFrame embeds (used by video_youtube lesson type) — cheap
+         DNS prefetch so the first frame loads faster when a learner opens a
+         YouTube lesson. Lighter than preconnect (no handshake) because most
+         pageviews don't hit a YouTube lesson at all. -->
+    <link rel="dns-prefetch" href="https://www.youtube-nocookie.com" />
+    <link rel="dns-prefetch" href="https://www.youtube.com" />
+    <link rel="dns-prefetch" href="https://i.ytimg.com" />
+    <!-- Weights 400/500/600/700 only — 300 is unused in the UI and would
+         add ~30KB of Thai + Latin glyphs we never render. -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap"
     />
+    <!-- Speculation Rules: prerender likely-next pages on hover so navigation
+         feels instant. Chromium-only (Safari/Firefox ignore silently — pure
+         progressive enhancement).
+
+         Scope rules:
+           - moderate eagerness: kicks in ~200ms into a hover, which catches
+             real intent without burning bandwidth on glance-overs.
+           - excluded /login, /register, /verify: pre-auth, no value
+             prerendering when the user is signed in.
+           - excluded /admin/*: pages do non-trivial work on mount (stats
+             aggregations, audit log fetches). Prerendering them when not
+             clicked wastes a real DB query.
+           - excluded /courses/*/learn*: the viewer page initialises a video
+             element + poller; prerendering would start playback/progress
+             saves for a lesson the user may not actually open.
+
+         Side-effect note: GET API calls inside prerendered pages fire ahead
+         of time and ride the auth cookie. All current GETs are idempotent
+         and cached server-side, so this is safe. If we ever add a GET with
+         side effects (analytics ping, etc.), gate it on
+         `document.prerendering` and listen for `prerenderingchange`. -->
+    <script type="speculationrules">
+    {
+      "prerender": [{
+        "where": {
+          "and": [
+            { "href_matches": "/*" },
+            { "not": { "href_matches": "/login" } },
+            { "not": { "href_matches": "/register" } },
+            { "not": { "href_matches": "/verify*" } },
+            { "not": { "href_matches": "/admin/*" } },
+            { "not": { "href_matches": "/courses/*/learn*" } }
+          ]
+        },
+        "eagerness": "moderate"
+      }]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

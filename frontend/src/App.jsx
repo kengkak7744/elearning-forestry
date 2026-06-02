@@ -22,6 +22,9 @@ const UserFormPage = lazy(() => import('./pages/admin/UserFormPage'))
 const CoursesListPage = lazy(() => import('./pages/admin/CoursesListPage'))
 const CourseEditPage = lazy(() => import('./pages/admin/CourseEditPage'))
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
+const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'))
+const AdminCertificatesPage = lazy(() => import('./pages/admin/AdminCertificatesPage'))
+const CertificateVerifyPage = lazy(() => import('./pages/CertificateVerifyPage'))
 
 function PageFallback() {
   // role=status + aria-live=polite announces the wait state to screen readers
@@ -48,6 +51,12 @@ function App() {
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              {/* Public certificate verification — no auth, deliberately
+                  outside the LearnerShell so third parties / HR staff at other
+                  agencies can scan the QR on a printed cert and land here
+                  without being prompted to log in. */}
+              <Route path="/verify" element={<CertificateVerifyPage />} />
+              <Route path="/verify/:certNumber" element={<CertificateVerifyPage />} />
 
               {/* Learner shell — top bar + mobile bottom nav */}
               <Route
@@ -89,6 +98,8 @@ function App() {
                 <Route path="/admin/users" element={<UsersListPage />} />
                 <Route path="/admin/users/new" element={<UserFormPage />} />
                 <Route path="/admin/users/:id/edit" element={<UserFormPage />} />
+                <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+                <Route path="/admin/certificates" element={<AdminCertificatesPage />} />
               </Route>
 
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

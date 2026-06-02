@@ -542,7 +542,10 @@ export default function CourseViewerPage() {
       } else {
         const el = document.getElementById(`quiz-${blockingQuiz.id}`)
         if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Respect prefers-reduced-motion — CSS reset only catches scroll-behavior,
+          // not JS-initiated smooth scrolling.
+          const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
           el.classList.add('ring-2', 'ring-warning', 'ring-offset-2')
           setTimeout(() => {
             el.classList.remove('ring-2', 'ring-warning', 'ring-offset-2')
@@ -805,9 +808,20 @@ export default function CourseViewerPage() {
               </>
             ) : currentLesson ? (
               <>
-                {/* Player surface */}
+                {/* Player surface — video gets a 16:9 landscape box, PDF
+                    gets a taller portrait-leaning container that fills most
+                    of the viewport vertically. PDFs are nearly always A4
+                    portrait, so cramming them into 16:9 wastes huge amounts
+                    of vertical space and forces tiny font rendering. */}
                 <Card className="mb-4 overflow-hidden border-border/60">
-                  <div className="aspect-video bg-black">
+                  <div
+                    className={cn(
+                      'relative',
+                      currentLesson.content_type === 'pdf'
+                        ? 'h-[78vh] min-h-[520px] bg-muted'
+                        : 'aspect-video bg-black'
+                    )}
+                  >
                     {currentLesson.content_type === 'video_file' &&
                       currentLesson.content_url && (
                         <video
@@ -833,11 +847,31 @@ export default function CourseViewerPage() {
                         />
                       )}
                     {currentLesson.content_type === 'pdf' && currentLesson.content_url && (
-                      <iframe
-                        src={mediaUrl(currentLesson.content_url)}
-                        title={currentLesson.title}
-                        className="h-full w-full bg-white"
-                      />
+                      <>
+                        <iframe
+                          src={mediaUrl(currentLesson.content_url)}
+                          title={currentLesson.title}
+                          className="h-full w-full bg-white"
+                        />
+                        {/* Overlay download — `download` attr suggests the
+                            lesson title as the filename so saved files don't
+                            have opaque hashed names. Same-origin so the
+                            browser honours the attribute. */}
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="secondary"
+                          className="absolute right-3 top-3 shadow-md"
+                        >
+                          <a
+                            href={mediaUrl(currentLesson.content_url)}
+                            download={`${currentLesson.title || 'lesson'}.pdf`}
+                          >
+                            <Download className="mr-1 h-3.5 w-3.5" />
+                            ดาวน์โหลด PDF
+                          </a>
+                        </Button>
+                      </>
                     )}
                     {!currentLesson.content_url && (
                       <div className="flex h-full w-full items-center justify-center text-sm text-white/80">

@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const [enrollments, setEnrollments] = useState(null)
   const [certs, setCerts] = useState(null)
   const [mandatory, setMandatory] = useState(null)
+  const [allCourses, setAllCourses] = useState(null)
 
   useEffect(() => {
     coursesApi.myEnrollments().then(setEnrollments).catch(() => setEnrollments([]))
@@ -63,6 +64,9 @@ export default function DashboardPage() {
     // All mandatory courses in the catalog — joined client-side against
     // enrollments to figure out which ones the user still owes.
     coursesApi.list({ is_mandatory: true }).then(setMandatory).catch(() => setMandatory([]))
+    // Latest catalog for the "browse more" row on Dashboard — pulled separately
+    // so a slow catalog request never blocks the hero/enrollment cards.
+    coursesApi.list({ limit: 20 }).then(setAllCourses).catch(() => setAllCourses([]))
   }, [])
 
   const progressOf = (e) => e?.progress_percent ?? e?.progress_percentage ?? 0
@@ -108,6 +112,16 @@ export default function DashboardPage() {
           year: 'numeric',
         })
       : ''
+
+  // "Browse more" — courses the user hasn't enrolled in yet. Filters out
+  // anything already in their enrollments + drops drafts. Capped at 8 so the
+  // row stays compact; full catalog is one click away via the "ดูทั้งหมด" link.
+  const enrolledCourseIds = new Set(
+    enrollmentList.map((e) => e.course?.id ?? e.course_id).filter(Boolean)
+  )
+  const exploreCourses = (Array.isArray(allCourses) ? allCourses : [])
+    .filter((c) => c.is_published !== false && !enrolledCourseIds.has(c.id))
+    .slice(0, 8)
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -279,6 +293,30 @@ export default function DashboardPage() {
                   />
                 )
               })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Browse-more row — published courses the user hasn't enrolled in yet.
+          Keeps the catalog one click away even after they're enrolled in
+          something. Hidden when caught up on everything. */}
+      {exploreCourses.length > 0 && (
+        <section className="mt-10">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <h3 className="text-lg font-semibold text-foreground">หลักสูตรอื่น ๆ</h3>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/courses">
+                {BUTTONS.VIEW_ALL_COURSES}
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="-mx-4 overflow-x-auto px-4 pb-2">
+            <div className="flex gap-4">
+              {exploreCourses.map((c) => (
+                <CourseCard key={c.id} course={c} variant="compact" />
+              ))}
             </div>
           </div>
         </section>

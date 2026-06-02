@@ -36,6 +36,12 @@ export const coursesApi = {
     return response.data
   },
 
+  /** ทำสำเนาหลักสูตร — admin/instructor only. Returns { id, title, message }. */
+  duplicate: async (courseId) => {
+    const response = await apiClient.post(`/courses/${courseId}/duplicate`)
+    return response.data
+  },
+
   /** หลักสูตรของฉัน + ความคืบหน้า */
   myEnrollments: async () => {
     const response = await apiClient.get('/courses/me/enrollments')

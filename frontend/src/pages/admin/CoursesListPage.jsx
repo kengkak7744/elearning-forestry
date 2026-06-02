@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ImageIcon, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Copy, ImageIcon, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
 import { CATEGORY_BADGES } from '@/constants/labels'
 import { mediaUrl } from '@/utils/media'
@@ -62,6 +62,8 @@ export default function CoursesListPage() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [duplicatingId, setDuplicatingId] = useState(null)
+  const navigate = useNavigate()
 
   const load = async () => {
     setLoading(true)
@@ -94,6 +96,25 @@ export default function CoursesListPage() {
       load()
     } catch (err) {
       showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+    }
+  }
+
+  const handleDuplicate = async (course) => {
+    if (duplicatingId) return // guard against double-click
+    setDuplicatingId(course.id)
+    try {
+      const data = await coursesApi.duplicate(course.id)
+      showToast(
+        data?.message || `ทำสำเนาหลักสูตร '${course.title}' เรียบร้อย`,
+        'success'
+      )
+      // Drop the admin into the new course's editor so they can rename/publish
+      // immediately instead of hunting for it in the list.
+      if (data?.id) navigate(`/admin/courses/${data.id}/edit`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'ทำสำเนาไม่สำเร็จ', 'error')
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -242,7 +263,7 @@ export default function CoursesListPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button asChild variant="ghost" size="sm">
+                          <Button asChild variant="ghost" size="sm" title="แก้ไข">
                             <Link to={`/admin/courses/${c.id}/edit`}>
                               <Pencil className="h-3.5 w-3.5" />
                               <span className="sr-only">แก้ไข</span>
@@ -251,8 +272,19 @@ export default function CoursesListPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleDuplicate(c)}
+                            disabled={duplicatingId === c.id}
+                            title="ทำสำเนา"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            <span className="sr-only">ทำสำเนา</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setConfirmTarget(c)}
                             className="text-destructive hover:text-destructive"
+                            title="ลบ"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             <span className="sr-only">ลบ</span>
@@ -303,6 +335,15 @@ export default function CoursesListPage() {
                           <Pencil className="h-4 w-4" />
                           <span className="sr-only">แก้ไข</span>
                         </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDuplicate(c)}
+                        disabled={duplicatingId === c.id}
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span className="sr-only">ทำสำเนา</span>
                       </Button>
                       <Button
                         variant="ghost"

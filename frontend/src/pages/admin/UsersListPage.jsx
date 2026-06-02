@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { KeyRound, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { KeyRound, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react'
 import { usersApi } from '@/api/users'
 import { BUTTONS, ROLE_BADGES, ROLE_LABELS } from '@/constants/labels'
 import { showToast } from '@/lib/toast'
@@ -37,6 +37,7 @@ import {
 import UserFormSheet from '@/components/admin/UserFormSheet'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
 import ResetPasswordDialog from '@/components/admin/ResetPasswordDialog'
+import BulkImportDialog from '@/components/admin/BulkImportDialog'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 
 export default function UsersListPage() {
@@ -54,6 +55,7 @@ export default function UsersListPage() {
   const [resetTarget, setResetTarget] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [summaryUserId, setSummaryUserId] = useState(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   const loadUsers = async () => {
     setLoading(true)
@@ -102,10 +104,16 @@ export default function UsersListPage() {
             รายการเจ้าหน้าที่ทั้งหมดในระบบ
           </p>
         </div>
-        <Button onClick={openAdd} className="w-full sm:w-auto">
-          <Plus className="mr-1 h-4 w-4" />
-          {BUTTONS.ADD_USER}
-        </Button>
+        <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+          <Button variant="outline" onClick={() => setBulkOpen(true)} className="w-full sm:w-auto">
+            <Upload className="mr-1 h-4 w-4" />
+            นำเข้าจาก CSV
+          </Button>
+          <Button onClick={openAdd} className="w-full sm:w-auto">
+            <Plus className="mr-1 h-4 w-4" />
+            {BUTTONS.ADD_USER}
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-4 border-border/60">
@@ -316,6 +324,12 @@ export default function UsersListPage() {
       />
 
       <ResetPasswordDialog target={resetTarget} onClose={() => setResetTarget(null)} />
+
+      <BulkImportDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        onDone={loadUsers}
+      />
 
       <AlertDialog
         open={!!confirmDelete}

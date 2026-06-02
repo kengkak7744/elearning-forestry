@@ -132,7 +132,11 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
           const scrollTo = (qid) => {
             const el = document.getElementById(`q-result-${quiz.id}-${qid}`)
             if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              // Smooth scroll defeats prefers-reduced-motion when triggered
+              // from JS (the CSS reset in index.css only catches CSS-driven
+              // scrolling). Check the media query and downgrade to 'auto'.
+              const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+              el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
               el.classList.add('ring-2', 'ring-destructive', 'ring-offset-2')
               setTimeout(() => {
                 el.classList.remove('ring-2', 'ring-destructive', 'ring-offset-2')

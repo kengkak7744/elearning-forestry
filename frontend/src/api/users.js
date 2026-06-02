@@ -48,4 +48,19 @@ export const usersApi = {
     })
     return response.data
   },
+
+  /**
+   * Bulk CSV import (admin). Returns
+   * `{ created_count, skipped_count, error_count, created, skipped, errors }`.
+   * `created[i].generated_password` is plaintext (returned once, not stored) —
+   * the admin needs to hand it to the new user.
+   */
+  bulkImport: async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post('/users/bulk-import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
 }

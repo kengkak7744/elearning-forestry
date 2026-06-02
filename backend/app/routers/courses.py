@@ -1,4 +1,6 @@
+import logging
 import os
+import shutil
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response
@@ -8,21 +10,94 @@ from typing import Optional
 from app.database import get_db
 from app.models.bookmark import Bookmark
 from app.models.course import Course, Module, CourseCategory
-from app.models.lesson import Lesson
+from app.models.lesson import Lesson, LessonResource, ContentType
+from app.models.lesson_note import LessonNote
+from app.models.quiz import Quiz, Question
 from app.models.enrollment import Enrollment
 from app.models.user import User
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseResponse, CourseListItem
 )
 from app.dependencies import get_current_user, require_instructor_or_admin
+from app.services.audit import log_action
+from fastapi import Request
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
 
 IMAGE_DIR = Path("/app/images")
 IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+# Duplicate-course media copy uses these dirs — must match the upload paths in
+# lessons.py. Kept here (not imported) to avoid a circular dependency.
+_VIDEO_DIR = Path("/app/videos")
+_PDF_DIR = Path("/app/pdf_documents")
+
+
+def _copy_media_file(content_url: Optional[str]) -> Optional[str]:
+    """Return a new content_url pointing at a fresh copy of the source file.
+
+    If the source file is missing on disk, return the original URL unchanged —
+    a clone with a broken link is still better than failing the whole duplicate
+    operation (the admin can re-upload to fix it).
+    """
+    if not content_url:
+        return content_url
+    name = Path(content_url).name
+    if content_url.startswith("/videos/"):
+        src_dir, url_prefix = _VIDEO_DIR, "/videos"
+    elif content_url.startswith("/pdfs/"):
+        src_dir, url_prefix = _PDF_DIR, "/pdfs"
+    else:
+        # External link or unknown path scheme — share as-is.
+        return content_url
+    src_path = src_dir / name
+    if not src_path.exists():
+        logger.warning("clone: source media missing, sharing URL: %s", content_url)
+        return content_url
+    ext = Path(name).suffix
+    new_name = f"{uuid.uuid4().hex}{ext}"
+    dest_path = src_dir / new_name
+    try:
+        shutil.copy2(src_path, dest_path)
+    except OSError:
+        logger.exception("clone: failed to copy %s", src_path)
+        return content_url
+    return f"{url_prefix}/{new_name}"
+
+
+def _clone_quiz_into(source_quiz: Quiz, db: Session, *, new_course_id=None, new_lesson_id=None) -> Quiz:
+    """Deep-copy a quiz including all its questions."""
+    new_quiz = Quiz(
+        course_id=new_course_id,
+        lesson_id=new_lesson_id,
+        title=source_quiz.title,
+        placement=source_quiz.placement,
+        trigger_time=source_quiz.trigger_time,
+        can_skip=source_quiz.can_skip,
+        show_correct_answer=source_quiz.show_correct_answer,
+        passing_score=source_quiz.passing_score,
+        order_index=source_quiz.order_index,
+        randomize_questions=source_quiz.randomize_questions,
+        questions_per_attempt=source_quiz.questions_per_attempt,
+    )
+    db.add(new_quiz)
+    db.flush()  # need new_quiz.id for child Questions
+    for src_q in source_quiz.questions:
+        db.add(Question(
+            quiz_id=new_quiz.id,
+            question_text=src_q.question_text,
+            question_type=src_q.question_type,
+            choices=src_q.choices,
+            correct_text=src_q.correct_text,
+            explanation=src_q.explanation,
+            points=src_q.points,
+            order_index=src_q.order_index,
+        ))
+    return new_quiz
 
 
 @router.get("", response_model=list[CourseListItem])
@@ -142,11 +217,19 @@ def get_course(
 @router.post("", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 def create_course(
     course_data: CourseCreate,
+    request: Request,
     db: Session = Depends(get_db),
-    _user: User = Depends(require_instructor_or_admin)
+    user: User = Depends(require_instructor_or_admin)
 ):
     new_course = Course(**course_data.model_dump())
     db.add(new_course)
+    db.flush()
+    log_action(
+        db, user, "course.create",
+        target_type="course", target_id=new_course.id, target_label=new_course.title,
+        summary=f"สร้างหลักสูตร {new_course.title}",
+        request=request,
+    )
     db.commit()
     db.refresh(new_course)
     return {
@@ -162,36 +245,189 @@ def create_course(
 def update_course(
     course_id: int,
     course_data: CourseUpdate,
+    request: Request,
     db: Session = Depends(get_db),
-    _user: User = Depends(require_instructor_or_admin)
+    user: User = Depends(require_instructor_or_admin)
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
-    
+
     update_data = course_data.model_dump(exclude_unset=True)
+
+    # Snapshot the bits regulators care about — publish state + mandatory flag.
+    before = {k: getattr(course, k) for k in update_data}
     for field, value in update_data.items():
         setattr(course, field, value)
-    
+
+    notable_changes = []
+    if "is_published" in update_data and before.get("is_published") != update_data["is_published"]:
+        notable_changes.append("เผยแพร่" if update_data["is_published"] else "ถอนเผยแพร่")
+    if "is_mandatory" in update_data and before.get("is_mandatory") != update_data["is_mandatory"]:
+        notable_changes.append(
+            "ตั้งเป็นบังคับ" if update_data["is_mandatory"] else "ปลดสถานะบังคับ"
+        )
+    summary = (
+        f"แก้ไขหลักสูตร {course.title}"
+        + (" — " + ", ".join(notable_changes) if notable_changes else "")
+    )
+    log_action(
+        db, user, "course.update",
+        target_type="course", target_id=course.id, target_label=course.title,
+        summary=summary,
+        details={"changed_fields": list(update_data.keys())},
+        request=request,
+    )
+
     db.commit()
     db.refresh(course)
-    return get_course(course_id, db, _user)
+    return get_course(course_id, db, user)
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_200_OK)
 def delete_course(
     course_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    _user: User = Depends(require_instructor_or_admin)
+    user: User = Depends(require_instructor_or_admin)
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
-    
+
+    title = course.title
+    log_action(
+        db, user, "course.delete",
+        target_type="course", target_id=course.id, target_label=title,
+        summary=f"ลบหลักสูตร {title}",
+        request=request,
+    )
     db.delete(course)
     db.commit()
-    
-    return {"message": f"ลบหลักสูตร '{course.title}' เรียบร้อย"}
+
+    return {"message": f"ลบหลักสูตร '{title}' เรียบร้อย"}
+
+
+@router.post("/{course_id}/duplicate", status_code=status.HTTP_201_CREATED)
+def duplicate_course(
+    course_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_instructor_or_admin),
+):
+    """
+    Deep-clone a course into a new draft (is_published=False).
+
+    Copies: modules → lessons → lesson resources → quizzes → questions, plus
+    a fresh physical copy of every uploaded video/PDF (so deleting either
+    course later doesn't break the other one).
+
+    Does NOT copy: enrollments, lesson progress, quiz attempts, certificates,
+    bookmarks, learner notes — those are per-user history and shouldn't
+    transfer to a brand new variant.
+
+    Cover image is shared by URL — re-uploading is trivial if the admin wants
+    a different cover for the variant.
+    """
+    source = (
+        db.query(Course)
+        .options(
+            selectinload(Course.modules)
+            .selectinload(Module.lessons)
+            .selectinload(Lesson.resources),
+            selectinload(Course.modules)
+            .selectinload(Module.lessons)
+            .selectinload(Lesson.quizzes)
+            .selectinload(Quiz.questions),
+        )
+        .filter(Course.id == course_id)
+        .first()
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+
+    new_course = Course(
+        title=f"[สำเนา] {source.title}",
+        description=source.description,
+        category=source.category,
+        is_mandatory=source.is_mandatory,
+        cover_image=source.cover_image,
+        estimated_hours=source.estimated_hours,
+        instructor_name=source.instructor_name,
+        is_published=False,
+        recertify_after_days=source.recertify_after_days,
+    )
+    db.add(new_course)
+    db.flush()
+
+    # Course-level (final) quizzes attach via course_id, not via any lesson.
+    course_level_quizzes = (
+        db.query(Quiz)
+        .options(selectinload(Quiz.questions))
+        .filter(Quiz.course_id == source.id)
+        .all()
+    )
+    for q in course_level_quizzes:
+        _clone_quiz_into(q, db, new_course_id=new_course.id)
+
+    for source_module in sorted(source.modules, key=lambda m: m.order_index or 0):
+        new_module = Module(
+            course_id=new_course.id,
+            title=source_module.title,
+            description=source_module.description,
+            order_index=source_module.order_index,
+        )
+        db.add(new_module)
+        db.flush()
+
+        for source_lesson in sorted(source_module.lessons, key=lambda l: l.order_index or 0):
+            # Physically copy uploaded media so the clone is independent.
+            new_content_url = source_lesson.content_url
+            if source_lesson.content_type in (ContentType.VIDEO_FILE, ContentType.PDF):
+                new_content_url = _copy_media_file(source_lesson.content_url)
+
+            new_lesson = Lesson(
+                module_id=new_module.id,
+                title=source_lesson.title,
+                description=source_lesson.description,
+                content_type=source_lesson.content_type,
+                content_url=new_content_url,
+                duration_seconds=source_lesson.duration_seconds,
+                total_pages=source_lesson.total_pages,
+                notes_content=source_lesson.notes_content,
+                order_index=source_lesson.order_index,
+                min_view_seconds=source_lesson.min_view_seconds,
+            )
+            db.add(new_lesson)
+            db.flush()
+
+            for src_res in source_lesson.resources:
+                db.add(LessonResource(
+                    lesson_id=new_lesson.id,
+                    title=src_res.title,
+                    resource_type=src_res.resource_type,
+                    url=src_res.url,
+                    file_size=src_res.file_size,
+                ))
+
+            for src_quiz in source_lesson.quizzes:
+                _clone_quiz_into(src_quiz, db, new_lesson_id=new_lesson.id)
+
+    log_action(
+        db, user, "course.duplicate",
+        target_type="course", target_id=new_course.id, target_label=new_course.title,
+        summary=f"ทำสำเนาหลักสูตร {source.title} → {new_course.title}",
+        details={"source_course_id": source.id},
+        request=request,
+    )
+    db.commit()
+    db.refresh(new_course)
+    logger.info("clone: course %s → %s by user-action", source.id, new_course.id)
+    return {
+        "id": new_course.id,
+        "title": new_course.title,
+        "message": f"ทำสำเนาหลักสูตร '{source.title}' เรียบร้อย",
+    }
 
 
 @router.post("/{course_id}/upload-cover")

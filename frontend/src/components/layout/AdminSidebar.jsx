@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import {
+  Award,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  ScrollText,
   Users,
   ArrowLeft,
 } from 'lucide-react'
@@ -26,6 +28,13 @@ const groups = [
   {
     label: 'ผู้ใช้',
     items: [{ to: '/admin/users', label: 'จัดการผู้ใช้', icon: Users }],
+  },
+  {
+    label: 'ตรวจสอบ',
+    items: [
+      { to: '/admin/audit-logs', label: 'บันทึกการเปลี่ยนแปลง', icon: ScrollText },
+      { to: '/admin/certificates', label: 'ใบรับรองทั้งหมด', icon: Award },
+    ],
   },
 ]
 
@@ -60,7 +69,13 @@ export default function AdminSidebar({ onNavigate }) {
     >
       <div className="flex h-16 items-center gap-2 px-3 border-b border-border">
         <Link to="/admin/dashboard" onClick={handleClickItem} className="flex min-w-0 flex-1 items-center gap-2.5">
-          <img src="/elearning/forest_logo.png" alt="" className="h-9 w-9 flex-shrink-0" />
+          <img
+            src="/elearning/forest_logo.png"
+            alt=""
+            width="36"
+            height="36"
+            className="h-9 w-9 flex-shrink-0"
+          />
           {!collapsed && (
             <div className="min-w-0 leading-tight">
               <div className="truncate text-sm font-semibold text-foreground">จัดการระบบ</div>

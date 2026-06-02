@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import CourseStatsModal from '@/components/CourseStatsModal'
 import CourseScoresModal from '@/components/CourseScoresModal'
+import CourseFeedbackCard from '@/components/learner/CourseFeedbackCard'
 
 function formatThaiDate(d) {
   if (!d) return ''
@@ -291,6 +292,7 @@ export default function CourseDetailPage() {
             <TabsList>
               <TabsTrigger value="overview">ภาพรวม</TabsTrigger>
               <TabsTrigger value="content">เนื้อหา</TabsTrigger>
+              <TabsTrigger value="feedback">ความคิดเห็น</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-4">
@@ -306,6 +308,10 @@ export default function CourseDetailPage() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="feedback" className="mt-4">
+              <CourseFeedbackCard courseId={course.id} isEnrolled={enrolled} />
             </TabsContent>
 
             <TabsContent value="content" className="mt-4">
