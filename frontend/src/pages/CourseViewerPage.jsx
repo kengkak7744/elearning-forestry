@@ -16,6 +16,7 @@ import {
 import { coursesApi } from '@/api/courses'
 import { progressApi } from '@/api/progress'
 import { quizzesApi } from '@/api/quizzes'
+import { certificatesApi } from '@/api/certificates'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
@@ -531,7 +532,7 @@ export default function CourseViewerPage() {
   }, [currentLesson, lessonQuizzes])
   const currentLessonGated = !blockingQuiz
 
-  const goNext = () => {
+  const goNext = async () => {
     if (!timeGateMet) {
       showToast(`ต้องอยู่บนหน้านี้อีก ${fmtTime(remainingSeconds)} ก่อนไปต่อ`, 'error')
       return
@@ -556,7 +557,24 @@ export default function CourseViewerPage() {
       return
     }
     if (!nextDest) {
-      showToast('คุณเรียนถึงบทสุดท้ายแล้ว', 'success')
+      // End of course (no more lessons AND no final quiz). Try to claim the
+      // cert on the spot — issue is idempotent (returns existing valid cert
+      // if there is one) and opens the PDF download in a new tab on success.
+      // Then bounce back to the course detail page either way.
+      try {
+        const data = await certificatesApi.issue(id)
+        showToast(
+          data.already_existed ? 'เปิดใบรับรองที่เคยออกแล้ว' : 'ออกใบรับรองเรียบร้อย',
+          'success'
+        )
+        window.open(certificatesApi.downloadUrl(data.id), '_blank', 'noopener')
+      } catch (err) {
+        showToast(
+          err.response?.data?.detail || 'เรียนจบแล้ว — ดูใบรับรองในหน้าหลักสูตร',
+          'success'
+        )
+      }
+      navigate(`/courses/${id}`)
       return
     }
     if (nextDest.type === 'final') switchToFinal()

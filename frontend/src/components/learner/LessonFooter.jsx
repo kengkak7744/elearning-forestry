@@ -92,11 +92,12 @@ export default function LessonFooter({
           ) : (
             <Button
               onClick={onNext}
-              disabled={!timeGateMet || !nextDest}
+              disabled={!timeGateMet}
               title={blocked ? 'คลิกเพื่อไปทำแบบทดสอบที่ต้องผ่าน' : undefined}
               className={cn(
                 'flex-1 sm:flex-none',
-                blocked && 'bg-warning text-warning-foreground hover:bg-warning/90'
+                blocked && 'bg-warning text-warning-foreground hover:bg-warning/90',
+                !blocked && !nextDest && 'bg-success text-success-foreground hover:bg-success/90'
               )}
             >
               {blocked ? (

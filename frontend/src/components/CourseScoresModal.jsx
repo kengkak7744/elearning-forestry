@@ -64,14 +64,21 @@ export default function CourseScoresModal({ open, quizzes, courseId, onClose }) 
   const [cert, setCert] = useState(null)
   const [certLoading, setCertLoading] = useState(false)
   const [certError, setCertError] = useState('')
+  // Backend-decided eligibility. We need this separate from the front-end's
+  // `coursePassed` heuristic because that heuristic only considers final-quiz
+  // pass status, which is wrong for courses that don't HAVE a final quiz —
+  // those should still get a cert once all lessons are complete.
+  const [eligible, setEligible] = useState(false)
 
   useEffect(() => {
     if (!open || !courseId) return
     setCert(null)
     setCertError('')
+    setEligible(false)
     certificatesApi
       .eligibility(courseId)
       .then((data) => {
+        setEligible(!!data.eligible)
         if (data.has_certificate) {
           setCert({ id: data.certificate_id, number: data.certificate_number })
         }
@@ -203,7 +210,10 @@ export default function CourseScoresModal({ open, quizzes, courseId, onClose }) 
             </div>
           )}
 
-          {coursePassed && courseId && (
+          {/* Show the certificate block when the backend says we're eligible
+              (covers courses without a final quiz) OR when our local
+              "coursePassed" heuristic agrees (covers stale eligibility responses). */}
+          {(eligible || coursePassed) && courseId && (
             <div className="rounded-lg border border-warning/40 bg-warning/10 p-4">
               <div className="flex items-start gap-3">
                 <Trophy className="mt-0.5 h-6 w-6 flex-shrink-0 text-warning" />

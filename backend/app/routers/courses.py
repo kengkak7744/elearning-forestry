@@ -142,9 +142,13 @@ def get_course(
     current_user: User = Depends(get_current_user)
 ):
     # selectinload (not joinedload): avoids cartesian module×lesson row explosion;
-    # each relationship loads via a single IN query.
+    # each relationship loads via a single IN query. Also chain into
+    # Lesson.resources so the admin editor and learner viewer both see the
+    # full attached-document list without N+1 queries.
     course = db.query(Course).options(
-        selectinload(Course.modules).selectinload(Module.lessons)
+        selectinload(Course.modules)
+        .selectinload(Module.lessons)
+        .selectinload(Lesson.resources)
     ).filter(Course.id == course_id).first()
     
     if not course:
@@ -183,6 +187,20 @@ def get_course(
                 "notes_content": lesson.notes_content,
                 "order_index": lesson.order_index,
                 "min_view_seconds": lesson.min_view_seconds,
+                # Supplementary downloads / external links attached to this
+                # lesson. The admin editor and the learner viewer both
+                # consume this field — adding it here means a single
+                # course-fetch shows everything that's actually saved.
+                "resources": [
+                    {
+                        "id": r.id,
+                        "title": r.title,
+                        "url": r.url,
+                        "resource_type": r.resource_type,
+                        "file_size": r.file_size,
+                    }
+                    for r in (lesson.resources or [])
+                ],
             })
         modules_data.append({
             "id": module.id,

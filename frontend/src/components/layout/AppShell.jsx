@@ -45,10 +45,12 @@ export function AdminShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <SkipLink />
       {/* Desktop sidebar — sticky to viewport so footer (back/logout) is always
-          visible regardless of main-content scroll. */}
+          visible regardless of main-content scroll. overflow-hidden on the
+          outer flex container ensures the body never gets a scrollbar — every
+          scrollable area lives inside <main> below. */}
       <div className="hidden h-screen flex-shrink-0 lg:flex">
         <AdminSidebar />
       </div>
