@@ -19,6 +19,10 @@ export const adminStatsApi = {
     apiClient
       .get(`/admin/stats/departments/${encodeURIComponent(name)}/courses`)
       .then((r) => r.data),
+  departmentCourseMembers: (name, courseId) =>
+    apiClient
+      .get(`/admin/stats/departments/${encodeURIComponent(name)}/courses/${courseId}/members`)
+      .then((r) => r.data),
   // Built like departmentComplianceCsvUrl — direct browser navigation so the
   // auth cookie rides along automatically.
   departmentMembersCsvUrl: (name) => {

@@ -438,6 +438,145 @@ def department_course_performance(
     return out
 
 
+@router.get("/departments/{department}/courses/{course_id}/members")
+def department_course_members(
+    department: str,
+    course_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Department members crossed with one specific course.
+
+    Returns every member of the department + their relationship to the
+    course: enrolled or not, progress %, cert status. Admins use this to
+    answer "who in my team hasn't started the mandatory fire-safety course
+    yet?".
+
+    Members who aren't enrolled in the course are returned with
+    `is_enrolled = false` and zeroed counters so the UI can render a
+    single "ยังไม่ลงทะเบียน" list without needing a second fetch.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    from app.models.certificate import Certificate
+    from app.models.lesson import Lesson
+    from app.models.course import Module
+    from app.models.progress import LessonProgress
+
+    response.headers["Cache-Control"] = _STATS_CACHE
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+
+    total_lessons = (
+        db.query(func.count(Lesson.id))
+        .join(Module, Module.id == Lesson.module_id)
+        .filter(Module.course_id == course_id)
+        .scalar()
+    ) or 0
+
+    # Per-user completed-lesson count, scoped to this course.
+    completed_sub = (
+        db.query(
+            LessonProgress.user_id,
+            func.count(LessonProgress.id).label("n"),
+        )
+        .join(Lesson, Lesson.id == LessonProgress.lesson_id)
+        .join(Module, Module.id == Lesson.module_id)
+        .filter(Module.course_id == course_id, LessonProgress.completed == True)
+        .group_by(LessonProgress.user_id)
+        .subquery()
+    )
+    enrollment_sub = (
+        db.query(
+            Enrollment.user_id,
+            Enrollment.enrolled_at,
+        )
+        .filter(Enrollment.course_id == course_id)
+        .subquery()
+    )
+    # The most recent cert per (user, course) — recertification flows can
+    # have historical certs, but for this view we care about the current one.
+    cert_sub = (
+        db.query(
+            Certificate.user_id,
+            func.max(Certificate.id).label("cert_id"),
+        )
+        .filter(Certificate.course_id == course_id)
+        .group_by(Certificate.user_id)
+        .subquery()
+    )
+    rows = (
+        db.query(
+            User,
+            enrollment_sub.c.enrolled_at,
+            completed_sub.c.n,
+            cert_sub.c.cert_id,
+        )
+        .outerjoin(enrollment_sub, enrollment_sub.c.user_id == User.id)
+        .outerjoin(completed_sub, completed_sub.c.user_id == User.id)
+        .outerjoin(cert_sub, cert_sub.c.user_id == User.id)
+        .filter(User.department == department)
+        .order_by(User.is_active.desc(), User.full_name)
+        .all()
+    )
+    # Pull current-cert details for everyone who has one — one extra query
+    # rather than joining the whole row through a sub.
+    cert_ids = [r[3] for r in rows if r[3] is not None]
+    cert_info: dict[int, tuple] = {}
+    if cert_ids:
+        for c in db.query(Certificate).filter(Certificate.id.in_(cert_ids)).all():
+            cert_info[c.id] = (c.is_revoked, c.expires_at)
+
+    now = _dt.now(_tz.utc)
+    members = []
+    for u, enrolled_at, completed_n, cert_id in rows:
+        is_enrolled = enrolled_at is not None
+        completed_n = int(completed_n or 0)
+        progress = (
+            int(round((completed_n / total_lessons) * 100))
+            if (total_lessons > 0 and is_enrolled)
+            else 0
+        )
+        cert_status = None
+        if cert_id is not None:
+            is_revoked, expires_at = cert_info.get(cert_id, (False, None))
+            if is_revoked:
+                cert_status = "revoked"
+            elif expires_at:
+                exp = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=_tz.utc)
+                cert_status = "expired" if exp < now else "valid"
+            else:
+                cert_status = "valid"
+        members.append({
+            "id": u.id,
+            "full_name": u.full_name,
+            "username": u.username,
+            "email": u.email,
+            "position": u.position,
+            "phone": u.phone,
+            "role": u.role.value if u.role else None,
+            "is_active": u.is_active,
+            "is_enrolled": is_enrolled,
+            "enrolled_at": enrolled_at.isoformat() if enrolled_at else None,
+            "progress_percent": progress,
+            "completed_lessons": completed_n if is_enrolled else 0,
+            "total_lessons": total_lessons,
+            "cert_status": cert_status,
+            "cert_id": cert_id,
+        })
+    return {
+        "course": {
+            "id": course.id,
+            "title": course.title,
+            "is_mandatory": course.is_mandatory,
+            "category": course.category.value if course.category else None,
+            "total_lessons": total_lessons,
+        },
+        "members": members,
+    }
+
+
 @router.get("/departments/{department}/members.csv")
 def department_members_csv(
     department: str,
