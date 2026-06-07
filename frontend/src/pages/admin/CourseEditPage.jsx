@@ -128,6 +128,7 @@ export default function CourseEditPage() {
     estimated_hours: '',
     instructor_name: '',
     is_published: false,
+    allow_downloads: true,
     recertify_after_days: '',
   })
 
@@ -150,6 +151,8 @@ export default function CourseEditPage() {
         estimated_hours: data.estimated_hours || '',
         instructor_name: data.instructor_name || '',
         is_published: data.is_published || false,
+        // Default ON for any course created before this field existed.
+        allow_downloads: data.allow_downloads ?? true,
         recertify_after_days: data.recertify_after_days ?? '',
       })
       setCoverImage(data.cover_image || null)
@@ -597,6 +600,20 @@ export default function CourseEditPage() {
                     id="ce-mand"
                     checked={courseData.is_mandatory}
                     onCheckedChange={updateField('is_mandatory')}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label htmlFor="ce-dl">อนุญาตให้ผู้เรียนดาวน์โหลดเอกสาร</Label>
+                    <p className="text-xs text-muted-foreground">
+                      เปิด = ผู้เรียนเห็นปุ่มดาวน์โหลด PDF/วิดีโอบนหน้าหลักสูตร
+                      · ปิด = ดูได้แต่ดาวน์โหลดไม่ได้
+                    </p>
+                  </div>
+                  <Switch
+                    id="ce-dl"
+                    checked={courseData.allow_downloads ?? true}
+                    onCheckedChange={updateField('allow_downloads')}
                   />
                 </div>
                 <div className="space-y-1.5">

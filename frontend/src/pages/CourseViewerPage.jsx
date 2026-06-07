@@ -865,32 +865,17 @@ export default function CourseViewerPage() {
                         />
                       )}
                     {currentLesson.content_type === 'pdf' && currentLesson.content_url && (
-                      <>
-                        <iframe
-                          src={mediaUrl(currentLesson.content_url)}
-                          title={currentLesson.title}
-                          className="h-full w-full bg-white"
-                        />
-                        {/* Overlay download — `download` attr suggests the
-                            lesson title as the filename so saved files don't
-                            have opaque hashed names. Same-origin so the
-                            browser honours the attribute. */}
-                        <Button
-                          asChild
-                          size="sm"
-                          variant="secondary"
-                          className="absolute right-3 top-3 shadow-md"
-                        >
-                          <a
-                            href={mediaUrl(currentLesson.content_url)}
-                            download={`${currentLesson.title || 'lesson'}.pdf`}
-                          >
-                            <Download className="mr-1 h-3.5 w-3.5" />
-                            ดาวน์โหลด PDF
-                          </a>
-                        </Button>
-                      </>
+                      <iframe
+                        src={mediaUrl(currentLesson.content_url)}
+                        title={currentLesson.title}
+                        className="h-full w-full bg-white"
+                      />
                     )}
+                    {/* The per-lesson download button used to live here as an
+                        overlay on top of the iframe. It moved to a single
+                        consolidated "ดาวน์โหลดเอกสารประกอบหลักสูตร" section
+                        at the end of the content list on the course detail
+                        page so learners can grab everything from one spot. */}
                     {!currentLesson.content_url && (
                       <div className="flex h-full w-full items-center justify-center text-sm text-white/80">
                         ยังไม่มีเนื้อหาในบทเรียนนี้

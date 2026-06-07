@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Download,
   FileText,
   Lock,
   Paperclip,
@@ -10,6 +12,25 @@ import {
   Tv,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { mediaUrl } from '@/utils/media'
+
+const DOWNLOADABLE_CONTENT_TYPES = new Set(['pdf', 'video_file'])
+
+/**
+ * Pick a sensible file extension for the downloaded file. Prefer the actual
+ * extension from the URL if it's there; fall back to the obvious one for
+ * the content type.
+ */
+function fileExtForContentType(type, contentUrl) {
+  if (typeof contentUrl === 'string') {
+    const dot = contentUrl.lastIndexOf('.')
+    if (dot > -1 && dot > contentUrl.lastIndexOf('/')) {
+      const ext = contentUrl.slice(dot + 1).toLowerCase()
+      if (ext.length > 0 && ext.length <= 5) return ext
+    }
+  }
+  return type === 'video_file' ? 'mp4' : 'pdf'
+}
 
 function LessonRow({
   lesson,
@@ -227,6 +248,67 @@ export default function LessonTree({
           </span>
         </button>
       )}
+
+      <CourseDownloads course={course} />
+    </div>
+  )
+}
+
+/**
+ * Bottom-of-the-tree consolidated downloads panel. Lists every uploaded PDF
+ * and uploaded video in the course as one-click downloads. YouTube lessons
+ * are skipped — we don't host the bytes so we can't serve a download.
+ *
+ * Hidden when `course.allow_downloads === false` (admin override on the
+ * course-editor Settings tab) or when no lesson has a downloadable file.
+ */
+function CourseDownloads({ course }) {
+  const items = useMemo(() => {
+    if (!Array.isArray(course?.modules)) return []
+    const out = []
+    for (const m of course.modules) {
+      for (const lesson of m.lessons ?? []) {
+        if (
+          DOWNLOADABLE_CONTENT_TYPES.has(lesson.content_type) &&
+          lesson.content_url
+        ) {
+          out.push(lesson)
+        }
+      }
+    }
+    return out
+  }, [course])
+
+  if (course?.allow_downloads === false || items.length === 0) return null
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex items-center gap-2 bg-muted/30 px-3 py-2.5">
+        <Download className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">เอกสารประกอบทั้งหมด</span>
+        <span className="ml-auto text-[11px] text-muted-foreground">{items.length} ไฟล์</span>
+      </div>
+      <ul className="divide-y divide-border">
+        {items.map((lesson) => {
+          const ext = fileExtForContentType(lesson.content_type, lesson.content_url)
+          const Icon = lesson.content_type === 'video_file' ? PlayCircle : FileText
+          return (
+            <li key={lesson.id}>
+              <a
+                href={mediaUrl(lesson.content_url)}
+                download={`${lesson.title || 'lesson'}.${ext}`}
+                className="flex items-center gap-2 px-3 py-2 text-sm transition hover:bg-muted/30"
+              >
+                <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-foreground">
+                  {lesson.title}
+                </span>
+                <Download className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+              </a>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

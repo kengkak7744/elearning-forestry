@@ -221,6 +221,7 @@ def get_course(
         "estimated_hours": course.estimated_hours,
         "instructor_name": course.instructor_name,
         "is_published": course.is_published,
+        "allow_downloads": course.allow_downloads,
         "created_at": course.created_at.isoformat() if course.created_at else None,
         "updated_at": course.updated_at.isoformat() if course.updated_at else None,
         "total_modules": total_modules,

@@ -24,6 +24,12 @@ class Course(Base):
     estimated_hours = Column(Integer, nullable=True)
     instructor_name = Column(String(150), nullable=True)
     is_published = Column(Boolean, default=False)
+    # Controls whether the "ดาวน์โหลดเอกสารประกอบหลักสูตร" section on the
+    # course detail page is shown. Default True for backwards compatibility
+    # with courses that existed before this flag was added — admins can
+    # opt-out per-course (e.g. exam materials, copyrighted PDFs) by flipping
+    # this off in the Settings tab.
+    allow_downloads = Column(Boolean, default=True, nullable=False, server_default="true")
     # Annual / periodic recertification. NULL = permanent (no recert).
     # When set, certificates issued for this course get expires_at = issued + N days.
     recertify_after_days = Column(Integer, nullable=True)

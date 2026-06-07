@@ -12,6 +12,9 @@ class CourseBase(BaseModel):
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = Field(None, ge=0)
     instructor_name: Optional[str] = Field(None, max_length=150)
+    # Toggle for the course-level downloads section. True = learners see the
+    # consolidated download list on the detail page; False = no downloads.
+    allow_downloads: bool = True
     # Periodic recertification window in days. None / 0 → permanent certificate.
     recertify_after_days: Optional[int] = Field(None, ge=0)
 
@@ -29,6 +32,7 @@ class CourseUpdate(BaseModel):
     estimated_hours: Optional[int] = Field(None, ge=0)
     instructor_name: Optional[str] = Field(None, max_length=150)
     is_published: Optional[bool] = None
+    allow_downloads: Optional[bool] = None
     recertify_after_days: Optional[int] = Field(None, ge=0)
 
 
