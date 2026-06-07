@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import {
   Award,
+  Building2,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
@@ -27,7 +28,10 @@ const groups = [
   },
   {
     label: 'ผู้ใช้',
-    items: [{ to: '/admin/users', label: 'จัดการผู้ใช้', icon: Users }],
+    items: [
+      { to: '/admin/users', label: 'จัดการผู้ใช้', icon: Users },
+      { to: '/admin/departments', label: 'หน่วยงาน', icon: Building2 },
+    ],
   },
   {
     label: 'ตรวจสอบ',

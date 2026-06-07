@@ -242,6 +242,258 @@ def course_feedback_stats(
     }
 
 
+@router.get("/departments")
+def departments_overview(
+    response: Response,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Every department in the system with aggregate metrics.
+
+    Used by the admin "หน่วยงาน" page as the top-level browsable list.
+    Returns one row per distinct `department` value, including a
+    role-breakdown count so admins can see at a glance whether a
+    department has e.g. instructors but no learners.
+    """
+    response.headers["Cache-Control"] = _STATS_CACHE
+    # Step 1 — base per-dept counts (users + active users).
+    base_rows = (
+        db.query(
+            User.department,
+            func.count(User.id).label("user_count"),
+            func.count(User.id).filter(User.is_active == True).label("active_count"),
+        )
+        .filter(User.department.isnot(None), User.department != "")
+        .group_by(User.department)
+        .all()
+    )
+    # Step 2 — role breakdown per dept. Single query, then bucketed in Python.
+    role_rows = (
+        db.query(User.department, User.role, func.count(User.id))
+        .filter(User.department.isnot(None), User.department != "")
+        .group_by(User.department, User.role)
+        .all()
+    )
+    role_breakdown_by_dept: dict[str, dict[str, int]] = {}
+    for dept, role, n in role_rows:
+        role_breakdown_by_dept.setdefault(dept, {})[role.value if role else "unknown"] = int(n)
+
+    # Step 3 — enrollment count + certs held, per dept.
+    enroll_rows = dict(
+        db.query(User.department, func.count(Enrollment.id))
+        .join(Enrollment, Enrollment.user_id == User.id)
+        .filter(User.department.isnot(None), User.department != "")
+        .group_by(User.department)
+        .all()
+    )
+    from app.models.certificate import Certificate
+    cert_rows = dict(
+        db.query(User.department, func.count(Certificate.id))
+        .join(Certificate, Certificate.user_id == User.id)
+        .filter(User.department.isnot(None), User.department != "")
+        .filter(Certificate.is_revoked == False)
+        .group_by(User.department)
+        .all()
+    )
+
+    out = []
+    for dept, user_count, active_count in base_rows:
+        out.append({
+            "name": dept,
+            "user_count": int(user_count or 0),
+            "active_count": int(active_count or 0),
+            "role_breakdown": role_breakdown_by_dept.get(dept, {}),
+            "enrollment_count": int(enroll_rows.get(dept, 0)),
+            "cert_count": int(cert_rows.get(dept, 0)),
+        })
+    out.sort(key=lambda d: (-d["active_count"], d["name"]))
+    return out
+
+
+def _department_members_query(db: Session, department: str):
+    """Shared helper for the JSON + CSV member listings."""
+    from app.models.certificate import Certificate
+    # Subqueries for per-user enrollment + non-revoked cert counts. Done as
+    # subqueries (not joined groups) to avoid duplicating user rows.
+    enroll_sub = (
+        db.query(Enrollment.user_id, func.count(Enrollment.id).label("n"))
+        .group_by(Enrollment.user_id)
+        .subquery()
+    )
+    cert_sub = (
+        db.query(Certificate.user_id, func.count(Certificate.id).label("n"))
+        .filter(Certificate.is_revoked == False)
+        .group_by(Certificate.user_id)
+        .subquery()
+    )
+    rows = (
+        db.query(User, enroll_sub.c.n, cert_sub.c.n)
+        .outerjoin(enroll_sub, enroll_sub.c.user_id == User.id)
+        .outerjoin(cert_sub, cert_sub.c.user_id == User.id)
+        .filter(User.department == department)
+        .order_by(User.is_active.desc(), User.full_name)
+        .all()
+    )
+    return rows
+
+
+@router.get("/departments/{department}/members")
+def department_members(
+    department: str,
+    response: Response,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """All members of a department with the organizational metadata
+    available in the User model.
+
+    Includes the deliberately-omitted-from-csv fields (responsibility,
+    motivation) on the JSON path because they're useful for an admin
+    inspecting a single user from the browser, but are too long-form
+    for a spreadsheet column.
+    """
+    response.headers["Cache-Control"] = _STATS_CACHE
+    rows = _department_members_query(db, department)
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "full_name": u.full_name,
+            "email": u.email,
+            "role": u.role.value if u.role else None,
+            "position": u.position,
+            "phone": u.phone,
+            "responsibility": u.responsibility,
+            "motivation": u.motivation,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "enrollment_count": int(enroll_n or 0),
+            "cert_count": int(cert_n or 0),
+        }
+        for u, enroll_n, cert_n in rows
+    ]
+
+
+@router.get("/departments/{department}/courses")
+def department_course_performance(
+    department: str,
+    response: Response,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Per-course performance for one department.
+
+    For every published course, count how many members of this department
+    enrolled and how many hold a non-revoked certificate. The
+    `certification_pct` field is the load-bearing one — sorted ascending
+    so courses where the dept is lagging surface at the top of the table.
+
+    Courses with zero enrollments in this department are still returned
+    (with certification_pct = 0) when they're mandatory, so admins can see
+    "we haven't started this required course at all". Non-mandatory courses
+    with zero enrollments are filtered out as noise.
+    """
+    response.headers["Cache-Control"] = _STATS_CACHE
+    from app.models.certificate import Certificate
+
+    # Per-course enrollment count restricted to this department.
+    enrolled_rows = dict(
+        db.query(Enrollment.course_id, func.count(func.distinct(Enrollment.user_id)))
+        .join(User, User.id == Enrollment.user_id)
+        .filter(User.department == department)
+        .group_by(Enrollment.course_id)
+        .all()
+    )
+    cert_rows = dict(
+        db.query(Certificate.course_id, func.count(func.distinct(Certificate.user_id)))
+        .join(User, User.id == Certificate.user_id)
+        .filter(User.department == department, Certificate.is_revoked == False)
+        .group_by(Certificate.course_id)
+        .all()
+    )
+    courses = (
+        db.query(Course)
+        .filter(Course.is_published == True)
+        .all()
+    )
+    out = []
+    for c in courses:
+        enrolled_n = int(enrolled_rows.get(c.id, 0))
+        cert_n = int(cert_rows.get(c.id, 0))
+        if enrolled_n == 0 and not c.is_mandatory:
+            continue
+        pct = int(round((cert_n / enrolled_n) * 100)) if enrolled_n > 0 else 0
+        out.append({
+            "id": c.id,
+            "title": c.title,
+            "category": c.category.value if c.category else None,
+            "is_mandatory": c.is_mandatory,
+            "enrolled_count": enrolled_n,
+            "certified_count": cert_n,
+            "certification_pct": pct,
+        })
+    # Worst-first: low certification first. Within ties, mandatory > optional,
+    # and within those, higher enrollment first (more impact).
+    out.sort(key=lambda r: (r["certification_pct"], not r["is_mandatory"], -r["enrolled_count"]))
+    return out
+
+
+@router.get("/departments/{department}/members.csv")
+def department_members_csv(
+    department: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """CSV download of a department's members. UTF-8 + BOM so Excel
+    opens the Thai headers without garbling, matching the existing
+    compliance CSV pattern."""
+    rows = _department_members_query(db, department)
+    buf = io.StringIO()
+    buf.write("﻿")  # BOM for Excel
+    writer = csv.writer(buf)
+    writer.writerow([
+        "ชื่อผู้ใช้",
+        "ชื่อ-สกุล",
+        "อีเมล",
+        "บทบาท",
+        "ตำแหน่ง",
+        "เบอร์โทร",
+        "ความรับผิดชอบ",
+        "สถานะการใช้งาน",
+        "ลงทะเบียน (ครั้ง)",
+        "ใบรับรอง (ฉบับ)",
+        "วันที่สร้างบัญชี",
+    ])
+    for u, enroll_n, cert_n in rows:
+        writer.writerow([
+            u.username,
+            u.full_name,
+            u.email,
+            (u.role.value if u.role else "") or "",
+            u.position or "",
+            u.phone or "",
+            (u.responsibility or "").replace("\n", " "),
+            "ใช้งานอยู่" if u.is_active else "ปิดใช้งาน",
+            int(enroll_n or 0),
+            int(cert_n or 0),
+            u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
+        ])
+    buf.seek(0)
+    stamp = datetime.now().strftime("%Y%m%d")
+    # Department name may contain spaces / Thai chars; ASCII-fallback the
+    # filename so old User-Agent headers don't mangle the download.
+    safe_name = "".join(c if c.isalnum() else "_" for c in department)[:60]
+    filename = f"department-{safe_name}-{stamp}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @router.get("/department-compliance")
 def department_compliance(
     response: Response,

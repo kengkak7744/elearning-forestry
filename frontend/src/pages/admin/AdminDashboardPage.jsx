@@ -189,7 +189,11 @@ export default function AdminDashboardPage() {
                 {topDepartments.map((d) => {
                   const pct = (d.enrolled_count / maxDeptEnroll) * 100
                   return (
-                    <div key={d.department}>
+                    <Link
+                      key={d.department}
+                      to={`/admin/departments/${encodeURIComponent(d.department)}`}
+                      className="block rounded-md p-1 -m-1 transition hover:bg-muted/30"
+                    >
                       <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
                         <span className="truncate font-medium text-foreground">
                           {d.department}
@@ -199,7 +203,7 @@ export default function AdminDashboardPage() {
                         </span>
                       </div>
                       <Progress value={pct} className="h-2" />
-                    </div>
+                    </Link>
                   )
                 })}
               </div>
