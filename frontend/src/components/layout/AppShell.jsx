@@ -79,7 +79,11 @@ export function AdminShell() {
           )}
         </div>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-auto scrollbar-hidden"
+        >
           <Outlet />
         </main>
       </div>

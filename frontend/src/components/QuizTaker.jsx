@@ -9,6 +9,36 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
+/**
+ * Build a per-question choice-shuffle map. Returns
+ *   { [questionId]: number[] }
+ * where each array is the ORIGINAL choice indices in their displayed order
+ * for this attempt. We keep answers stored as original indices so the
+ * backend / correctness-check code stays unchanged — we just look up the
+ * original index when rendering and on click.
+ *
+ * Skipped for opinion questions because those are typically Likert-style
+ * scales where the order is meaningful (e.g. มาก/ปานกลาง/น้อย).
+ */
+function buildShuffleMaps(questions) {
+  const out = {}
+  for (const q of questions || []) {
+    const isShufflable =
+      (q.question_type === 'single_choice' || q.question_type === 'multiple_choice') &&
+      Array.isArray(q.choices) &&
+      q.choices.length > 1
+    if (!isShufflable) continue
+    const indices = q.choices.map((_, i) => i)
+    // Fisher-Yates
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[indices[i], indices[j]] = [indices[j], indices[i]]
+    }
+    out[q.id] = indices
+  }
+  return out
+}
+
 export default function QuizTaker({ quiz, onAttempted, showToast }) {
   const [started, setStarted] = useState(false)
   const [answers, setAnswers] = useState({})
@@ -17,6 +47,9 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
   // Freeze the random subset when the learner starts so a parent refetch
   // doesn't swap questions mid-attempt.
   const [lockedQuestions, setLockedQuestions] = useState(null)
+  // Per-attempt choice shuffle map: { [questionId]: originalIndex[] }.
+  // Regenerated on every start / reset so retakes get a fresh order.
+  const [shuffleMaps, setShuffleMaps] = useState({})
 
   const passedBefore = quiz.is_passed
   const currentlyPassed = result?.is_passed || passedBefore
@@ -27,15 +60,25 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
     setAnswers((prev) => ({ ...prev, [qid]: value }))
   }
 
+  // Returns the original-indices array for q.choices in their displayed
+  // (shuffled) order. Falls back to natural order when this question isn't
+  // in the shuffle map (opinion, written, or only one choice).
+  const orderedChoiceIndices = (q) =>
+    shuffleMaps[q.id] || (q.choices ? q.choices.map((_, i) => i) : [])
+
   const start = () => {
-    setLockedQuestions(quiz.questions || [])
+    const qs = quiz.questions || []
+    setLockedQuestions(qs)
+    setShuffleMaps(buildShuffleMaps(qs))
     setStarted(true)
   }
 
   const reset = () => {
     setAnswers({})
     setResult(null)
-    setLockedQuestions(quiz.questions || [])
+    const qs = quiz.questions || []
+    setLockedQuestions(qs)
+    setShuffleMaps(buildShuffleMaps(qs))
     setStarted(true)
   }
 
@@ -217,18 +260,19 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
 
                   {q.question_type === 'single_choice' && (
                     <div className="space-y-1.5">
-                      {q.choices?.map((c, ci) => {
-                        const isCorrectChoice = qResult?.correct_answer === ci
+                      {orderedChoiceIndices(q).map((origIdx) => {
+                        const c = q.choices[origIdx]
+                        const isCorrectChoice = qResult?.correct_answer === origIdx
                         return (
                           <label
-                            key={ci}
+                            key={origIdx}
                             className="flex cursor-pointer items-start gap-2"
                           >
                             <input
                               type="radio"
                               name={`q-${q.id}`}
-                              checked={answers[q.id] === ci}
-                              onChange={() => setAnswer(q.id, ci)}
+                              checked={answers[q.id] === origIdx}
+                              onChange={() => setAnswer(q.id, origIdx)}
                               disabled={!!result}
                               className="mt-1 h-4 w-4 accent-primary"
                             />
@@ -253,12 +297,13 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
 
                   {q.question_type === 'multiple_choice' && (
                     <div className="space-y-1.5">
-                      {q.choices?.map((c, ci) => {
-                        const selected = (answers[q.id] || []).includes(ci)
-                        const isCorrectChoice = qResult?.correct_answer?.includes?.(ci)
+                      {orderedChoiceIndices(q).map((origIdx) => {
+                        const c = q.choices[origIdx]
+                        const selected = (answers[q.id] || []).includes(origIdx)
+                        const isCorrectChoice = qResult?.correct_answer?.includes?.(origIdx)
                         return (
                           <label
-                            key={ci}
+                            key={origIdx}
                             className="flex cursor-pointer items-start gap-2"
                           >
                             <input
@@ -267,8 +312,8 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                               onChange={() => {
                                 const current = answers[q.id] || []
                                 const next = selected
-                                  ? current.filter((x) => x !== ci)
-                                  : [...current, ci]
+                                  ? current.filter((x) => x !== origIdx)
+                                  : [...current, origIdx]
                                 setAnswer(q.id, next)
                               }}
                               disabled={!!result}

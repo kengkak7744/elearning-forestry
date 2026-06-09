@@ -324,6 +324,52 @@ export default function CourseViewerPage() {
     playCurrentVideo()
   }
 
+  /**
+   * Failed-mid-quiz rewind: when a learner fails a mid-video quiz, the
+   * "ย้อนไปดูใหม่" button in the modal calls this. We seek the video
+   * back to the previous mid-video quiz's trigger_time (or 0 if this is
+   * the first one) so they can re-watch the section that led up to the
+   * question. The failed quiz is removed from triggeredQuizIds so it
+   * re-triggers when the playhead reaches its trigger_time again.
+   */
+  const rewindMidQuiz = (quiz) => {
+    const cl = currentLessonRef.current
+    if (!cl || !quiz) return
+    const mids = (lessonQuizzesRef.current[cl.id] || [])
+      .filter((q) => q.placement === 'mid_video' && q.trigger_time != null)
+      .sort((a, b) => a.trigger_time - b.trigger_time)
+    const idx = mids.findIndex((q) => q.id === quiz.id)
+    const rewindTo = idx > 0 ? mids[idx - 1].trigger_time : 0
+
+    setTriggeredQuizIds((prev) => {
+      const next = new Set(prev)
+      next.delete(quiz.id)
+      return next
+    })
+    setActiveMidQuiz(null)
+
+    if (videoRef.current) {
+      try {
+        videoRef.current.currentTime = rewindTo
+        const p = videoRef.current.play()
+        if (p && typeof p.catch === 'function') p.catch(() => {})
+      } catch {}
+    }
+    if (ytPlayerRef.current?.seekTo) {
+      try {
+        ytPlayerRef.current.seekTo(rewindTo, true)
+        ytPlayerRef.current.playVideo?.()
+      } catch {}
+    }
+
+    const mm = Math.floor(rewindTo / 60)
+    const ss = rewindTo % 60
+    showToast(
+      `ย้อนไปดูตั้งแต่นาที ${mm}:${String(ss).padStart(2, '0')} แล้วลองทำใหม่`,
+      'success'
+    )
+  }
+
   useEffect(() => {
     setTriggeredQuizIds(new Set())
     setActiveMidQuiz(null)
@@ -1054,6 +1100,7 @@ export default function CourseViewerPage() {
         onAttempted={refreshQuizzes}
         onContinue={closeMidQuiz}
         onSkip={closeMidQuiz}
+        onRewind={rewindMidQuiz}
       />
 
       <CourseScoresModal

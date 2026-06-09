@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats, certificates, search, audit, feedback
+from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats, certificates, search, audit, feedback, cert_settings
 from app.config import settings
 import os
 
@@ -92,6 +92,7 @@ app.include_router(certificates.router)
 app.include_router(search.router)
 app.include_router(audit.router)
 app.include_router(feedback.router)
+app.include_router(cert_settings.router)
 
 @app.get("/")
 def read_root():

@@ -106,3 +106,21 @@
 .skip-link:focus {
   top: 1rem;
 }
+
+/* Visually hide the scrollbar while keeping scroll behaviour intact —
+   content still scrolls via wheel, touchpad, keyboard, and programmatic
+   .scrollTo(). Applied to html + body so the document-level scrollbar
+   (the one that appears at the very right edge of the viewport) also
+   disappears, AND to the .scrollbar-hidden class for any nested scroll
+   container that needs the same treatment (admin <main>, lists, etc.). */
+html,
+body,
+.scrollbar-hidden {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / legacy Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;                /* Chromium / Safari */
+}

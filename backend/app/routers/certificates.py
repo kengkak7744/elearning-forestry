@@ -223,17 +223,35 @@ def _qr_data_uri(text: str) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def _render_certificate_pdf(cert: Certificate, user: User, course: Course) -> Path:
-    """Write a PDF for this certificate and return the path."""
+_THAI_MONTHS = [
+    "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+]
+_THAI_DIGITS = str.maketrans("0123456789", "๐๑๒๓๔๕๖๗๘๙")
+
+
+def _format_thai_date(d: datetime) -> str:
+    """Render '๑๕ พฤศจิกายน พ.ศ. ๒๕๖๗' style dates — matches the official cert
+    layout the department uses on paper."""
+    day = str(d.day).translate(_THAI_DIGITS)
+    month = _THAI_MONTHS[d.month]
+    year = str(d.year + 543).translate(_THAI_DIGITS)
+    return f"๑".replace("๑", day) + f" {month} พ.ศ. {year}"
+
+
+def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=None) -> Path:
+    """Write a PDF for this certificate and return the path.
+
+    Layout intentionally mirrors the official Royal Forest Department
+    paper certificate: gold layered border, organisation header, recipient
+    name centred and oversized, course title, Thai-numeral Buddhist Era
+    date, and two signature blocks at the bottom whose names and titles
+    come from `cert_settings` (admin-editable). QR code sits in the
+    bottom-right corner for public verification."""
+    # Late import to avoid a circular dependency between routers.
+    from app.models.cert_settings import CertSettings
+
     issued = cert.issued_at or datetime.utcnow()
-    score_line = (
-        f"<p class='score'>คะแนนสอบสุดท้าย: <strong>{int(cert.final_score)}%</strong></p>"
-        if cert.final_score is not None else ""
-    )
-    instructor_line = (
-        f"<p class='instructor'>วิทยากร: {course.instructor_name}</p>"
-        if course.instructor_name else ""
-    )
     qr_uri = _qr_data_uri(_verify_url(cert.certificate_number))
     verify_label = (
         "สแกนเพื่อตรวจสอบความถูกต้อง"
@@ -241,14 +259,39 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course) -> Pa
         else "สแกนเพื่อดูเลขที่ใบรับรอง"
     )
 
+    cs: CertSettings | None = None
+    if db is not None:
+        cs = db.query(CertSettings).first()
+    org = (cs.organization_name if cs else "") or "กรมป่าไม้"
+    left_name = (cs.left_signer_name if cs else "") or ""
+    left_title = (cs.left_signer_title if cs else "") or ""
+    right_name = (cs.right_signer_name if cs else "") or ""
+    right_title = (cs.right_signer_title if cs else "") or ""
+
+    score_line = (
+        f"<p class='score'>คะแนนสอบสุดท้าย <strong>{int(cert.final_score)}%</strong></p>"
+        if cert.final_score is not None else ""
+    )
+
+    # Each signature block renders only when at least the name is set, so an
+    # un-configured cert just shows the body + date + QR without empty
+    # signature lines hanging off the bottom.
+    def _sig_block(name: str, title: str) -> str:
+        if not (name or title):
+            return ""
+        name_html = f"<div class='sig-name'>({name})</div>" if name else ""
+        title_html = f"<div class='sig-title'>{title}</div>" if title else ""
+        return f"<div class='sig'><div class='sig-line'></div>{name_html}{title_html}</div>"
+
+    left_sig = _sig_block(left_name, left_title)
+    right_sig = _sig_block(right_name, right_title)
+    issued_date_th = _format_thai_date(issued)
+
     html = f"""
     <!DOCTYPE html>
     <html lang="th">
     <head>
         <meta charset="UTF-8" />
-        <!-- WeasyPrint fetches this at render time and uses the @font-face rules
-             inside. Without it the container has no Thai-capable font and Thai
-             glyphs draw as blank space. -->
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap"
@@ -258,58 +301,144 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course) -> Pa
             body {{
                 margin: 0;
                 font-family: 'Sarabun', 'DejaVu Sans', sans-serif;
-                background: #F9F8F2;
+                background: #FFFCF2;
                 color: #1F2937;
             }}
+            /* Layered gold borders to read as "official paper" without
+               needing an SVG floral asset. Outer thin line, gap, thicker
+               middle band, gap, inner thin line. */
+            .outer {{
+                margin: 10mm;
+                padding: 4mm;
+                border: 1px solid #B8860B;
+                height: calc(297mm - 20mm - 8mm);
+                background: #FFFCF2;
+                box-sizing: border-box;
+            }}
+            .mid {{
+                border: 3px double #D4A017;
+                padding: 3mm;
+                height: 100%;
+                box-sizing: border-box;
+            }}
             .frame {{
-                margin: 20mm;
-                border: 4px solid #0F6E56;
-                border-radius: 12px;
-                padding: 18mm 22mm;
+                border: 1px solid #B8860B;
+                padding: 10mm 18mm 8mm 18mm;
+                height: 100%;
+                box-sizing: border-box;
                 background: #FFFFFF;
                 text-align: center;
-                height: calc(297mm - 80mm);
+                position: relative;
             }}
-            .eyebrow {{ font-size: 13pt; letter-spacing: 0.18em; color: #0F6E56; text-transform: uppercase; }}
-            h1 {{ font-size: 36pt; margin: 8mm 0 4mm; color: #085041; letter-spacing: 0.04em; }}
-            .recipient {{ font-size: 28pt; font-weight: 700; margin: 10mm 0 6mm; color: #111827; }}
-            .body {{ font-size: 14pt; line-height: 1.6; color: #374151; }}
-            .course {{ font-size: 20pt; font-weight: 600; color: #0F6E56; margin: 6mm 0; }}
-            .score {{ font-size: 13pt; color: #374151; margin: 2mm 0; }}
-            .instructor {{ font-size: 12pt; color: #6B7280; margin: 1mm 0; }}
-            .meta {{ margin-top: 12mm; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11pt; color: #6B7280; }}
-            .meta div {{ text-align: left; }}
-            .meta .right {{ text-align: right; }}
-            .qr {{ text-align: center; }}
-            .qr img {{ width: 28mm; height: 28mm; display: block; margin: 0 auto 2mm; }}
-            .qr .qr-label {{ font-size: 8.5pt; color: #6B7280; }}
+            .org {{
+                font-size: 32pt;
+                font-weight: 700;
+                color: #0E4B36;
+                margin: 2mm 0 4mm;
+                letter-spacing: 0.02em;
+            }}
+            .intro {{
+                font-size: 14pt;
+                color: #374151;
+                margin: 0 0 6mm;
+            }}
+            .recipient {{
+                font-size: 26pt;
+                font-weight: 700;
+                color: #111827;
+                margin: 4mm 0 6mm;
+                letter-spacing: 0.01em;
+            }}
+            .course-intro {{
+                font-size: 13pt;
+                color: #374151;
+                margin: 0 0 2mm;
+            }}
+            .course {{
+                font-size: 18pt;
+                font-weight: 600;
+                color: #0E4B36;
+                margin: 1mm 0 4mm;
+                line-height: 1.35;
+            }}
+            .score {{
+                font-size: 12pt;
+                color: #374151;
+                margin: 0 0 2mm;
+            }}
+            .date {{
+                font-size: 12pt;
+                color: #374151;
+                margin: 6mm 0 0;
+            }}
+            .sigs {{
+                margin: 8mm 0 0;
+                display: flex;
+                justify-content: space-around;
+                align-items: flex-start;
+                gap: 10mm;
+            }}
+            .sig {{
+                flex: 1;
+                text-align: center;
+                font-size: 11pt;
+                color: #374151;
+            }}
+            .sig-line {{
+                width: 60mm;
+                margin: 0 auto 2mm;
+                border-bottom: 1px dotted #6B7280;
+                height: 12mm;
+            }}
+            .sig-name {{ font-weight: 600; color: #1F2937; }}
+            .sig-title {{ font-size: 10pt; color: #4B5563; margin-top: 0.5mm; }}
+            .footer-row {{
+                position: absolute;
+                left: 18mm;
+                right: 18mm;
+                bottom: 4mm;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                font-size: 9pt;
+                color: #6B7280;
+            }}
+            .cert-no {{ text-align: left; }}
+            .cert-no strong {{ font-family: 'DejaVu Sans Mono', monospace; color: #1F2937; }}
+            .qr {{ text-align: right; }}
+            .qr img {{ width: 22mm; height: 22mm; display: inline-block; }}
+            .qr .qr-label {{ font-size: 7.5pt; color: #6B7280; }}
         </style>
     </head>
     <body>
-        <div class="frame">
-            <p class="eyebrow">ใบรับรองการผ่านหลักสูตร</p>
-            <h1>Certificate of Completion</h1>
-            <p class="body">มอบให้แก่</p>
-            <p class="recipient">{user.full_name}</p>
-            <p class="body">เพื่อแสดงว่าได้ผ่านการอบรมหลักสูตร</p>
-            <p class="course">{course.title}</p>
+      <div class="outer">
+        <div class="mid">
+          <div class="frame">
+            <div class="org">{org}</div>
+            <p class="intro">ขอมอบประกาศนียบัตรให้ไว้เพื่อแสดงว่า</p>
+            <div class="recipient">{user.full_name}</div>
+            <p class="course-intro">ได้สำเร็จการฝึกอบรมหลักสูตร</p>
+            <div class="course">{course.title}</div>
             {score_line}
-            {instructor_line}
-            <div class="meta">
-                <div>
-                    <div>เลขที่ใบรับรอง</div>
-                    <strong>{cert.certificate_number}</strong>
-                </div>
-                <div class="qr">
-                    <img src="{qr_uri}" alt="QR code for verification" />
-                    <div class="qr-label">{verify_label}</div>
-                </div>
-                <div class="right">
-                    <div>ออกให้เมื่อ</div>
-                    <strong>{issued:%d/%m/%Y}</strong>
-                </div>
+            <p class="date">ให้ไว้ ณ วันที่ {issued_date_th}</p>
+
+            <div class="sigs">
+              {left_sig}
+              {right_sig}
             </div>
+
+            <div class="footer-row">
+              <div class="cert-no">
+                เลขที่ใบรับรอง <strong>{cert.certificate_number}</strong>
+              </div>
+              <div class="qr">
+                <img src="{qr_uri}" alt="QR" />
+                <div class="qr-label">{verify_label}</div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
     </body>
     </html>
     """
@@ -382,7 +511,7 @@ def issue(
     if existing and not _is_expired(existing) and not existing.is_revoked:
         # Regenerate the PDF if it's missing on disk (e.g. fresh container).
         if not existing.pdf_path or not Path(existing.pdf_path).exists():
-            path = _render_certificate_pdf(existing, current_user, course)
+            path = _render_certificate_pdf(existing, current_user, course, db=db)
             existing.pdf_path = str(path)
             db.commit()
         return {
@@ -412,7 +541,7 @@ def issue(
     db.commit()
     db.refresh(cert)
 
-    path = _render_certificate_pdf(cert, current_user, course)
+    path = _render_certificate_pdf(cert, current_user, course, db=db)
     cert.pdf_path = str(path)
     db.commit()
 
@@ -477,7 +606,7 @@ def download(
 
     # Regenerate if the PDF is missing (e.g. cert dir wiped on container rebuild).
     if not cert.pdf_path or not Path(cert.pdf_path).exists():
-        path = _render_certificate_pdf(cert, cert.user, cert.course)
+        path = _render_certificate_pdf(cert, cert.user, cert.course, db=db)
         cert.pdf_path = str(path)
         db.commit()
 

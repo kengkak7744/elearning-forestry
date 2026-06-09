@@ -10,3 +10,4 @@ backend/alembic/versions/
 .agents
 skills-lock.json
 FEATURES.txt
+.VSCodeCounter/

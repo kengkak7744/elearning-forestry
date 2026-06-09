@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight, Pause } from 'lucide-react'
+import { ChevronRight, Pause, RotateCcw } from 'lucide-react'
 import QuizTaker from './QuizTaker'
 import { BUTTONS } from '@/constants/labels'
 import { Button } from '@/components/ui/button'
@@ -12,15 +12,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempted, showToast }) {
+export default function MidVideoQuizModal({
+  quiz,
+  onContinue,
+  onSkip,
+  onRewind,
+  onAttempted,
+  showToast,
+}) {
   const [passed, setPassed] = useState(quiz?.is_passed || false)
+  // `failed` flips to true after the learner attempts and doesn't pass.
+  // Surfaces the "rewind to previous checkpoint" CTA so they have a clear
+  // path out of a non-skippable quiz they got wrong.
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     setPassed(quiz?.is_passed || false)
+    setFailed(false)
   }, [quiz?.id, quiz?.is_passed])
 
   const open = !!quiz
   const canContinue = quiz?.can_skip || passed
+  const showRewind = !!onRewind && failed && !passed
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onSkip?.()}>
@@ -43,6 +56,7 @@ export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempte
             showToast={showToast}
             onAttempted={(qid, attempt) => {
               if (attempt.is_passed) setPassed(true)
+              else setFailed(true)
               onAttempted?.(qid, attempt)
             }}
           />
@@ -52,6 +66,16 @@ export default function MidVideoQuizModal({ quiz, onContinue, onSkip, onAttempte
           {quiz?.can_skip && (
             <Button variant="outline" onClick={onSkip}>
               {BUTTONS.SKIP_QUIZ}
+            </Button>
+          )}
+          {showRewind && (
+            <Button
+              variant="outline"
+              onClick={() => onRewind(quiz)}
+              className="border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"
+            >
+              <RotateCcw className="mr-1 h-4 w-4" />
+              ย้อนไปดูใหม่
             </Button>
           )}
           <Button onClick={onContinue} disabled={!canContinue}>

@@ -24,6 +24,7 @@ const CourseEditPage = lazy(() => import('./pages/admin/CourseEditPage'))
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'))
 const AuditLogsPage = lazy(() => import('./pages/admin/AuditLogsPage'))
 const AdminCertificatesPage = lazy(() => import('./pages/admin/AdminCertificatesPage'))
+const AdminCertSettingsPage = lazy(() => import('./pages/admin/AdminCertSettingsPage'))
 const AdminDepartmentsPage = lazy(() => import('./pages/admin/AdminDepartmentsPage'))
 const AdminDepartmentDetailPage = lazy(() => import('./pages/admin/AdminDepartmentDetailPage'))
 const CertificateVerifyPage = lazy(() => import('./pages/CertificateVerifyPage'))
@@ -102,6 +103,7 @@ function App() {
                 <Route path="/admin/users/:id/edit" element={<UserFormPage />} />
                 <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
                 <Route path="/admin/certificates" element={<AdminCertificatesPage />} />
+                <Route path="/admin/cert-settings" element={<AdminCertSettingsPage />} />
                 <Route path="/admin/departments" element={<AdminDepartmentsPage />} />
                 <Route path="/admin/departments/:name" element={<AdminDepartmentDetailPage />} />
               </Route>

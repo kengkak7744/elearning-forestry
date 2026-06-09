@@ -9,3 +9,4 @@ from app.models.lesson_note import LessonNote
 from app.models.bookmark import Bookmark
 from app.models.audit_log import AuditLog
 from app.models.course_feedback import CourseFeedback
+from app.models.cert_settings import CertSettings
