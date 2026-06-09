@@ -239,8 +239,12 @@ def _format_thai_date(d: datetime) -> str:
     return f"๑".replace("๑", day) + f" {month} พ.ศ. {year}"
 
 
-def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=None) -> Path:
-    """Write a PDF for this certificate and return the path.
+def _build_certificate_html(cert, user, course, db=None) -> str:
+    """Return the cert PDF as an HTML string. Split from
+    `_render_certificate_pdf` so the preview endpoint can render to bytes
+    without writing to disk. Accepts duck-typed cert/user/course (real
+    ORM rows OR stub objects with the same attributes) — used to keep
+    the preview path free of DB insertion.
 
     Layout intentionally mirrors the official Royal Forest Department
     paper certificate: gold layered border, organisation header, recipient
@@ -267,24 +271,70 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=No
     left_title = (cs.left_signer_title if cs else "") or ""
     right_name = (cs.right_signer_name if cs else "") or ""
     right_title = (cs.right_signer_title if cs else "") or ""
+    left_image_url = (cs.left_signer_image if cs else None) or None
+    right_image_url = (cs.right_signer_image if cs else None) or None
 
     score_line = (
         f"<p class='score'>คะแนนสอบสุดท้าย <strong>{int(cert.final_score)}%</strong></p>"
         if cert.final_score is not None else ""
     )
 
-    # Each signature block renders only when at least the name is set, so an
-    # un-configured cert just shows the body + date + QR without empty
-    # signature lines hanging off the bottom.
-    def _sig_block(name: str, title: str) -> str:
-        if not (name or title):
+    def _signature_image_uri(url: str | None) -> str | None:
+        """Resolve a stored signature URL (e.g. '/images/signatures/abc.png')
+        to a base64 data URI WeasyPrint can embed without any URL fetching
+        gymnastics. Returns None if the file isn't on disk."""
+        if not url:
+            return None
+        # All signature paths are under /app prefix on the filesystem.
+        fs = Path("/app" + url) if url.startswith("/") else Path("/app/" + url)
+        if not fs.exists() or not fs.is_file():
+            return None
+        try:
+            data = fs.read_bytes()
+        except OSError:
+            return None
+        return "data:image/png;base64," + base64.b64encode(data).decode("ascii")
+
+    left_image_uri = _signature_image_uri(left_image_url)
+    right_image_uri = _signature_image_uri(right_image_url)
+
+    # Header crest: department logo above the org name. Picked up from a
+    # known filesystem path so deploy is "drop the PNG in this folder" —
+    # no DB row, no upload endpoint. /app/images is the same volume that
+    # holds cover images, so existing infra carries it.
+    logo_uri = None
+    _logo_fs = Path("/app/images/forest_logo.png")
+    if _logo_fs.exists() and _logo_fs.is_file():
+        try:
+            logo_uri = (
+                "data:image/png;base64,"
+                + base64.b64encode(_logo_fs.read_bytes()).decode("ascii")
+            )
+        except OSError:
+            logo_uri = None
+    logo_html = (
+        f"<img class='header-logo' src='{logo_uri}' alt='' />"
+        if logo_uri else ""
+    )
+
+    # Each signature block renders only when at least one of name / title /
+    # image is set, so an un-configured cert just shows the body + date + QR
+    # without empty signature lines hanging off the bottom. When an image is
+    # uploaded we use it INSTEAD of the dotted line so the cert reads like a
+    # genuinely-signed document.
+    def _sig_block(name: str, title: str, image_uri: str | None) -> str:
+        if not (name or title or image_uri):
             return ""
+        if image_uri:
+            line_html = f"<img class='sig-image' src='{image_uri}' alt='signature' />"
+        else:
+            line_html = "<div class='sig-line'></div>"
         name_html = f"<div class='sig-name'>({name})</div>" if name else ""
         title_html = f"<div class='sig-title'>{title}</div>" if title else ""
-        return f"<div class='sig'><div class='sig-line'></div>{name_html}{title_html}</div>"
+        return f"<div class='sig'>{line_html}{name_html}{title_html}</div>"
 
-    left_sig = _sig_block(left_name, left_title)
-    right_sig = _sig_block(right_name, right_title)
+    left_sig = _sig_block(left_name, left_title, left_image_uri)
+    right_sig = _sig_block(right_name, right_title, right_image_uri)
     issued_date_th = _format_thai_date(issued)
 
     html = f"""
@@ -298,79 +348,143 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=No
         />
         <style>
             @page {{ size: A4 landscape; margin: 0; }}
+
             body {{
                 margin: 0;
                 font-family: 'Sarabun', 'DejaVu Sans', sans-serif;
-                background: #FFFCF2;
+                background: #FFFFFF;
                 color: #1F2937;
             }}
-            /* Layered gold borders to read as "official paper" without
-               needing an SVG floral asset. Outer thin line, gap, thicker
-               middle band, gap, inner thin line. */
+
             .outer {{
-                margin: 10mm;
-                padding: 4mm;
-                border: 1px solid #B8860B;
-                height: calc(297mm - 20mm - 8mm);
-                background: #FFFCF2;
+                margin: 5mm;
+                padding: 3mm;
+                height: calc(210mm - 10mm - 6mm);
                 box-sizing: border-box;
             }}
+
             .mid {{
-                border: 3px double #D4A017;
-                padding: 3mm;
+                padding: 2mm;
                 height: 100%;
                 box-sizing: border-box;
             }}
+
             .frame {{
-                border: 1px solid #B8860B;
-                padding: 10mm 18mm 8mm 18mm;
+                padding: 6mm 16mm 28mm 16mm;
                 height: 100%;
                 box-sizing: border-box;
                 background: #FFFFFF;
                 text-align: center;
                 position: relative;
+                overflow: hidden;
             }}
+
+            .header-logo {{
+                display: block;
+                width: 32mm;
+                height: 32mm;
+                margin: 0 auto 1mm;
+                object-fit: contain;
+            }}
+
             .org {{
-                font-size: 32pt;
-                font-weight: 700;
+                font-size: 43pt;
+                font-weight: 600;
                 color: #0E4B36;
-                margin: 2mm 0 4mm;
+                margin: 0 0 1mm;
                 letter-spacing: 0.02em;
+                line-height: 1.1;
             }}
+
+            .org-rule {{ 
+                width: 60mm;
+                height: 0;
+                border-top: 2px solid #D4A017;
+                margin: 1mm auto 4mm;
+            }}
+
             .intro {{
-                font-size: 14pt;
-                color: #374151;
-                margin: 0 0 6mm;
+                font-size: 18pt;
+                margin: 0 0 3mm;
             }}
-            .recipient {{
-                font-size: 26pt;
-                font-weight: 700;
-                color: #111827;
+
+            /* Recipient name with flanking gold flourishes. Flex layout means
+               the side rules grow / shrink to fill, so a short or long name
+               both look balanced — no hard-coded widths to fight. */
+            .recipient-row {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8mm;
                 margin: 4mm 0 6mm;
-                letter-spacing: 0.01em;
             }}
+            .flourish {{
+                flex: 1 1 0;
+                max-width: 50mm;
+                min-width: 12mm;
+                height: 0;
+                border-top: 1.5px solid #D4A017;
+                position: relative;
+            }}
+            .flourish::before,
+            .flourish::after {{
+                content: '';
+                position: absolute;
+                top: -1mm;
+                width: 2mm;
+                height: 2mm;
+                background: #D4A017;
+                transform: rotate(45deg);
+            }}
+            .flourish::before {{ left: 0; }}
+            .flourish::after {{ right: 0; }}
+            .recipient {{
+                font-size: 28pt;
+                color: #111827;
+                letter-spacing: 0.01em;
+                white-space: nowrap;
+            }}
+
             .course-intro {{
-                font-size: 13pt;
-                color: #374151;
+                font-size: 18pt;
+                font-weight: 600;
                 margin: 0 0 2mm;
+            }}
+
+            /* Soft tinted card around the course title — gives the achievement
+               visual weight without competing with the recipient name. */
+            .course-card {{
+                display: inline-block;
+                padding: 4mm 12mm;
+                margin: 0 auto 3mm;
+                background: #F2F8F4;
+                border: 1px solid #C9E0D0;
+                border-radius: 4px;
             }}
             .course {{
                 font-size: 18pt;
                 font-weight: 600;
                 color: #0E4B36;
-                margin: 1mm 0 4mm;
+                margin: 0;
                 line-height: 1.35;
             }}
+
             .score {{
-                font-size: 12pt;
-                color: #374151;
+                font-size: 11pt;
+                color: #4B5563;
                 margin: 0 0 2mm;
             }}
-            .date {{
-                font-size: 12pt;
-                color: #374151;
-                margin: 6mm 0 0;
+
+            .score strong {{
+                color: #0E4B36;
             }}
+
+            .date {{
+                font-size: 13pt;
+                color: #374151;
+                margin: 4mm 0 0;
+            }}
+
             .sigs {{
                 margin: 8mm 0 0;
                 display: flex;
@@ -378,47 +492,104 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=No
                 align-items: flex-start;
                 gap: 10mm;
             }}
+
             .sig {{
                 flex: 1;
                 text-align: center;
-                font-size: 11pt;
+                font-size: 13pt;
                 color: #374151;
             }}
+
             .sig-line {{
                 width: 60mm;
                 margin: 0 auto 2mm;
                 border-bottom: 1px dotted #6B7280;
                 height: 12mm;
             }}
-            .sig-name {{ font-weight: 600; color: #1F2937; }}
-            .sig-title {{ font-size: 10pt; color: #4B5563; margin-top: 0.5mm; }}
+
+            .sig-image {{
+                display: block;
+                max-width: 60mm;
+                max-height: 18mm;
+                margin: 0 auto 1mm;
+                object-fit: contain;
+            }}
+
+            .sig-name {{
+                font-weight: 600;
+                color: #1F2937;
+            }}
+
+            .sig-title {{
+                font-size: 13pt;
+                color: #4B5563;
+                margin-top: 0.5mm;
+            }}
+
             .footer-row {{
                 position: absolute;
-                left: 18mm;
-                right: 18mm;
-                bottom: 4mm;
+                left: 16mm;
+                right: 16mm;
+                bottom: 3mm;
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-end;
                 font-size: 9pt;
                 color: #6B7280;
             }}
-            .cert-no {{ text-align: left; }}
-            .cert-no strong {{ font-family: 'DejaVu Sans Mono', monospace; color: #1F2937; }}
-            .qr {{ text-align: right; }}
-            .qr img {{ width: 22mm; height: 22mm; display: inline-block; }}
-            .qr .qr-label {{ font-size: 7.5pt; color: #6B7280; }}
+            /* Small gold diamond centered between the cert-no (left) and the
+               QR (right) — ties the corners together visually. */
+            .footer-mark {{
+                position: absolute;
+                left: 50%;
+                bottom: 6mm;
+                transform: translateX(-50%) rotate(45deg);
+                width: 2.5mm;
+                height: 2.5mm;
+                background: #D4A017;
+            }}
+
+            .cert-no {{
+                text-align: left;
+            }}
+
+            .cert-no strong {{
+                font-family: 'DejaVu Sans Mono', monospace;
+                color: #1F2937;
+            }}
+
+            .qr {{
+                text-align: right;
+            }}
+
+            .qr img {{
+                margin-top: 2mm;
+                width: 18mm;
+                height: 18mm;
+                display: inline-block;
+            }}
+
+            .qr .qr-label {{
+                font-size: 7.5pt;
+                color: #6B7280;
+            }}
         </style>
     </head>
     <body>
       <div class="outer">
         <div class="mid">
           <div class="frame">
+            {logo_html}
             <div class="org">{org}</div>
+            <div class="org-rule"></div>
             <p class="intro">ขอมอบประกาศนียบัตรให้ไว้เพื่อแสดงว่า</p>
-            <div class="recipient">{user.full_name}</div>
+            <div class="recipient-row">
+              <span class="flourish left"></span>
+              <span class="recipient">{user.full_name}</span>
+              <span class="flourish right"></span>
+            </div>
             <p class="course-intro">ได้สำเร็จการฝึกอบรมหลักสูตร</p>
-            <div class="course">{course.title}</div>
+            <div class="course-card"><span class="course">{course.title}</span></div>
             {score_line}
             <p class="date">ให้ไว้ ณ วันที่ {issued_date_th}</p>
 
@@ -427,6 +598,8 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=No
               {right_sig}
             </div>
 
+            <div class="footer-mark"></div>
+            <div class="footer-mark"></div>
             <div class="footer-row">
               <div class="cert-no">
                 เลขที่ใบรับรอง <strong>{cert.certificate_number}</strong>
@@ -443,6 +616,12 @@ def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=No
     </html>
     """
 
+    return html
+
+
+def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=None) -> Path:
+    """Write a PDF for this certificate and return the path."""
+    html = _build_certificate_html(cert, user, course, db=db)
     path = CERT_DIR / f"{cert.certificate_number}.pdf"
     HTML(string=html).write_pdf(target=str(path))
     return path

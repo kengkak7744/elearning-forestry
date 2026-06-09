@@ -21,4 +21,11 @@ class CertSettings(Base):
     left_signer_title = Column(String(250), nullable=False, default="")
     right_signer_name = Column(String(150), nullable=False, default="")
     right_signer_title = Column(String(250), nullable=False, default="")
+    # Optional uploaded PNG signature scans. When set, the PDF renders the
+    # image above the dotted line instead of an empty line — used for
+    # certificates that need an actual signature rather than a printed name.
+    # Stored as the URL path (e.g. "/images/signatures/abc.png"); the
+    # filesystem path is the same with a "/app" prefix.
+    left_signer_image = Column(String(500), nullable=True)
+    right_signer_image = Column(String(500), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
