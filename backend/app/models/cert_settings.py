@@ -28,4 +28,9 @@ class CertSettings(Base):
     # filesystem path is the same with a "/app" prefix.
     left_signer_image = Column(String(500), nullable=True)
     right_signer_image = Column(String(500), nullable=True)
+    # "two" (default) renders both signer blocks side-by-side. "one" renders
+    # ONLY the left signer, centered on the cert. The right fields stay
+    # editable in the UI so switching modes is non-destructive — admin can
+    # configure both, render with one, switch back later without re-typing.
+    signature_mode = Column(String(10), nullable=False, default="two", server_default="two")
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

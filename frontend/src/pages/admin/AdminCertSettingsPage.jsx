@@ -10,34 +10,48 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// `side` controls visibility per signature_mode. 'org' always shows;
+// 'left' always shows; 'right' is hidden when signature_mode === 'one'.
+// Each entry has two label variants so the form reads naturally in either
+// mode — left fields lose the "ฝั่งซ้าย" suffix when there's only one signer.
 const FIELDS = [
   {
     key: 'organization_name',
+    side: 'org',
     label: 'ชื่อหน่วยงาน',
+    labelOne: 'ชื่อหน่วยงาน',
     hint: 'ปรากฏเป็นหัวเรื่องด้านบนของใบรับรอง (เช่น "กรมป่าไม้")',
     placeholder: 'กรมป่าไม้',
   },
   {
     key: 'left_signer_name',
+    side: 'left',
     label: 'ผู้ลงนามฝั่งซ้าย — ชื่อ-สกุล',
-    hint: 'ปรากฏใต้เส้นลายเซ็นฝั่งซ้าย เช่น "นายเก่ง ใจดี"',
+    labelOne: 'ผู้ลงนาม — ชื่อ-สกุล',
+    hint: 'ปรากฏใต้เส้นลายเซ็น เช่น "นายเก่ง ใจดี"',
     placeholder: 'นายเก่ง ใจดี',
   },
   {
     key: 'left_signer_title',
+    side: 'left',
     label: 'ผู้ลงนามฝั่งซ้าย — ตำแหน่ง',
+    labelOne: 'ผู้ลงนาม — ตำแหน่ง',
     hint: 'ปรากฏใต้ชื่อ',
     placeholder: 'ผู้อำนวยการสำนักป้องกันรักษาป่าและควบคุมไฟป่า',
   },
   {
     key: 'right_signer_name',
+    side: 'right',
     label: 'ผู้ลงนามฝั่งขวา — ชื่อ-สกุล',
+    labelOne: '',
     hint: 'ปรากฏใต้เส้นลายเซ็นฝั่งขวา เช่น "นายเก่ง ใจดี"',
     placeholder: 'นายเก่ง ใจดี',
   },
   {
     key: 'right_signer_title',
+    side: 'right',
     label: 'ผู้ลงนามฝั่งขวา — ตำแหน่ง',
+    labelOne: '',
     hint: 'ปรากฏใต้ชื่อ',
     placeholder: 'อธิบดีกรมป่าไม้',
   },
@@ -214,19 +228,66 @@ export default function AdminCertSettingsPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-5">
-              {FIELDS.map((f) => (
-                <div key={f.key} className="space-y-1.5">
-                  <Label htmlFor={f.key}>{f.label}</Label>
-                  <Input
-                    id={f.key}
-                    value={data[f.key] ?? ''}
-                    onChange={handleChange(f.key)}
-                    placeholder={f.placeholder}
-                    maxLength={250}
-                  />
-                  <p className="text-xs text-muted-foreground">{f.hint}</p>
+              {/* Signature mode — explicit 1 vs 2 toggle. Storing this
+                  separately from the field values means switching back and
+                  forth doesn't wipe whatever's typed on the unused side. */}
+              <div className="space-y-1.5">
+                <Label>จำนวนผู้ลงนามบนใบรับรอง</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      (data.signature_mode ?? 'two') === 'two'
+                        ? 'default'
+                        : 'outline'
+                    }
+                    onClick={() =>
+                      setData((prev) => ({ ...prev, signature_mode: 'two' }))
+                    }
+                  >
+                    ผู้ลงนาม 2 คน
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      data.signature_mode === 'one' ? 'default' : 'outline'
+                    }
+                    onClick={() =>
+                      setData((prev) => ({ ...prev, signature_mode: 'one' }))
+                    }
+                  >
+                    ผู้ลงนามคนเดียว
+                  </Button>
                 </div>
-              ))}
+                <p className="text-xs text-muted-foreground">
+                  เมื่อเลือก "ผู้ลงนามคนเดียว" ระบบจะใช้เฉพาะข้อมูลฝั่งซ้าย
+                  และจัดวางกึ่งกลางใบรับรอง — ข้อมูลฝั่งขวายังเก็บไว้
+                  สลับโหมดได้โดยไม่เสียข้อมูล
+                </p>
+              </div>
+
+              {FIELDS.filter(
+                (f) =>
+                  !(f.side === 'right' && (data.signature_mode ?? 'two') === 'one')
+              ).map((f) => {
+                const isOne = (data.signature_mode ?? 'two') === 'one'
+                const label = isOne ? f.labelOne || f.label : f.label
+                return (
+                  <div key={f.key} className="space-y-1.5">
+                    <Label htmlFor={f.key}>{label}</Label>
+                    <Input
+                      id={f.key}
+                      value={data[f.key] ?? ''}
+                      onChange={handleChange(f.key)}
+                      placeholder={f.placeholder}
+                      maxLength={250}
+                    />
+                    <p className="text-xs text-muted-foreground">{f.hint}</p>
+                  </div>
+                )
+              })}
             </CardContent>
           </Card>
 
@@ -242,16 +303,22 @@ export default function AdminCertSettingsPage() {
             <CardContent className="space-y-6">
               <SignatureUploader
                 side="left"
-                label="ลายเซ็นฝั่งซ้าย"
+                label={
+                  (data.signature_mode ?? 'two') === 'one'
+                    ? 'ลายเซ็นผู้ลงนาม'
+                    : 'ลายเซ็นฝั่งซ้าย'
+                }
                 value={data.left_signer_image}
                 onChange={setData}
               />
-              <SignatureUploader
-                side="right"
-                label="ลายเซ็นฝั่งขวา"
-                value={data.right_signer_image}
-                onChange={setData}
-              />
+              {(data.signature_mode ?? 'two') !== 'one' && (
+                <SignatureUploader
+                  side="right"
+                  label="ลายเซ็นฝั่งขวา"
+                  value={data.right_signer_image}
+                  onChange={setData}
+                />
+              )}
             </CardContent>
           </Card>
 

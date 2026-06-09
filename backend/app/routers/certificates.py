@@ -335,6 +335,14 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
 
     left_sig = _sig_block(left_name, left_title, left_image_uri)
     right_sig = _sig_block(right_name, right_title, right_image_uri)
+    # signature_mode toggle: "one" = render only the LEFT signer (centered);
+    # "two" (default) = render both side-by-side. Setting "one" doesn't
+    # touch the right-side fields in the database, so switching back to
+    # "two" later restores both without re-typing.
+    sig_mode = (cs.signature_mode if cs else "two") or "two"
+    if sig_mode == "one":
+        right_sig = ""
+    sigs_class = "single" if sig_mode == "one" else "dual"
     issued_date_th = _format_thai_date(issued)
 
     html = f"""
@@ -451,21 +459,11 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
                 margin: 0 0 2mm;
             }}
 
-            /* Soft tinted card around the course title — gives the achievement
-               visual weight without competing with the recipient name. */
-            .course-card {{
-                display: inline-block;
-                padding: 4mm 12mm;
-                margin: 0 auto 3mm;
-                background: #F2F8F4;
-                border: 1px solid #C9E0D0;
-                border-radius: 4px;
-            }}
             .course {{
                 font-size: 18pt;
                 font-weight: 600;
                 color: #0E4B36;
-                margin: 0;
+                margin: 0 0 3mm;
                 line-height: 1.35;
             }}
 
@@ -488,13 +486,27 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
             .sigs {{
                 margin: 8mm 0 0;
                 display: flex;
-                justify-content: space-around;
                 align-items: flex-start;
                 gap: 10mm;
             }}
+            .sigs.dual {{
+                justify-content: space-around;
+            }}
+            .sigs.dual .sig {{
+                flex: 1;
+            }}
+            /* One-signer layout: don't stretch — fix to a sensible width and
+               center horizontally. Otherwise a single flex:1 block fills the
+               row, which looks like a layout bug. */
+            .sigs.single {{
+                justify-content: center;
+            }}
+            .sigs.single .sig {{
+                flex: 0 0 auto;
+                width: 90mm;
+            }}
 
             .sig {{
-                flex: 1;
                 text-align: center;
                 font-size: 13pt;
                 color: #374151;
@@ -537,17 +549,6 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
                 font-size: 9pt;
                 color: #6B7280;
             }}
-            /* Small gold diamond centered between the cert-no (left) and the
-               QR (right) — ties the corners together visually. */
-            .footer-mark {{
-                position: absolute;
-                left: 50%;
-                bottom: 6mm;
-                transform: translateX(-50%) rotate(45deg);
-                width: 2.5mm;
-                height: 2.5mm;
-                background: #D4A017;
-            }}
 
             .cert-no {{
                 text-align: left;
@@ -589,17 +590,15 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
               <span class="flourish right"></span>
             </div>
             <p class="course-intro">ได้สำเร็จการฝึกอบรมหลักสูตร</p>
-            <div class="course-card"><span class="course">{course.title}</span></div>
+            <div class="course">{course.title}</div>
             {score_line}
             <p class="date">ให้ไว้ ณ วันที่ {issued_date_th}</p>
 
-            <div class="sigs">
+            <div class="sigs {sigs_class}">
               {left_sig}
               {right_sig}
             </div>
 
-            <div class="footer-mark"></div>
-            <div class="footer-mark"></div>
             <div class="footer-row">
               <div class="cert-no">
                 เลขที่ใบรับรอง <strong>{cert.certificate_number}</strong>
