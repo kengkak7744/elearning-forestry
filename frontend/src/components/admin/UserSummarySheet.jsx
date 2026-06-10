@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { usersApi } from '@/api/users'
 import { CATEGORY_BADGES, ROLE_LABELS } from '@/constants/labels'
-import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -21,6 +20,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toastApiError } from '@/utils/apiError'
 
 function formatDate(d) {
   if (!d) return '-'
@@ -58,7 +58,7 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
       .getLearningSummary(userId)
       .then(setData)
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [open, userId])

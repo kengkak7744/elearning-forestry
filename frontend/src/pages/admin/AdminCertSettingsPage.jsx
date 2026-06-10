@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toastApiError } from '@/utils/apiError'
 
 // `side` controls visibility per signature_mode. 'org' always shows;
 // 'left' always shows; 'right' is hidden when signature_mode === 'one'.
@@ -82,7 +83,7 @@ function SignatureUploader({ side, label, value, onChange }) {
       onChange(updated)
       showToast('อัปโหลดลายเซ็นเรียบร้อย', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
+      toastApiError(err, 'อัปโหลดไม่สำเร็จ')
     } finally {
       setUploading(false)
     }
@@ -95,7 +96,7 @@ function SignatureUploader({ side, label, value, onChange }) {
       onChange(updated)
       showToast('ลบลายเซ็นเรียบร้อย', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     } finally {
       setUploading(false)
     }
@@ -170,7 +171,7 @@ export default function AdminCertSettingsPage() {
       .get()
       .then(setData)
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [])
@@ -189,7 +190,7 @@ export default function AdminCertSettingsPage() {
       setData(updated)
       showToast('บันทึกการตั้งค่าเรียบร้อย', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
+      toastApiError(err, 'บันทึกไม่สำเร็จ')
     } finally {
       setSaving(false)
     }

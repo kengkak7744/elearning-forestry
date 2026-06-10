@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { toastApiError } from '@/utils/apiError'
 
 const MAX_COMMENT = 2000
 
@@ -188,7 +189,7 @@ export default function CourseFeedbackCard({ courseId, isEnrolled }) {
       showToast(mine?.has_feedback ? 'อัปเดตความคิดเห็นเรียบร้อย' : 'ขอบคุณสำหรับความคิดเห็น', 'success')
       await loadAll()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ส่งความคิดเห็นไม่สำเร็จ', 'error')
+      toastApiError(err, 'ส่งความคิดเห็นไม่สำเร็จ')
     } finally {
       setSubmitting(false)
     }

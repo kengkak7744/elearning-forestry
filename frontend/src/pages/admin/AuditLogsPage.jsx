@@ -6,7 +6,6 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { auditApi } from '@/api/audit'
-import { showToast } from '@/lib/toast'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toastApiError } from '@/utils/apiError'
 import {
   Table,
   TableBody,
@@ -107,7 +107,7 @@ export default function AuditLogsPage() {
       })
       .then(setRows)
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดบันทึกไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดบันทึกไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [actionFilter, targetTypeFilter, page, reloadKey])

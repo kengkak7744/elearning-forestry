@@ -15,7 +15,6 @@ import {
   X,
 } from 'lucide-react'
 import { adminStatsApi } from '@/api/adminStats'
-import { showToast } from '@/lib/toast'
 import { CATEGORY_BADGES, ROLE_LABELS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +45,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
+import { toastApiError } from '@/utils/apiError'
 
 const ROLE_TONE = {
   admin: 'bg-destructive/15 text-destructive',
@@ -121,7 +121,7 @@ export default function AdminDepartmentDetailPage() {
         setCourses(crs)
       })
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [department])
@@ -556,7 +556,7 @@ function CourseMembersSheet({ department, course, open, onOpenChange, onPickMemb
       .departmentCourseMembers(department, course.id)
       .then(setData)
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [open, course, department])

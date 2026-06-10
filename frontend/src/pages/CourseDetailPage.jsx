@@ -51,15 +51,8 @@ import {
 import CourseStatsModal from '@/components/CourseStatsModal'
 import CourseScoresModal from '@/components/CourseScoresModal'
 import CourseFeedbackCard from '@/components/learner/CourseFeedbackCard'
-
-function formatThaiDate(d) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
+import { toastApiError, getApiErrorMessage } from '@/utils/apiError'
+import { formatThaiDate } from '@/utils/formatting'
 
 function LessonRow({ lesson, locked }) {
   const Icon = locked ? Lock : lesson.is_completed ? CheckCircle2 : PlayCircle
@@ -114,7 +107,7 @@ export default function CourseDetailPage() {
       const data = await coursesApi.getById(id)
       setCourse(data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'ไม่สามารถโหลดข้อมูลหลักสูตร')
+      setError(getApiErrorMessage(err, 'ไม่สามารถโหลดข้อมูลหลักสูตร'))
     } finally {
       setLoading(false)
     }
@@ -132,7 +125,7 @@ export default function CourseDetailPage() {
       showToast('ลงทะเบียนเรียนสำเร็จ', 'success')
       await loadCourse()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      toastApiError(err, 'เกิดข้อผิดพลาด')
     } finally {
       setEnrollLoading(false)
     }
@@ -155,7 +148,7 @@ export default function CourseDetailPage() {
     } catch (err) {
       // Revert
       setCourse((prev) => (prev ? { ...prev, is_bookmarked: !willBookmark } : prev))
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      toastApiError(err, 'เกิดข้อผิดพลาด')
     } finally {
       setBookmarkBusy(false)
     }
@@ -169,7 +162,7 @@ export default function CourseDetailPage() {
       showToast('ยกเลิกการลงทะเบียนเรียบร้อย', 'success')
       await loadCourse()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      toastApiError(err, 'เกิดข้อผิดพลาด')
     } finally {
       setEnrollLoading(false)
     }
@@ -182,7 +175,7 @@ export default function CourseDetailPage() {
       setMyQuizzes(data)
       setScoresOpen(true)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดคะแนนไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดคะแนนไม่สำเร็จ')
     } finally {
       setScoresLoading(false)
     }
@@ -462,7 +455,7 @@ export default function CourseDetailPage() {
                 ) : null}
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">เผยแพร่</span>
-                  <span className="font-medium">{formatThaiDate(course.created_at)}</span>
+                  <span className="font-medium">{formatThaiDate(course.created_at, { fallback: '' })}</span>
                 </div>
               </div>
             </CardContent>

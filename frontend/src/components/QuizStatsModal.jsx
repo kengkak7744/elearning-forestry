@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const typeLabels = {
   single_choice: 'เลือกข้อเดียว',
@@ -167,7 +168,7 @@ export default function QuizStatsModal({ open, quizId, onClose }) {
     quizzesApi
       .getStats(quizId)
       .then(setStats)
-      .catch((err) => setError(err.response?.data?.detail || 'โหลดสถิติไม่สำเร็จ'))
+      .catch((err) => setError(getApiErrorMessage(err, 'โหลดสถิติไม่สำเร็จ')))
       .finally(() => setLoading(false))
   }, [open, quizId])
 

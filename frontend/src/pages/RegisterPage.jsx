@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import { toastApiError } from '@/utils/apiError'
 
 const initialForm = {
   username: '',
@@ -186,7 +187,7 @@ export default function RegisterPage() {
       showToast('สมัครสมาชิกสำเร็จ กำลังพาไปหน้าเข้าสู่ระบบ', 'success')
       setTimeout(() => navigate('/login'), 1200)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'สมัครสมาชิกไม่สำเร็จ', 'error')
+      toastApiError(err, 'สมัครสมาชิกไม่สำเร็จ')
     } finally {
       setLoading(false)
     }

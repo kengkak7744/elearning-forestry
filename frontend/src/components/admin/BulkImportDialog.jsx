@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toastApiError } from '@/utils/apiError'
 
 const TEMPLATE_HEADERS = [
   'username',
@@ -108,7 +109,7 @@ export default function BulkImportDialog({ open, onOpenChange, onDone }) {
         showToast('ไม่ได้สร้างผู้ใช้ใหม่', 'error')
       }
     } catch (err) {
-      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
+      toastApiError(err, 'อัปโหลดไม่สำเร็จ')
     } finally {
       setLoading(false)
     }

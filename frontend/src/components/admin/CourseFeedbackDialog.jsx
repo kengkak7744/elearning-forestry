@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Star } from 'lucide-react'
 import { feedbackApi } from '@/api/feedback'
-import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -13,6 +12,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { toastApiError } from '@/utils/apiError'
 
 function Stars({ value }) {
   return (
@@ -46,7 +46,7 @@ export default function CourseFeedbackDialog({ courseId, courseTitle, open, onOp
       .list(courseId, { limit: 200 })
       .then(setItems)
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดความคิดเห็นไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดความคิดเห็นไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [open, courseId])

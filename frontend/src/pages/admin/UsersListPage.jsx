@@ -39,6 +39,7 @@ import UserSummarySheet from '@/components/admin/UserSummarySheet'
 import ResetPasswordDialog from '@/components/admin/ResetPasswordDialog'
 import BulkImportDialog from '@/components/admin/BulkImportDialog'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
+import { toastApiError } from '@/utils/apiError'
 
 export default function UsersListPage() {
   useDocumentTitle('จัดการผู้ใช้')
@@ -66,7 +67,7 @@ export default function UsersListPage() {
       })
       setUsers(data)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดรายการไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดรายการไม่สำเร็จ')
     } finally {
       setLoading(false)
     }
@@ -87,7 +88,7 @@ export default function UsersListPage() {
       showToast(`ลบบัญชี ${target.full_name} เรียบร้อย`, 'success')
       loadUsers()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     }
   }
 

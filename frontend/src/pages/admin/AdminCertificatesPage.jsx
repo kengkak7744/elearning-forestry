@@ -25,6 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { toastApiError } from '@/utils/apiError'
+import { formatThaiDate } from '@/utils/formatting'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,15 +37,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-
-function formatThaiDate(iso) {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
 
 function StatusBadge({ cert }) {
   if (cert.is_revoked) {
@@ -83,7 +76,7 @@ export default function AdminCertificatesPage() {
       const data = await certificatesApi.adminAll()
       setCerts(Array.isArray(data) ? data : [])
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
     } finally {
       setLoading(false)
     }
@@ -139,7 +132,7 @@ export default function AdminCertificatesPage() {
       setRevokeTarget(null)
       await load()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เพิกถอนไม่สำเร็จ', 'error')
+      toastApiError(err, 'เพิกถอนไม่สำเร็จ')
     } finally {
       setRevokeBusy(false)
     }
@@ -151,7 +144,7 @@ export default function AdminCertificatesPage() {
       showToast('ยกเลิกการเพิกถอนเรียบร้อย', 'success')
       await load()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ยกเลิกการเพิกถอนไม่สำเร็จ', 'error')
+      toastApiError(err, 'ยกเลิกการเพิกถอนไม่สำเร็จ')
     }
   }
 
@@ -273,10 +266,10 @@ export default function AdminCertificatesPage() {
                       {c.course?.title}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {formatThaiDate(c.issued_at)}
+                      {formatThaiDate(c.issued_at, { month: 'short' })}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {c.expires_at ? formatThaiDate(c.expires_at) : 'ไม่มีกำหนด'}
+                      {c.expires_at ? formatThaiDate(c.expires_at, { month: 'short' }) : 'ไม่มีกำหนด'}
                     </TableCell>
                     <TableCell>
                       <StatusBadge cert={c} />

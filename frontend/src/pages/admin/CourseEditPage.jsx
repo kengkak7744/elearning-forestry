@@ -60,6 +60,7 @@ import {
 import QuizManager from '@/components/QuizManager'
 import CourseStatsModal from '@/components/CourseStatsModal'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
+import { toastApiError } from '@/utils/apiError'
 
 function PromptInputDialog({ open, title, label, placeholder, onConfirm, onCancel }) {
   const [value, setValue] = useState('')
@@ -158,7 +159,7 @@ export default function CourseEditPage() {
       setCoverImage(data.cover_image || null)
       setModules(data.modules || [])
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดข้อมูลไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
     } finally {
       setLoading(false)
     }
@@ -195,7 +196,7 @@ export default function CourseEditPage() {
         showToast('บันทึกหลักสูตรสำเร็จ', 'success')
       }
     } catch (err) {
-      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
+      toastApiError(err, 'บันทึกไม่สำเร็จ')
     } finally {
       setSaving(false)
     }
@@ -208,7 +209,7 @@ export default function CourseEditPage() {
       showToast('ลบหลักสูตรเรียบร้อย', 'success')
       navigate('/admin/courses')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     }
   }
 
@@ -222,7 +223,7 @@ export default function CourseEditPage() {
       setCoverImage(result.cover_image)
       showToast('อัปโหลดรูปภาพปกสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
+      toastApiError(err, 'อัปโหลดไม่สำเร็จ')
     } finally {
       setCoverUploading(false)
       setCoverProgress(0)
@@ -244,7 +245,7 @@ export default function CourseEditPage() {
           setModules([...modules, { ...newModule, lessons: [] }])
           showToast('เพิ่มโมดูลสำเร็จ', 'success')
         } catch (err) {
-          showToast(err.response?.data?.detail || 'เพิ่มโมดูลไม่สำเร็จ', 'error')
+          toastApiError(err, 'เพิ่มโมดูลไม่สำเร็จ')
         }
         setPromptState(null)
       },
@@ -256,7 +257,7 @@ export default function CourseEditPage() {
       await modulesApi.update(moduleId, updates)
       setModules(modules.map((m) => (m.id === moduleId ? { ...m, ...updates } : m)))
     } catch (err) {
-      showToast(err.response?.data?.detail || 'แก้ไขไม่สำเร็จ', 'error')
+      toastApiError(err, 'แก้ไขไม่สำเร็จ')
     }
   }
 
@@ -270,7 +271,7 @@ export default function CourseEditPage() {
           setModules(modules.filter((m) => m.id !== moduleId))
           showToast('ลบโมดูลเรียบร้อย', 'success')
         } catch (err) {
-          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+          toastApiError(err, 'ลบไม่สำเร็จ')
         }
         setConfirmState(null)
       },
@@ -298,7 +299,7 @@ export default function CourseEditPage() {
           )
           showToast('เพิ่มบทเรียนสำเร็จ', 'success')
         } catch (err) {
-          showToast(err.response?.data?.detail || 'เพิ่มบทเรียนไม่สำเร็จ', 'error')
+          toastApiError(err, 'เพิ่มบทเรียนไม่สำเร็จ')
         }
         setPromptState(null)
       },
@@ -323,7 +324,7 @@ export default function CourseEditPage() {
       await lessonsApi.update(lesson.id, lesson)
       showToast('บันทึกบทเรียนสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
+      toastApiError(err, 'บันทึกไม่สำเร็จ')
     }
   }
 
@@ -343,7 +344,7 @@ export default function CourseEditPage() {
           )
           showToast('ลบบทเรียนเรียบร้อย', 'success')
         } catch (err) {
-          showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+          toastApiError(err, 'ลบไม่สำเร็จ')
         }
         setConfirmState(null)
       },
@@ -843,7 +844,7 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
       onUpdate(updated)
       showToast('อัปโหลดวิดีโอสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
+      toastApiError(err, 'อัปโหลดไม่สำเร็จ')
     } finally {
       setUploading(false)
       setUploadProgress(0)
@@ -860,7 +861,7 @@ function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
       onUpdate(updated)
       showToast('อัปโหลด PDF สำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'อัปโหลดไม่สำเร็จ', 'error')
+      toastApiError(err, 'อัปโหลดไม่สำเร็จ')
     } finally {
       setUploading(false)
       setUploadProgress(0)
@@ -1111,7 +1112,7 @@ function LessonResourcesEditor({ lesson, onChange }) {
       setDraftType('')
       showToast('เพิ่มเอกสารสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เพิ่มไม่สำเร็จ', 'error')
+      toastApiError(err, 'เพิ่มไม่สำเร็จ')
     } finally {
       setAdding(false)
     }
@@ -1123,7 +1124,7 @@ function LessonResourcesEditor({ lesson, onChange }) {
       onChange({ resources: resources.filter((r) => r.id !== resourceId) })
       showToast('ลบเอกสารเรียบร้อย', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     }
   }
 

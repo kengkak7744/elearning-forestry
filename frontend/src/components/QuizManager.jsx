@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import QuizEditor from './QuizEditor'
+import { toastApiError } from '@/utils/apiError'
 
 export default function QuizManager({ lessonId, courseId, scope, showToast }) {
   // scope: "lesson" or "final"
@@ -36,7 +37,7 @@ export default function QuizManager({ lessonId, courseId, scope, showToast }) {
         }
       }
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดแบบทดสอบไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดแบบทดสอบไม่สำเร็จ')
     } finally {
       setLoading(false)
     }
@@ -65,7 +66,7 @@ export default function QuizManager({ lessonId, courseId, scope, showToast }) {
       setQuizzes([...quizzes, { ...newQuiz, questions: [] }])
       showToast('เพิ่มแบบทดสอบสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เพิ่มไม่สำเร็จ', 'error')
+      toastApiError(err, 'เพิ่มไม่สำเร็จ')
     }
   }
 
@@ -82,7 +83,7 @@ export default function QuizManager({ lessonId, courseId, scope, showToast }) {
       setQuizzes(quizzes.filter((q) => q.id !== quizId))
       showToast('ลบแบบทดสอบสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     }
   }
 

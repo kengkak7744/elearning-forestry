@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const placementLabels = {
   mid_video: 'กลางวิดีโอ',
@@ -95,7 +96,7 @@ export default function CourseScoresModal({ open, quizzes, courseId, onClose }) 
       setCert({ id: data.id, number: data.certificate_number })
       window.open(certificatesApi.downloadUrl(data.id), '_blank', 'noopener')
     } catch (err) {
-      setCertError(err.response?.data?.detail || 'ออกใบรับรองไม่สำเร็จ')
+      setCertError(getApiErrorMessage(err, 'ออกใบรับรองไม่สำเร็จ'))
     } finally {
       setCertLoading(false)
     }

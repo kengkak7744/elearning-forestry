@@ -3,12 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { BUTTONS } from '@/constants/labels'
 import { cn } from '@/lib/utils'
-
-function fmtTime(s) {
-  const m = Math.floor(s / 60)
-  const r = s % 60
-  return m > 0 ? `${m}:${String(r).padStart(2, '0')}` : `${r}วิ`
-}
+import { fmtTime } from '@/utils/formatting'
 
 export default function LessonFooter({
   currentLesson,

@@ -38,26 +38,14 @@ import LessonTree from '@/components/learner/LessonTree'
 import LessonFooter from '@/components/learner/LessonFooter'
 import LessonNotes from '@/components/learner/LessonNotes'
 import { cn } from '@/lib/utils'
-
-function fmtBytes(bytes) {
-  if (!bytes && bytes !== 0) return null
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
+import { toastApiError } from '@/utils/apiError'
+import { fmtBytes, fmtTime } from '@/utils/formatting'
 
 function isInternalMediaUrl(url) {
   // Backend-served paths come back as /videos/, /pdfs/, /images/, etc. Anything
   // that doesn't start with http(s) is treated as a same-origin media path and
   // resolved via mediaUrl(). External links open in a new tab unchanged.
   return typeof url === 'string' && !/^https?:\/\//i.test(url)
-}
-
-function fmtTime(s) {
-  const m = Math.floor(s / 60)
-  const r = s % 60
-  return m > 0 ? `${m}:${String(r).padStart(2, '0')}` : `${r}วิ`
 }
 
 function getYoutubeEmbed(url) {
@@ -159,7 +147,7 @@ export default function CourseViewerPage() {
         setQuizzes([])
       }
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดหลักสูตรไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดหลักสูตรไม่สำเร็จ')
     } finally {
       setLoading(false)
     }

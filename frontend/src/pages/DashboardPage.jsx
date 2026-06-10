@@ -21,17 +21,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
 import CourseCard from '@/components/learner/CourseCard'
+import { formatThaiDate } from '@/utils/formatting'
 
 const FALLBACK_COVER = '/elearning/forest_logo.png'
-
-function formatThaiDate(dateString) {
-  if (!dateString) return ''
-  return new Date(dateString).toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
 
 function StatCard({ icon: Icon, label, value, hint }) {
   return (
@@ -372,7 +364,7 @@ export default function DashboardPage() {
                       </p>
                       {c.issued_at && (
                         <p className="text-[11px] text-muted-foreground/80">
-                          ออกเมื่อ {formatThaiDate(c.issued_at)}
+                          ออกเมื่อ {formatThaiDate(c.issued_at, { month: 'short', fallback: '' })}
                           {c.expires_at && (
                             <span className={c.is_expired ? 'text-destructive font-medium' : ''}>
                               {' · '}

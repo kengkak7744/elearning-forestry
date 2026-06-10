@@ -8,15 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-
-function formatThaiDate(iso) {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
+import { getApiErrorMessage } from '@/utils/apiError'
+import { formatThaiDate } from '@/utils/formatting'
 
 const STATUS_META = {
   valid: {
@@ -121,7 +114,7 @@ export default function CertificateVerifyPage() {
       if (err.response?.status === 429) {
         setError('ตรวจสอบบ่อยเกินไป — กรุณาลองใหม่อีกครั้งในอีก 1 นาที')
       } else {
-        setError(err.response?.data?.detail || 'ไม่สามารถตรวจสอบได้ในขณะนี้')
+        setError(getApiErrorMessage(err, 'ไม่สามารถตรวจสอบได้ในขณะนี้'))
       }
     } finally {
       setLoading(false)

@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils'
 import QuestionEditor from './QuestionEditor'
 import QuizStatsModal from './QuizStatsModal'
+import { toastApiError } from '@/utils/apiError'
 
 const placementLabels = {
   mid_video: 'กลางวิดีโอ',
@@ -63,7 +64,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
       setEditing(false)
       showToast('บันทึกการตั้งค่าสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
+      toastApiError(err, 'บันทึกไม่สำเร็จ')
     }
   }
 
@@ -86,7 +87,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
       onUpdate({ questions: [...quiz.questions, newQ] })
       showToast('เพิ่มคำถามสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เพิ่มคำถามไม่สำเร็จ', 'error')
+      toastApiError(err, 'เพิ่มคำถามไม่สำเร็จ')
     }
   }
 
@@ -107,7 +108,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
       onUpdate({ questions: quiz.questions.filter((q) => q.id !== questionId) })
       showToast('ลบคำถามสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     }
   }
 

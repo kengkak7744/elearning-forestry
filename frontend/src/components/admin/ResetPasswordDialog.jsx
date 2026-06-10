@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toastApiError } from '@/utils/apiError'
 
 export default function ResetPasswordDialog({ target, onClose }) {
   const [pw1, setPw1] = useState('')
@@ -42,7 +43,7 @@ export default function ResetPasswordDialog({ target, onClose }) {
       showToast(`รีเซ็ตรหัสผ่านของ ${target.full_name} สำเร็จ`, 'success')
       onClose()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      toastApiError(err, 'เกิดข้อผิดพลาด')
     } finally {
       setLoading(false)
     }

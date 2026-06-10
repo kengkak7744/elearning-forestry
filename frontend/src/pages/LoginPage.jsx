@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toastApiError } from '@/utils/apiError'
 
 export default function LoginPage() {
   useDocumentTitle('เข้าสู่ระบบ')
@@ -29,7 +30,7 @@ export default function LoginPage() {
       showToast('เข้าสู่ระบบสำเร็จ', 'success')
       navigate(from, { replace: true })
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เข้าสู่ระบบไม่สำเร็จ', 'error')
+      toastApiError(err, 'เข้าสู่ระบบไม่สำเร็จ')
     } finally {
       setLoading(false)
     }

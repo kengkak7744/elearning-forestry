@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import CourseCard from '@/components/learner/CourseCard'
+import { toastApiError } from '@/utils/apiError'
 
 function initials(name) {
   if (!name) return 'U'
@@ -217,7 +218,7 @@ function SecurityTab() {
       showToast('เปลี่ยนรหัสผ่านสำเร็จ', 'success')
       setData({ current_password: '', new_password: '', confirm_new_password: '' })
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      toastApiError(err, 'เกิดข้อผิดพลาด')
     } finally {
       setLoading(false)
     }

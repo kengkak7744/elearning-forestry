@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import { toastApiError } from '@/utils/apiError'
 
 const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
   value,
@@ -74,7 +75,7 @@ export default function CoursesListPage() {
       const data = await coursesApi.list(params)
       setCourses(data)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'โหลดรายการไม่สำเร็จ', 'error')
+      toastApiError(err, 'โหลดรายการไม่สำเร็จ')
     } finally {
       setLoading(false)
     }
@@ -95,7 +96,7 @@ export default function CoursesListPage() {
       showToast('ลบหลักสูตรเรียบร้อย', 'success')
       load()
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบไม่สำเร็จ')
     }
   }
 
@@ -112,7 +113,7 @@ export default function CoursesListPage() {
       // immediately instead of hunting for it in the list.
       if (data?.id) navigate(`/admin/courses/${data.id}/edit`)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ทำสำเนาไม่สำเร็จ', 'error')
+      toastApiError(err, 'ทำสำเนาไม่สำเร็จ')
     } finally {
       setDuplicatingId(null)
     }

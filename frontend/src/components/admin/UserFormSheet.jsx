@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { toastApiError } from '@/utils/apiError'
 
 const emptyForm = {
   username: '',
@@ -89,7 +90,7 @@ export default function UserFormSheet({ open, onOpenChange, userId, onSaved }) {
       onSaved?.()
       onOpenChange(false)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'เกิดข้อผิดพลาด', 'error')
+      toastApiError(err, 'เกิดข้อผิดพลาด')
     } finally {
       setLoading(false)
     }

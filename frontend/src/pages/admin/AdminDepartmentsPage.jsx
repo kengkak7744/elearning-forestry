@@ -9,12 +9,12 @@ import {
   Users,
 } from 'lucide-react'
 import { adminStatsApi } from '@/api/adminStats'
-import { showToast } from '@/lib/toast'
 import { ROLE_LABELS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toastApiError } from '@/utils/apiError'
 
 const ROLE_TONE = {
   admin: 'bg-destructive/15 text-destructive',
@@ -96,7 +96,7 @@ export default function AdminDepartmentsPage() {
       .departments()
       .then(setDepartments)
       .catch((err) =>
-        showToast(err.response?.data?.detail || 'โหลดข้อมูลหน่วยงานไม่สำเร็จ', 'error')
+        toastApiError(err, 'โหลดข้อมูลหน่วยงานไม่สำเร็จ')
       )
       .finally(() => setLoading(false))
   }, [])

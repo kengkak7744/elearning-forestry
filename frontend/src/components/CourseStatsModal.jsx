@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import QuizStatsModal from './QuizStatsModal'
+import { getApiErrorMessage } from '@/utils/apiError'
 
 const placementLabels = {
   mid_video: 'กลางวิดีโอ',
@@ -63,7 +64,7 @@ export default function CourseStatsModal({ open, courseId, onClose }) {
     quizzesApi
       .getCourseStats(courseId)
       .then(setStats)
-      .catch((err) => setError(err.response?.data?.detail || 'โหลดสถิติไม่สำเร็จ'))
+      .catch((err) => setError(getApiErrorMessage(err, 'โหลดสถิติไม่สำเร็จ')))
       .finally(() => setLoading(false))
   }, [open, courseId])
 

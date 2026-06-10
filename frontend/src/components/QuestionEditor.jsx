@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { toastApiError } from '@/utils/apiError'
 
 const typeLabels = {
   single_choice: 'เลือกข้อเดียว',
@@ -30,7 +31,7 @@ export default function QuestionEditor({ question, index, onUpdate, onDelete, sh
       setExpanded(false)
       showToast('บันทึกคำถามสำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'บันทึกไม่สำเร็จ', 'error')
+      toastApiError(err, 'บันทึกไม่สำเร็จ')
     }
   }
 
