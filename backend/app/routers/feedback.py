@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.helpers import get_or_404
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.course import Course
@@ -66,9 +67,7 @@ def submit_feedback(
     Gated on completion — anyone trying earlier gets a 400 explaining why
     (matches what the certificate endpoint returns).
     """
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     eligible, _final_score, reason = _course_completion(db, current_user.id, course_id)
     if not eligible:
@@ -155,9 +154,7 @@ def feedback_summary(
 
     Distribution is a list of 5 ints: stars 1, 2, 3, 4, 5 (in that order).
     """
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
     if current_user.role.value in ("learner", "manager") and not course.is_published:
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
 
@@ -194,9 +191,7 @@ def list_feedback(
     """Full feedback list with author info — admin/instructor only."""
     if current_user.role.value not in ("admin", "instructor"):
         raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์เข้าถึง")
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     rows = (
         db.query(CourseFeedback, User)

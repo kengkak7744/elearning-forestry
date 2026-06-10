@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, joinedload
 from weasyprint import HTML
 
 from app.config import settings
+from app.core.helpers import get_or_404
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models.user import User
@@ -674,9 +675,7 @@ def issue(
     For recertifiable courses, the old expired cert is kept in the DB as an
     audit-trail record; the new cert just shadows it for "current" lookups.
     """
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     existing = (
         db.query(Certificate)

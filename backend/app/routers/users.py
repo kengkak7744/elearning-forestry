@@ -16,6 +16,7 @@ from app.models.course import Course, Module
 from app.models.lesson import Lesson
 from app.models.lesson_note import LessonNote
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, AdminResetPassword
+from app.core.helpers import ensure_unique_user_fields, get_or_404
 from app.core.security import hash_password
 from app.dependencies import get_current_user, require_admin
 from app.services.audit import log_action
@@ -32,17 +33,7 @@ def create_user(
     admin: User = Depends(require_admin)
 ):
     """สร้างผู้ใช้ใหม่ (admin only)"""
-    if db.query(User).filter(User.username == user_data.username).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"ชื่อผู้ใช้ '{user_data.username}' มีอยู่ในระบบแล้ว"
-        )
-
-    if db.query(User).filter(User.email == user_data.email).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="อีเมลนี้มีอยู่ในระบบแล้ว"
-        )
+    ensure_unique_user_fields(db, username=user_data.username, email=user_data.email)
 
     new_user = User(
         username=user_data.username,
@@ -106,9 +97,7 @@ def get_user(
             detail="ไม่มีสิทธิ์ดูข้อมูลผู้ใช้คนอื่น"
         )
     
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
     return user
 
 
@@ -120,9 +109,7 @@ def update_user(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
 
     update_data = user_data.model_dump(exclude_unset=True)
 
@@ -192,9 +179,7 @@ def delete_user(
             detail="ไม่สามารถลบบัญชีของตัวเองได้"
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
 
     name = user.full_name
     deleted_username = user.username
@@ -229,9 +214,7 @@ def user_learning_summary(
     _admin: User = Depends(require_admin),
 ):
     """Admin view of a learner's full activity: enrollments, certificates, quiz stats."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
 
     enrollments = (
         db.query(Enrollment)
@@ -564,9 +547,7 @@ def reset_user_password(
             detail="ไม่สามารถรีเซ็ตรหัสผ่านของตัวเองได้ ใช้หน้า Profile แทน"
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
 
     user.hashed_password = hash_password(data.new_password)
     log_action(

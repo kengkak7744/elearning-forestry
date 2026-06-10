@@ -130,17 +130,15 @@ class TestDepartments:
         assert member["is_enrolled"] is True
         assert member["progress_percent"] == 0
 
-    @pytest.mark.xfail(
-        reason="Pre-existing bug: admin_stats.py uses HTTPException without "
-        "importing it, so a missing course raises NameError (500) instead of 404.",
-        raises=NameError,
-    )
     def test_department_course_members_unknown_course(self, admin_client, learner_user):
+        # Was a NameError/500 before the get_or_404 helper (HTTPException was
+        # used without being imported); now a proper 404.
         res = admin_client.get(
             f"/api/admin/stats/departments/{learner_user.department}"
             "/courses/99999/members"
         )
         assert res.status_code == 404
+        assert res.json()["detail"] == "ไม่พบหลักสูตร"
 
 
 class TestCompliance:

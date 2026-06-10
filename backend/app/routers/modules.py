@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.course import Module, Course
 from app.models.user import User
 from app.schemas.module import ModuleCreate, ModuleUpdate, ModuleResponse
+from app.core.helpers import get_or_404
 from app.dependencies import require_instructor_or_admin
 
 
@@ -16,10 +17,8 @@ def create_module(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    course = db.query(Course).filter(Course.id == data.course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
-    
+    get_or_404(db, Course, data.course_id, "ไม่พบหลักสูตร")
+
     new_module = Module(**data.model_dump())
     db.add(new_module)
     db.commit()
@@ -34,14 +33,12 @@ def update_module(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    module = db.query(Module).filter(Module.id == module_id).first()
-    if not module:
-        raise HTTPException(status_code=404, detail="ไม่พบโมดูล")
-    
+    module = get_or_404(db, Module, module_id, "ไม่พบโมดูล")
+
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(module, field, value)
-    
+
     db.commit()
     db.refresh(module)
     return module
@@ -53,10 +50,8 @@ def delete_module(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    module = db.query(Module).filter(Module.id == module_id).first()
-    if not module:
-        raise HTTPException(status_code=404, detail="ไม่พบโมดูล")
-    
+    module = get_or_404(db, Module, module_id, "ไม่พบโมดูล")
+
     db.delete(module)
     db.commit()
     return {"message": "ลบโมดูลเรียบร้อย"}

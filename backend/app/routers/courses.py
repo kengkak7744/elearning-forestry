@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseResponse, CourseListItem
 )
+from app.core.helpers import get_or_404
 from app.dependencies import get_current_user, require_instructor_or_admin
 from app.services.audit import log_action
 from fastapi import Request
@@ -267,9 +268,7 @@ def update_course(
     db: Session = Depends(get_db),
     user: User = Depends(require_instructor_or_admin)
 ):
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     update_data = course_data.model_dump(exclude_unset=True)
 
@@ -309,9 +308,7 @@ def delete_course(
     db: Session = Depends(get_db),
     user: User = Depends(require_instructor_or_admin)
 ):
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     title = course.title
     log_action(
@@ -456,9 +453,7 @@ async def upload_cover_image(
     _user: User = Depends(require_instructor_or_admin)
 ):
     """อัปโหลดรูปภาพปกหลักสูตร"""
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_IMAGE_EXTENSIONS:
@@ -601,9 +596,7 @@ def enroll_course(
     current_user: User = Depends(get_current_user)
 ):
     """ลงทะเบียนเรียนหลักสูตร"""
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
     
     if not course.is_published and current_user.role.value in ("learner", "manager"):
         raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
@@ -688,9 +681,7 @@ def add_bookmark(
     current_user: User = Depends(get_current_user),
 ):
     """Idempotent: bookmarking an already-bookmarked course is a no-op."""
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
     existing = (
         db.query(Bookmark)
         .filter(Bookmark.user_id == current_user.id, Bookmark.course_id == course_id)

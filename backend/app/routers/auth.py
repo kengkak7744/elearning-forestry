@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, Token
 from app.schemas.user import UserResponse, UserRegister, PasswordChange, UserSelfUpdate
+from app.core.helpers import ensure_unique_user_fields
 from app.core.security import verify_password, hash_password, create_access_token
 from app.config import settings
 from app.dependencies import get_current_user, ACCESS_COOKIE_NAME
@@ -41,20 +42,9 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
             detail="รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"
         )
     
-    # ตรวจ username ซ้ำ
-    if db.query(User).filter(User.username == data.username).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"ชื่อผู้ใช้ '{data.username}' มีอยู่ในระบบแล้ว"
-        )
-    
-    # ตรวจอีเมลซ้ำ
-    if db.query(User).filter(User.email == data.email).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="อีเมลนี้มีอยู่ในระบบแล้ว"
-        )
-    
+    # ตรวจ username / อีเมลซ้ำ
+    ensure_unique_user_fields(db, username=data.username, email=data.email)
+
     new_user = User(
         username=data.username,
         email=data.email,

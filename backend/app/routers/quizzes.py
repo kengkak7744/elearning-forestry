@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 
+from app.core.helpers import get_or_404, require_enrollment
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.quiz import Quiz, Question, QuizAttempt, QuestionType
 from app.models.lesson import Lesson
 from app.models.course import Course, Module
-from app.models.enrollment import Enrollment
 from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse,
     QuestionCreate, QuestionUpdate, QuestionResponse,
@@ -443,9 +443,7 @@ def update_quiz(
     current_user: User = Depends(get_current_user),
 ):
     require_admin(current_user)
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="ไม่พบแบบทดสอบ")
+    quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(quiz, key, value)
     db.commit()
@@ -460,9 +458,7 @@ def delete_quiz(
     current_user: User = Depends(get_current_user),
 ):
     require_admin(current_user)
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="ไม่พบแบบทดสอบ")
+    quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
     db.delete(quiz)
     db.commit()
     return {"deleted": True}
@@ -478,9 +474,7 @@ def create_question(
     current_user: User = Depends(get_current_user),
 ):
     require_admin(current_user)
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="ไม่พบแบบทดสอบ")
+    quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
     question = Question(quiz_id=quiz_id, **payload.model_dump())
     db.add(question)
     db.commit()
@@ -496,9 +490,7 @@ def update_question(
     current_user: User = Depends(get_current_user),
 ):
     require_admin(current_user)
-    q = db.query(Question).filter(Question.id == question_id).first()
-    if not q:
-        raise HTTPException(status_code=404, detail="ไม่พบคำถาม")
+    q = get_or_404(db, Question, question_id, "ไม่พบคำถาม")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(q, key, value)
     db.commit()
@@ -513,9 +505,7 @@ def delete_question(
     current_user: User = Depends(get_current_user),
 ):
     require_admin(current_user)
-    q = db.query(Question).filter(Question.id == question_id).first()
-    if not q:
-        raise HTTPException(status_code=404, detail="ไม่พบคำถาม")
+    q = get_or_404(db, Question, question_id, "ไม่พบคำถาม")
     db.delete(q)
     db.commit()
     return {"deleted": True}
@@ -546,11 +536,11 @@ def submit_quiz(
                 .first()
             )
             target_course_id = lesson_row[0] if lesson_row else None
-        if target_course_id is None or not db.query(Enrollment).filter(
-            Enrollment.user_id == current_user.id,
-            Enrollment.course_id == target_course_id,
-        ).first():
+        if target_course_id is None:
             raise HTTPException(status_code=403, detail="ต้องลงทะเบียนหลักสูตรก่อนทำแบบทดสอบ")
+        require_enrollment(
+            db, current_user.id, target_course_id, "ต้องลงทะเบียนหลักสูตรก่อนทำแบบทดสอบ"
+        )
 
     # Count-based scoring: every non-opinion question weights equally (1 each).
     # Opinion questions don't count in either direction — they're feedback only.

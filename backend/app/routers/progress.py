@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
+from app.core.helpers import require_enrollment
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.progress import LessonProgress
 from app.models.lesson import Lesson
 from app.models.course import Module
-from app.models.enrollment import Enrollment
 from app.schemas.progress import ProgressUpdate
 
 router = APIRouter()
@@ -38,12 +38,7 @@ def update_progress(
 
     # Require enrollment (admin/instructor exempt — they may preview content)
     if current_user.role.value not in ("admin", "instructor"):
-        enrolled = db.query(Enrollment).filter(
-            Enrollment.user_id == current_user.id,
-            Enrollment.course_id == course_id,
-        ).first()
-        if not enrolled:
-            raise HTTPException(status_code=403, detail="ต้องลงทะเบียนหลักสูตรก่อน")
+        require_enrollment(db, current_user.id, course_id, "ต้องลงทะเบียนหลักสูตรก่อน")
 
     progress = db.query(LessonProgress).filter(
         LessonProgress.user_id == current_user.id,

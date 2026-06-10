@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
+from app.core.helpers import get_or_404
 from app.database import get_db
 from app.dependencies import require_admin
 from app.models.user import User, UserRole
@@ -464,9 +465,7 @@ def department_course_members(
     from app.models.progress import LessonProgress
 
     response.headers["Cache-Control"] = _STATS_CACHE
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     total_lessons = (
         db.query(func.count(Lesson.id))

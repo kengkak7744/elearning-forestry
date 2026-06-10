@@ -18,6 +18,7 @@ from app.schemas.lesson import (
     LessonResponse,
 )
 from app.config import settings
+from app.core.helpers import get_or_404
 from app.dependencies import get_current_user, require_instructor_or_admin
 
 
@@ -74,10 +75,8 @@ def create_lesson(
     _user: User = Depends(require_instructor_or_admin)
 ):
     """สร้างบทเรียนใหม่ (สำหรับ YouTube link หรือ lesson ที่จะ upload file ทีหลัง)"""
-    module = db.query(Module).filter(Module.id == data.module_id).first()
-    if not module:
-        raise HTTPException(status_code=404, detail="ไม่พบโมดูล")
-    
+    get_or_404(db, Module, data.module_id, "ไม่พบโมดูล")
+
     new_lesson = Lesson(**data.model_dump())
     db.add(new_lesson)
     db.commit()
@@ -92,10 +91,8 @@ def update_lesson(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
-    
+    lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
+
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(lesson, field, value)
@@ -111,10 +108,8 @@ def delete_lesson(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
-    
+    lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
+
     # Delete associated file
     if lesson.content_url and lesson.content_type != ContentType.VIDEO_YOUTUBE:
         try:
@@ -142,10 +137,8 @@ async def upload_video(
     _user: User = Depends(require_instructor_or_admin)
 ):
     """อัปโหลดไฟล์วิดีโอสำหรับบทเรียน"""
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
-    
+    lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
+
     # Validate file extension
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_VIDEO_EXTENSIONS:
@@ -180,10 +173,8 @@ async def upload_pdf(
     _user: User = Depends(require_instructor_or_admin)
 ):
     """อัปโหลดไฟล์ PDF สำหรับบทเรียน"""
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
-    
+    lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
+
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_PDF_EXTENSIONS:
         raise HTTPException(
@@ -218,9 +209,7 @@ def list_lesson_resources(
     _user: User = Depends(get_current_user),
 ):
     """List supplementary materials for a lesson — visible to any logged-in learner."""
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
     return (
         db.query(LessonResource)
         .filter(LessonResource.lesson_id == lesson_id)
@@ -240,9 +229,7 @@ def add_lesson_resource(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
     resource = LessonResource(lesson_id=lesson_id, **data.model_dump())
     db.add(resource)
     db.commit()
@@ -256,9 +243,7 @@ def delete_lesson_resource(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    resource = db.query(LessonResource).filter(LessonResource.id == resource_id).first()
-    if not resource:
-        raise HTTPException(status_code=404, detail="ไม่พบเอกสาร")
+    resource = get_or_404(db, LessonResource, resource_id, "ไม่พบเอกสาร")
     db.delete(resource)
     db.commit()
     return {"message": "ลบเอกสารเรียบร้อย"}
@@ -293,9 +278,7 @@ def upsert_my_note(
     current_user: User = Depends(get_current_user),
 ):
     """Save my note for this lesson. Idempotent upsert — autosave-friendly."""
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
 
     note = (
         db.query(LessonNote)
@@ -330,9 +313,7 @@ def list_lesson_resources(
     _user: User = Depends(get_current_user),
 ):
     """Any logged-in user can read a lesson's resource list."""
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
     return lesson.resources
 
 
@@ -347,9 +328,7 @@ def add_lesson_resource(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
     resource = LessonResource(lesson_id=lesson_id, **data.model_dump())
     db.add(resource)
     db.commit()
@@ -363,9 +342,7 @@ def delete_lesson_resource(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    resource = db.query(LessonResource).filter(LessonResource.id == resource_id).first()
-    if not resource:
-        raise HTTPException(status_code=404, detail="ไม่พบเอกสารประกอบ")
+    resource = get_or_404(db, LessonResource, resource_id, "ไม่พบเอกสารประกอบ")
     db.delete(resource)
     db.commit()
     return {"message": "ลบเอกสารประกอบเรียบร้อย"}
