@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Copy, ImageIcon, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
@@ -6,6 +6,7 @@ import { CATEGORY_BADGES } from '@/constants/labels'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
+import useFetchData from '@/hooks/useFetchData'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -58,34 +59,30 @@ function CoverThumb({ src, alt }) {
 
 export default function CoursesListPage() {
   useDocumentTitle('จัดการหลักสูตร')
-  const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [duplicatingId, setDuplicatingId] = useState(null)
   const navigate = useNavigate()
 
-  const load = async () => {
-    setLoading(true)
-    try {
+  const {
+    data: courses,
+    loading,
+    reload,
+  } = useFetchData(
+    () => {
       const params = {}
       if (search) params.search = search
       if (categoryFilter) params.category = categoryFilter
-      const data = await coursesApi.list(params)
-      setCourses(data)
-    } catch (err) {
-      toastApiError(err, 'โหลดรายการไม่สำเร็จ')
-    } finally {
-      setLoading(false)
+      return coursesApi.list(params)
+    },
+    [search, categoryFilter],
+    {
+      errorFallback: 'โหลดรายการไม่สำเร็จ',
+      initialData: [],
+      debounceMs: search ? 350 : 0,
     }
-  }
-
-  useEffect(() => {
-    const t = setTimeout(load, search ? 350 : 0)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, categoryFilter])
+  )
 
   const handleDelete = async () => {
     if (!confirmTarget) return
@@ -94,7 +91,7 @@ export default function CoursesListPage() {
     try {
       await coursesApi.delete(target.id)
       showToast('ลบหลักสูตรเรียบร้อย', 'success')
-      load()
+      reload()
     } catch (err) {
       toastApiError(err, 'ลบไม่สำเร็จ')
     }

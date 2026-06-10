@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import useFetchData from '@/hooks/useFetchData'
 import {
   Award,
   Building2,
@@ -14,7 +15,6 @@ import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { toastApiError } from '@/utils/apiError'
 
 const ROLE_TONE = {
   admin: 'bg-destructive/15 text-destructive',
@@ -87,19 +87,13 @@ function DepartmentCard({ dept }) {
 
 export default function AdminDepartmentsPage() {
   useDocumentTitle('หน่วยงานทั้งหมด')
-  const [departments, setDepartments] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    adminStatsApi
-      .departments()
-      .then(setDepartments)
-      .catch((err) =>
-        toastApiError(err, 'โหลดข้อมูลหน่วยงานไม่สำเร็จ')
-      )
-      .finally(() => setLoading(false))
-  }, [])
+  const { data: departments, loading } = useFetchData(
+    () => adminStatsApi.departments(),
+    [],
+    { errorFallback: 'โหลดข้อมูลหน่วยงานไม่สำเร็จ', initialData: [] }
+  )
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()

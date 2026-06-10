@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import useFetchData from '@/hooks/useFetchData'
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,7 +19,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { toastApiError } from '@/utils/apiError'
 import {
   Table,
   TableBody,
@@ -87,30 +87,24 @@ export default function AuditLogsPage() {
   const [actionFilter, setActionFilter] = useState('all')
   const [targetTypeFilter, setTargetTypeFilter] = useState('all')
   const [page, setPage] = useState(0)
-  const [rows, setRows] = useState([])
-  const [actions, setActions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [reloadKey, setReloadKey] = useState(0)
 
-  useEffect(() => {
-    auditApi.actions().then(setActions).catch(() => setActions([]))
-  }, [])
+  const { data: actions } = useFetchData(
+    () => auditApi.actions().catch(() => []),
+    [],
+    { initialData: [] }
+  )
 
-  useEffect(() => {
-    setLoading(true)
-    auditApi
-      .list({
+  const { data: rows, loading, reload } = useFetchData(
+    () =>
+      auditApi.list({
         skip: page * PAGE_SIZE,
         limit: PAGE_SIZE,
         action: actionFilter === 'all' ? undefined : actionFilter,
         target_type: targetTypeFilter === 'all' ? undefined : targetTypeFilter,
-      })
-      .then(setRows)
-      .catch((err) =>
-        toastApiError(err, 'โหลดบันทึกไม่สำเร็จ')
-      )
-      .finally(() => setLoading(false))
-  }, [actionFilter, targetTypeFilter, page, reloadKey])
+      }),
+    [actionFilter, targetTypeFilter, page],
+    { errorFallback: 'โหลดบันทึกไม่สำเร็จ', initialData: [] }
+  )
 
   // Reset to page 0 when filters change (prevents landing on an empty page).
   useEffect(() => {
@@ -134,7 +128,7 @@ export default function AuditLogsPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setReloadKey((k) => k + 1)}
+          onClick={reload}
           disabled={loading}
         >
           <RefreshCw className={loading ? 'mr-1.5 h-3.5 w-3.5 animate-spin' : 'mr-1.5 h-3.5 w-3.5'} />

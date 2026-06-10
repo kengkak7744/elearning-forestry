@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import useFetchData from '@/hooks/useFetchData'
 import {
   Award,
   Clock,
@@ -62,28 +63,24 @@ function StatusBadge({ cert }) {
 
 export default function AdminCertificatesPage() {
   useDocumentTitle('ใบรับรองทั้งหมด')
-  const [certs, setCerts] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [revokeTarget, setRevokeTarget] = useState(null)
   const [revokeReason, setRevokeReason] = useState('')
   const [revokeBusy, setRevokeBusy] = useState(false)
 
-  const load = async () => {
-    setLoading(true)
-    try {
+  const {
+    data: certs,
+    loading,
+    reload: load,
+  } = useFetchData(
+    async () => {
       const data = await certificatesApi.adminAll()
-      setCerts(Array.isArray(data) ? data : [])
-    } catch (err) {
-      toastApiError(err, 'โหลดข้อมูลไม่สำเร็จ')
-    } finally {
-      setLoading(false)
-    }
-  }
-  useEffect(() => {
-    load()
-  }, [])
+      return Array.isArray(data) ? data : []
+    },
+    [],
+    { errorFallback: 'โหลดข้อมูลไม่สำเร็จ', initialData: [] }
+  )
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()

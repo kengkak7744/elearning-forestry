@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KeyRound, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react'
 import { usersApi } from '@/api/users'
+import useFetchData from '@/hooks/useFetchData'
 import { BUTTONS, ROLE_BADGES, ROLE_LABELS } from '@/constants/labels'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
@@ -43,8 +44,6 @@ import { toastApiError } from '@/utils/apiError'
 
 export default function UsersListPage() {
   useDocumentTitle('จัดการผู้ใช้')
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [params, setParams] = useSearchParams()
@@ -58,26 +57,23 @@ export default function UsersListPage() {
   const [summaryUserId, setSummaryUserId] = useState(null)
   const [bulkOpen, setBulkOpen] = useState(false)
 
-  const loadUsers = async () => {
-    setLoading(true)
-    try {
-      const data = await usersApi.list({
+  const {
+    data: users,
+    loading,
+    reload: loadUsers,
+  } = useFetchData(
+    () =>
+      usersApi.list({
         search,
         role: roleFilter === 'all' ? undefined : roleFilter,
-      })
-      setUsers(data)
-    } catch (err) {
-      toastApiError(err, 'โหลดรายการไม่สำเร็จ')
-    } finally {
-      setLoading(false)
+      }),
+    [search, roleFilter],
+    {
+      errorFallback: 'โหลดรายการไม่สำเร็จ',
+      initialData: [],
+      debounceMs: search ? 400 : 0,
     }
-  }
-
-  useEffect(() => {
-    const t = setTimeout(loadUsers, search ? 400 : 0)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, roleFilter])
+  )
 
   const handleDelete = async () => {
     if (!confirmDelete) return
