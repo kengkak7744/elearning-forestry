@@ -16,7 +16,6 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
@@ -26,6 +25,7 @@ from app.dependencies import get_current_user, require_admin
 from app.models.user import User
 from app.models.course import Course
 from app.models.certificate import Certificate
+from app.schemas.certificate import RevokeIn
 from app.services.audit import log_action
 from app.services.completion import course_completion
 from app.services.certificate import (
@@ -363,10 +363,6 @@ def verify_certificate(
 # ---------------------------------------------------------------------------
 # Admin revocation
 # ---------------------------------------------------------------------------
-
-class RevokeIn(BaseModel):
-    reason: str = Field(..., min_length=1, max_length=500)
-
 
 @router.post("/{cert_id}/revoke")
 def revoke_certificate(

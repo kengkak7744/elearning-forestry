@@ -9,10 +9,7 @@ Endpoints:
 Submission is gated on full course completion (every lesson done + final quiz
 passed if one exists) — same eligibility as certificate issuance.
 """
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -22,33 +19,13 @@ from app.dependencies import get_current_user
 from app.models.course import Course
 from app.models.course_feedback import CourseFeedback
 from app.models.user import User
+from app.schemas.feedback import FeedbackIn
 # Reuse the cert eligibility check so "completed" means the same thing
 # everywhere — single source of truth for what counts as finishing a course.
 from app.services.completion import course_completion
 
 
 router = APIRouter(prefix="/api/courses", tags=["Course feedback"])
-
-
-# ---------------------------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------------------------
-
-class FeedbackIn(BaseModel):
-    rating: int = Field(..., ge=1, le=5)
-    # Empty string is normalised to None server-side.
-    comment: Optional[str] = Field(None, max_length=2000)
-
-
-class FeedbackOut(BaseModel):
-    id: int
-    rating: int
-    comment: Optional[str]
-    created_at: Optional[str]
-    updated_at: Optional[str]
-
-    class Config:
-        from_attributes = True
 
 
 # ---------------------------------------------------------------------------

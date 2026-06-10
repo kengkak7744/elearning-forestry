@@ -4,10 +4,9 @@ organization name and the two signer blocks at the bottom of the PDF.
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -15,6 +14,7 @@ from app.database import get_db
 from app.dependencies import require_admin
 from app.models.cert_settings import CertSettings
 from app.models.user import User
+from app.schemas.cert_settings import CertSettingsOut, CertSettingsUpdate
 from app.services.audit import log_action
 from app.services.certificate import render_certificate_pdf_bytes
 
@@ -44,29 +44,6 @@ def get_or_create_cert_settings(db: Session) -> CertSettings:
         db.commit()
         db.refresh(s)
     return s
-
-
-class CertSettingsOut(BaseModel):
-    organization_name: str
-    left_signer_name: str
-    left_signer_title: str
-    right_signer_name: str
-    right_signer_title: str
-    left_signer_image: Optional[str] = None
-    right_signer_image: Optional[str] = None
-    signature_mode: str = "two"
-
-    class Config:
-        from_attributes = True
-
-
-class CertSettingsUpdate(BaseModel):
-    organization_name: Optional[str] = Field(None, max_length=100)
-    left_signer_name: Optional[str] = Field(None, max_length=150)
-    left_signer_title: Optional[str] = Field(None, max_length=250)
-    right_signer_name: Optional[str] = Field(None, max_length=150)
-    right_signer_title: Optional[str] = Field(None, max_length=250)
-    signature_mode: Optional[Literal["one", "two"]] = None
 
 
 @router.get("", response_model=CertSettingsOut)
