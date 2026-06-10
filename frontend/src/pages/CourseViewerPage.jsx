@@ -2,14 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  Download,
-  ExternalLink,
   FileText,
   Film,
   Hourglass,
   Layers,
   ListChecks,
-  Paperclip,
   Trophy,
   Tv,
 } from 'lucide-react'
@@ -18,9 +15,11 @@ import { progressApi } from '@/api/progress'
 import { quizzesApi } from '@/api/quizzes'
 import { certificatesApi } from '@/api/certificates'
 import { mediaUrl } from '@/utils/media'
+import { getYoutubeEmbed } from '@/utils/youtube'
 import { showToast } from '@/lib/toast'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
-import { Badge } from '@/components/ui/badge'
+import useMidVideoQuizzes from '@/hooks/useMidVideoQuizzes'
+import useYouTubePlayer from '@/hooks/useYouTubePlayer'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -37,54 +36,10 @@ import CourseScoresModal from '@/components/CourseScoresModal'
 import LessonTree from '@/components/learner/LessonTree'
 import LessonFooter from '@/components/learner/LessonFooter'
 import LessonNotes from '@/components/learner/LessonNotes'
+import LessonResourceList from '@/components/learner/LessonResourceList'
 import { cn } from '@/lib/utils'
 import { toastApiError } from '@/utils/apiError'
-import { fmtBytes, fmtTime } from '@/utils/formatting'
-
-function isInternalMediaUrl(url) {
-  // Backend-served paths come back as /videos/, /pdfs/, /images/, etc. Anything
-  // that doesn't start with http(s) is treated as a same-origin media path and
-  // resolved via mediaUrl(). External links open in a new tab unchanged.
-  return typeof url === 'string' && !/^https?:\/\//i.test(url)
-}
-
-function getYoutubeEmbed(url) {
-  if (!url) return null
-  const pattern =
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^?&"'>]+)/
-  const match = url.match(pattern)
-  if (!match) return url
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const params = new URLSearchParams({ enablejsapi: '1' })
-  if (origin) params.set('origin', origin)
-  return `https://www.youtube.com/embed/${match[1]}?${params.toString()}`
-}
-
-function loadYTApi() {
-  return new Promise((resolve) => {
-    if (window.YT && window.YT.Player) {
-      resolve(window.YT)
-      return
-    }
-    const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]')
-    if (!existingScript) {
-      const tag = document.createElement('script')
-      tag.src = 'https://www.youtube.com/iframe_api'
-      document.body.appendChild(tag)
-    }
-    const prev = window.onYouTubeIframeAPIReady
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof prev === 'function') prev()
-      resolve(window.YT)
-    }
-    const poll = setInterval(() => {
-      if (window.YT && window.YT.Player) {
-        clearInterval(poll)
-        resolve(window.YT)
-      }
-    }, 200)
-  })
-}
+import { fmtTime } from '@/utils/formatting'
 
 export default function CourseViewerPage() {
   const { id, lessonId } = useParams()
@@ -111,13 +66,6 @@ export default function CourseViewerPage() {
 
   const videoRef = useRef(null)
   const lastSavedRef = useRef(0)
-
-  const [activeMidQuiz, setActiveMidQuiz] = useState(null)
-  const [triggeredQuizIds, setTriggeredQuizIds] = useState(new Set())
-  const ytIframeRef = useRef(null)
-  const ytPlayerRef = useRef(null)
-  const ytPollRef = useRef(null)
-  const lastYtSavedRef = useRef(0)
   const progressRef = useRef(progress)
   useEffect(() => {
     progressRef.current = progress
@@ -244,38 +192,45 @@ export default function CourseViewerPage() {
     course.modules.length > 0 &&
     course.modules.every((m) => isModuleCleared(m))
 
-  // === Mid-video quiz triggering refs ===
-  const currentLessonRef = useRef(currentLesson)
-  const lessonQuizzesRef = useRef(lessonQuizzes)
-  const triggeredQuizIdsRef = useRef(triggeredQuizIds)
-  useEffect(() => {
-    currentLessonRef.current = currentLesson
-  }, [currentLesson])
-  useEffect(() => {
-    lessonQuizzesRef.current = lessonQuizzes
-  }, [lessonQuizzes])
-  useEffect(() => {
-    triggeredQuizIdsRef.current = triggeredQuizIds
-  }, [triggeredQuizIds])
+  // === Mid-video quizzes + YouTube player (extracted hooks) ===
+  const quizzesLoaded = quizzes.length > 0
 
-  const findDueMidQuiz = (currentTime) => {
-    const cl = currentLessonRef.current
-    if (!cl) return null
-    const mids = (lessonQuizzesRef.current[cl.id] || []).filter(
-      (q) =>
-        q.placement === 'mid_video' &&
-        q.trigger_time != null &&
-        q.questions.length > 0
-    )
-    return (
-      mids.find(
-        (q) =>
-          currentTime >= q.trigger_time && !triggeredQuizIdsRef.current.has(q.id)
-      ) || null
-    )
-  }
+  const midQuiz = useMidVideoQuizzes({
+    currentLesson,
+    lessonQuizzes,
+    quizzesLoaded,
+    onPause: () => pauseCurrentVideo(),
+    onResume: () => playCurrentVideo(),
+    onSeek: (t) => seekCurrentVideo(t),
+  })
 
-  const pauseCurrentVideo = () => {
+  const { iframeRef: ytIframeRef, playerRef: ytPlayerRef } = useYouTubePlayer({
+    lesson: currentLesson,
+    getResumePosition: () => {
+      const saved = currentLesson ? progressRef.current[currentLesson.id] : null
+      return saved?.current_position > 0 && !saved.is_completed
+        ? saved.current_position
+        : 0
+    },
+    onQuizCheck: (tFloor) => {
+      const due = midQuiz.findDueMidQuiz(tFloor)
+      if (due) midQuiz.triggerMidQuiz(due)
+    },
+    onSaveProgress: (tFloor, isCompleted) => {
+      const lid = currentLesson?.id
+      if (!lid) return
+      progressApi
+        .update({
+          lesson_id: lid,
+          current_position: tFloor,
+          is_completed: isCompleted,
+        })
+        .then((p) => setProgress((prev) => ({ ...prev, [lid]: p })))
+        .catch(() => {})
+    },
+  })
+
+  function pauseCurrentVideo() {
     if (videoRef.current) {
       try {
         videoRef.current.pause()
@@ -288,7 +243,7 @@ export default function CourseViewerPage() {
     }
   }
 
-  const playCurrentVideo = () => {
+  function playCurrentVideo() {
     if (videoRef.current) {
       try {
         videoRef.current.play()
@@ -301,77 +256,31 @@ export default function CourseViewerPage() {
     }
   }
 
-  const triggerMidQuiz = (quiz) => {
-    setTriggeredQuizIds((prev) => new Set([...prev, quiz.id]))
-    setActiveMidQuiz(quiz)
-    pauseCurrentVideo()
-  }
-
-  const closeMidQuiz = () => {
-    setActiveMidQuiz(null)
-    playCurrentVideo()
-  }
-
-  /**
-   * Failed-mid-quiz rewind: when a learner fails a mid-video quiz, the
-   * "ย้อนไปดูใหม่" button in the modal calls this. We seek the video
-   * back to the previous mid-video quiz's trigger_time (or 0 if this is
-   * the first one) so they can re-watch the section that led up to the
-   * question. The failed quiz is removed from triggeredQuizIds so it
-   * re-triggers when the playhead reaches its trigger_time again.
-   */
-  const rewindMidQuiz = (quiz) => {
-    const cl = currentLessonRef.current
-    if (!cl || !quiz) return
-    const mids = (lessonQuizzesRef.current[cl.id] || [])
-      .filter((q) => q.placement === 'mid_video' && q.trigger_time != null)
-      .sort((a, b) => a.trigger_time - b.trigger_time)
-    const idx = mids.findIndex((q) => q.id === quiz.id)
-    const rewindTo = idx > 0 ? mids[idx - 1].trigger_time : 0
-
-    setTriggeredQuizIds((prev) => {
-      const next = new Set(prev)
-      next.delete(quiz.id)
-      return next
-    })
-    setActiveMidQuiz(null)
-
+  function seekCurrentVideo(seconds) {
     if (videoRef.current) {
       try {
-        videoRef.current.currentTime = rewindTo
+        videoRef.current.currentTime = seconds
         const p = videoRef.current.play()
         if (p && typeof p.catch === 'function') p.catch(() => {})
       } catch {}
     }
     if (ytPlayerRef.current?.seekTo) {
       try {
-        ytPlayerRef.current.seekTo(rewindTo, true)
+        ytPlayerRef.current.seekTo(seconds, true)
         ytPlayerRef.current.playVideo?.()
       } catch {}
     }
-
-    const mm = Math.floor(rewindTo / 60)
-    const ss = rewindTo % 60
-    showToast(
-      `ย้อนไปดูตั้งแต่นาที ${mm}:${String(ss).padStart(2, '0')} แล้วลองทำใหม่`,
-      'success'
-    )
   }
 
-  useEffect(() => {
-    setTriggeredQuizIds(new Set())
-    setActiveMidQuiz(null)
-  }, [currentLesson?.id])
-
-  // === Video progress + mid-quiz check ===
+  // === Native video progress + mid-quiz check ===
   const handleTimeUpdate = () => {
     if (!videoRef.current || !currentLesson) return
     const currentTime = Math.floor(videoRef.current.currentTime)
     const duration = videoRef.current.duration
 
-    const due = findDueMidQuiz(currentTime)
+    const due = midQuiz.findDueMidQuiz(currentTime)
     if (due) {
-      triggerMidQuiz(due)
+      midQuiz.triggerMidQuiz(due)
       return
     }
 
@@ -573,7 +482,7 @@ export default function CourseViewerPage() {
     }
     if (blockingQuiz) {
       if (blockingQuiz.placement === 'mid_video') {
-        setActiveMidQuiz(blockingQuiz)
+        midQuiz.showMidQuiz(blockingQuiz)
       } else {
         const el = document.getElementById(`quiz-${blockingQuiz.id}`)
         if (el) {
@@ -641,114 +550,6 @@ export default function CourseViewerPage() {
   const completedItems = completedLessons + (finalQuiz?.is_passed ? 1 : 0)
   const progressPercent =
     totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
-
-  // PDF mid-quiz trigger
-  const quizzesLoaded = quizzes.length > 0
-  useEffect(() => {
-    if (!currentLesson || currentLesson.content_type !== 'pdf' || !currentLesson.content_url)
-      return
-    if (!quizzesLoaded) return
-    const mids = (lessonQuizzesRef.current[currentLesson.id] || []).filter(
-      (q) =>
-        q.placement === 'mid_video' &&
-        q.questions.length > 0 &&
-        !triggeredQuizIdsRef.current.has(q.id)
-    )
-    if (mids.length === 0) return
-    const timers = mids.map((q) => {
-      const seconds = Math.max(0, q.trigger_time || 0)
-      return setTimeout(() => {
-        if (!triggeredQuizIdsRef.current.has(q.id)) {
-          triggerMidQuiz(q)
-        }
-      }, seconds * 1000)
-    })
-    return () => {
-      timers.forEach((t) => clearTimeout(t))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLesson?.id, currentLesson?.content_type, currentLesson?.content_url, quizzesLoaded])
-
-  // YouTube IFrame API
-  useEffect(() => {
-    if (
-      !currentLesson ||
-      currentLesson.content_type !== 'video_youtube' ||
-      !currentLesson.content_url
-    ) {
-      return
-    }
-
-    let cancelled = false
-    lastYtSavedRef.current = 0
-    loadYTApi().then((YT) => {
-      if (cancelled || !ytIframeRef.current) return
-      try {
-        ytPlayerRef.current = new YT.Player(ytIframeRef.current, {
-          events: {
-            onReady: () => {
-              const cl = currentLessonRef.current
-              const saved = cl ? progressRef.current[cl.id] : null
-              if (saved?.current_position > 0 && !saved.is_completed) {
-                try {
-                  ytPlayerRef.current.seekTo(saved.current_position, true)
-                } catch {}
-                lastYtSavedRef.current = saved.current_position
-              }
-
-              if (ytPollRef.current) clearInterval(ytPollRef.current)
-              ytPollRef.current = setInterval(() => {
-                if (!ytPlayerRef.current?.getCurrentTime) return
-                let t = 0
-                try {
-                  t = ytPlayerRef.current.getCurrentTime()
-                } catch {
-                  return
-                }
-                const tFloor = Math.floor(t)
-                const due = findDueMidQuiz(tFloor)
-                if (due) triggerMidQuiz(due)
-                if (tFloor - lastYtSavedRef.current >= 10) {
-                  lastYtSavedRef.current = tFloor
-                  let duration = 0
-                  try {
-                    duration = ytPlayerRef.current.getDuration() || 0
-                  } catch {}
-                  const isCompleted = duration > 0 && tFloor >= duration * 0.9
-                  const lid = currentLessonRef.current?.id
-                  if (lid) {
-                    progressApi
-                      .update({
-                        lesson_id: lid,
-                        current_position: tFloor,
-                        is_completed: isCompleted,
-                      })
-                      .then((p) => setProgress((prev) => ({ ...prev, [lid]: p })))
-                      .catch(() => {})
-                  }
-                }
-              }, 2000)
-            },
-          },
-        })
-      } catch {}
-    })
-
-    return () => {
-      cancelled = true
-      if (ytPollRef.current) {
-        clearInterval(ytPollRef.current)
-        ytPollRef.current = null
-      }
-      if (ytPlayerRef.current) {
-        try {
-          ytPlayerRef.current.destroy()
-        } catch {}
-        ytPlayerRef.current = null
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLesson?.id, currentLesson?.content_type, currentLesson?.content_url])
 
   if (loading) {
     return (
@@ -970,52 +771,7 @@ export default function CourseViewerPage() {
                       </div>
                     )}
 
-                    {Array.isArray(currentLesson.resources) &&
-                      currentLesson.resources.length > 0 && (
-                        <div className="mt-4">
-                          <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                            <Paperclip className="h-3.5 w-3.5" />
-                            เอกสารประกอบบทเรียน
-                          </div>
-                          <ul className="space-y-1.5">
-                            {currentLesson.resources.map((r) => {
-                              const internal = isInternalMediaUrl(r.url)
-                              const href = internal ? mediaUrl(r.url) : r.url
-                              const Icon = internal ? Download : ExternalLink
-                              const size = fmtBytes(r.file_size)
-                              return (
-                                <li key={r.id}>
-                                  <a
-                                    href={href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted"
-                                  >
-                                    <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                    <span className="flex-1 truncate text-foreground">
-                                      {r.title}
-                                    </span>
-                                    {r.resource_type && (
-                                      <Badge variant="secondary" className="font-normal">
-                                        {r.resource_type}
-                                      </Badge>
-                                    )}
-                                    {size && (
-                                      <span className="text-[11px] tabular-nums text-muted-foreground">
-                                        {size}
-                                      </span>
-                                    )}
-                                    <Icon
-                                      className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
-                                      aria-hidden="true"
-                                    />
-                                  </a>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </div>
-                      )}
+                    <LessonResourceList resources={currentLesson.resources} />
 
                     <LessonNotes lessonId={currentLesson.id} />
                   </CardContent>
@@ -1083,12 +839,12 @@ export default function CourseViewerPage() {
       />
 
       <MidVideoQuizModal
-        quiz={activeMidQuiz}
+        quiz={midQuiz.activeMidQuiz}
         showToast={showToast}
         onAttempted={refreshQuizzes}
-        onContinue={closeMidQuiz}
-        onSkip={closeMidQuiz}
-        onRewind={rewindMidQuiz}
+        onContinue={midQuiz.closeMidQuiz}
+        onSkip={midQuiz.closeMidQuiz}
+        onRewind={midQuiz.rewindMidQuiz}
       />
 
       <CourseScoresModal
