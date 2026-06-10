@@ -2,45 +2,43 @@
 
 Eligibility = every lesson in the course is marked is_completed for this user
 AND (the course's final quiz, if any, has been passed by this user).
+
+Domain logic (eligibility, numbering, expiry, PDF rendering) lives in
+app/services/completion.py and app/services/certificate.py; this router keeps
+the HTTP concerns — auth, rate limiting, and response shaping.
 """
-import base64
-import io
 import logging
-import os
-import secrets
 import threading
 import time
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
-import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
-from weasyprint import HTML
 
 from app.config import settings
 from app.core.helpers import get_or_404
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models.user import User
-from app.models.course import Course, Module
-from app.models.lesson import Lesson
-from app.models.enrollment import Enrollment
-from app.models.progress import LessonProgress
-from app.models.quiz import Quiz, QuizAttempt
+from app.models.course import Course
 from app.models.certificate import Certificate
 from app.services.audit import log_action
+from app.services.completion import course_completion
+from app.services.certificate import (
+    compute_expires_at,
+    generate_certificate_number,
+    is_expired,
+    render_certificate_pdf,
+)
 
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/certificates", tags=["Certificates"])
-
-CERT_DIR = Path(settings.CERT_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -95,539 +93,6 @@ def _check_verify_rate(ip: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Eligibility / scoring helpers
-# ---------------------------------------------------------------------------
-
-def _course_completion(db: Session, user_id: int, course_id: int):
-    """Return (eligible, final_score_or_None, reason_if_not).
-
-    Eligible iff: enrolled, all lessons completed, and the course's final quiz
-    (if it has one) has been passed. final_score is the best final-exam attempt
-    when a final exists, otherwise None (course without a final still issues).
-    """
-    enrolled = db.query(Enrollment).filter(
-        Enrollment.user_id == user_id,
-        Enrollment.course_id == course_id,
-    ).first()
-    if not enrolled:
-        return False, None, "ยังไม่ได้ลงทะเบียนหลักสูตรนี้"
-
-    total_lessons = (
-        db.query(func.count(Lesson.id))
-        .join(Module, Lesson.module_id == Module.id)
-        .filter(Module.course_id == course_id)
-        .scalar()
-    ) or 0
-    if total_lessons == 0:
-        return False, None, "หลักสูตรยังไม่มีบทเรียน"
-
-    completed_lessons = (
-        db.query(func.count(LessonProgress.id))
-        .join(Lesson, Lesson.id == LessonProgress.lesson_id)
-        .join(Module, Module.id == Lesson.module_id)
-        .filter(
-            Module.course_id == course_id,
-            LessonProgress.user_id == user_id,
-            LessonProgress.completed == True,
-        )
-        .scalar()
-    ) or 0
-    if completed_lessons < total_lessons:
-        return False, None, f"เรียนยังไม่ครบ ({completed_lessons}/{total_lessons} บทเรียน)"
-
-    final_score = None
-    final_quiz = (
-        db.query(Quiz)
-        .filter(Quiz.course_id == course_id, Quiz.placement == "final")
-        .first()
-    )
-    if final_quiz:
-        best = (
-            db.query(QuizAttempt)
-            .filter(
-                QuizAttempt.user_id == user_id,
-                QuizAttempt.quiz_id == final_quiz.id,
-                QuizAttempt.is_passed == True,
-            )
-            .order_by(QuizAttempt.score.desc())
-            .first()
-        )
-        if not best:
-            return False, None, "ยังไม่ผ่านแบบทดสอบสุดท้าย"
-        final_score = float(best.score)
-
-    return True, final_score, None
-
-
-def _gen_certificate_number() -> str:
-    return f"CERT-{datetime.utcnow():%Y%m%d}-{secrets.token_hex(3).upper()}"
-
-
-def _compute_expires_at(course: Course, issued_at: datetime | None = None) -> datetime | None:
-    """Snapshot expiry for a freshly-issued certificate.
-
-    None when the course has no recertification policy (permanent cert).
-    Always uses UTC; comparisons elsewhere also use UTC-aware datetimes.
-    """
-    days = course.recertify_after_days
-    if not days or days <= 0:
-        return None
-    base = issued_at or datetime.now(timezone.utc)
-    if base.tzinfo is None:
-        base = base.replace(tzinfo=timezone.utc)
-    return base + timedelta(days=days)
-
-
-def _is_expired(cert: Certificate) -> bool:
-    if not cert.expires_at:
-        return False
-    exp = cert.expires_at
-    if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
-    return exp < datetime.now(timezone.utc)
-
-
-def _verify_url(cert_number: str) -> str:
-    """The URL/text the QR code points at.
-
-    With PUBLIC_BASE_URL set, the QR scans into a working verify link. Without
-    it (dev, or before the prod domain is configured), we still encode the
-    certificate number as plain text so a scanner shows something useful and
-    the recipient can type it into the verify page manually.
-    """
-    base = (settings.PUBLIC_BASE_URL or "").rstrip("/")
-    if base:
-        return f"{base}/verify/{cert_number}"
-    return cert_number
-
-
-def _qr_data_uri(text: str) -> str:
-    """Render a QR PNG and return a data: URI ready to drop into an <img src>.
-
-    Inline rather than disk-write because WeasyPrint reads the HTML at render
-    time — fetching from disk would require absolute paths and cleanup. Box-size
-    of 4 + medium error correction renders a ~200px QR at print resolution,
-    which scans reliably from a phone held 20cm away.
-    """
-    qr = qrcode.QRCode(
-        version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=4,
-        border=2,
-    )
-    qr.add_data(text)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="#0F6E56", back_color="white")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-
-
-_THAI_MONTHS = [
-    "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-]
-_THAI_DIGITS = str.maketrans("0123456789", "๐๑๒๓๔๕๖๗๘๙")
-
-
-def _format_thai_date(d: datetime) -> str:
-    """Render '๑๕ พฤศจิกายน พ.ศ. ๒๕๖๗' style dates — matches the official cert
-    layout the department uses on paper."""
-    day = str(d.day).translate(_THAI_DIGITS)
-    month = _THAI_MONTHS[d.month]
-    year = str(d.year + 543).translate(_THAI_DIGITS)
-    return f"๑".replace("๑", day) + f" {month} พ.ศ. {year}"
-
-
-def _build_certificate_html(cert, user, course, db=None) -> str:
-    """Return the cert PDF as an HTML string. Split from
-    `_render_certificate_pdf` so the preview endpoint can render to bytes
-    without writing to disk. Accepts duck-typed cert/user/course (real
-    ORM rows OR stub objects with the same attributes) — used to keep
-    the preview path free of DB insertion.
-
-    Layout intentionally mirrors the official Royal Forest Department
-    paper certificate: gold layered border, organisation header, recipient
-    name centred and oversized, course title, Thai-numeral Buddhist Era
-    date, and two signature blocks at the bottom whose names and titles
-    come from `cert_settings` (admin-editable). QR code sits in the
-    bottom-right corner for public verification."""
-    # Late import to avoid a circular dependency between routers.
-    from app.models.cert_settings import CertSettings
-
-    issued = cert.issued_at or datetime.utcnow()
-    qr_uri = _qr_data_uri(_verify_url(cert.certificate_number))
-    verify_label = (
-        "สแกนเพื่อตรวจสอบความถูกต้อง"
-        if settings.PUBLIC_BASE_URL
-        else "สแกนเพื่อดูเลขที่ใบรับรอง"
-    )
-
-    cs: CertSettings | None = None
-    if db is not None:
-        cs = db.query(CertSettings).first()
-    org = (cs.organization_name if cs else "") or "กรมป่าไม้"
-    left_name = (cs.left_signer_name if cs else "") or ""
-    left_title = (cs.left_signer_title if cs else "") or ""
-    right_name = (cs.right_signer_name if cs else "") or ""
-    right_title = (cs.right_signer_title if cs else "") or ""
-    left_image_url = (cs.left_signer_image if cs else None) or None
-    right_image_url = (cs.right_signer_image if cs else None) or None
-
-    score_line = (
-        f"<p class='score'>คะแนนสอบสุดท้าย <strong>{int(cert.final_score)}%</strong></p>"
-        if cert.final_score is not None else ""
-    )
-
-    def _signature_image_uri(url: str | None) -> str | None:
-        """Resolve a stored signature URL (e.g. '/images/signatures/abc.png')
-        to a base64 data URI WeasyPrint can embed without any URL fetching
-        gymnastics. Returns None if the file isn't on disk."""
-        if not url:
-            return None
-        # Signature URLs always point into the signatures dir; resolve by name.
-        fs = Path(settings.SIGNATURE_DIR) / Path(url).name
-        if not fs.exists() or not fs.is_file():
-            return None
-        try:
-            data = fs.read_bytes()
-        except OSError:
-            return None
-        return "data:image/png;base64," + base64.b64encode(data).decode("ascii")
-
-    left_image_uri = _signature_image_uri(left_image_url)
-    right_image_uri = _signature_image_uri(right_image_url)
-
-    # Header crest: department logo above the org name. Picked up from a
-    # known filesystem path so deploy is "drop the PNG in this folder" —
-    # no DB row, no upload endpoint. /app/images is the same volume that
-    # holds cover images, so existing infra carries it.
-    logo_uri = None
-    _logo_fs = Path(settings.IMAGE_DIR) / "forest_logo.png"
-    if _logo_fs.exists() and _logo_fs.is_file():
-        try:
-            logo_uri = (
-                "data:image/png;base64,"
-                + base64.b64encode(_logo_fs.read_bytes()).decode("ascii")
-            )
-        except OSError:
-            logo_uri = None
-    logo_html = (
-        f"<img class='header-logo' src='{logo_uri}' alt='' />"
-        if logo_uri else ""
-    )
-
-    # Each signature block renders only when at least one of name / title /
-    # image is set, so an un-configured cert just shows the body + date + QR
-    # without empty signature lines hanging off the bottom. When an image is
-    # uploaded we use it INSTEAD of the dotted line so the cert reads like a
-    # genuinely-signed document.
-    def _sig_block(name: str, title: str, image_uri: str | None) -> str:
-        if not (name or title or image_uri):
-            return ""
-        if image_uri:
-            line_html = f"<img class='sig-image' src='{image_uri}' alt='signature' />"
-        else:
-            line_html = "<div class='sig-line'></div>"
-        name_html = f"<div class='sig-name'>({name})</div>" if name else ""
-        title_html = f"<div class='sig-title'>{title}</div>" if title else ""
-        return f"<div class='sig'>{line_html}{name_html}{title_html}</div>"
-
-    left_sig = _sig_block(left_name, left_title, left_image_uri)
-    right_sig = _sig_block(right_name, right_title, right_image_uri)
-    # signature_mode toggle: "one" = render only the LEFT signer (centered);
-    # "two" (default) = render both side-by-side. Setting "one" doesn't
-    # touch the right-side fields in the database, so switching back to
-    # "two" later restores both without re-typing.
-    sig_mode = (cs.signature_mode if cs else "two") or "two"
-    if sig_mode == "one":
-        right_sig = ""
-    sigs_class = "single" if sig_mode == "one" else "dual"
-    issued_date_th = _format_thai_date(issued)
-
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="th">
-    <head>
-        <meta charset="UTF-8" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap"
-        />
-        <style>
-            @page {{ size: A4 landscape; margin: 0; }}
-
-            body {{
-                margin: 0;
-                font-family: 'Sarabun', 'DejaVu Sans', sans-serif;
-                background: #FFFFFF;
-                color: #1F2937;
-            }}
-
-            .outer {{
-                margin: 5mm;
-                padding: 3mm;
-                height: calc(210mm - 10mm - 6mm);
-                box-sizing: border-box;
-            }}
-
-            .mid {{
-                padding: 2mm;
-                height: 100%;
-                box-sizing: border-box;
-            }}
-
-            .frame {{
-                padding: 6mm 16mm 28mm 16mm;
-                height: 100%;
-                box-sizing: border-box;
-                background: #FFFFFF;
-                text-align: center;
-                position: relative;
-                overflow: hidden;
-            }}
-
-            .header-logo {{
-                display: block;
-                width: 32mm;
-                height: 32mm;
-                margin: 0 auto 1mm;
-                object-fit: contain;
-            }}
-
-            .org {{
-                font-size: 43pt;
-                font-weight: 600;
-                color: #0E4B36;
-                margin: 0 0 1mm;
-                letter-spacing: 0.02em;
-                line-height: 1.1;
-            }}
-
-            .org-rule {{ 
-                width: 60mm;
-                height: 0;
-                border-top: 2px solid #D4A017;
-                margin: 1mm auto 4mm;
-            }}
-
-            .intro {{
-                font-size: 18pt;
-                margin: 0 0 3mm;
-            }}
-
-            /* Recipient name with flanking gold flourishes. Flex layout means
-               the side rules grow / shrink to fill, so a short or long name
-               both look balanced — no hard-coded widths to fight. */
-            .recipient-row {{
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8mm;
-                margin: 4mm 0 6mm;
-            }}
-            .flourish {{
-                flex: 1 1 0;
-                max-width: 50mm;
-                min-width: 12mm;
-                height: 0;
-                border-top: 1.5px solid #D4A017;
-                position: relative;
-            }}
-            .flourish::before,
-            .flourish::after {{
-                content: '';
-                position: absolute;
-                top: -1mm;
-                width: 2mm;
-                height: 2mm;
-                background: #D4A017;
-                transform: rotate(45deg);
-            }}
-            .flourish::before {{ left: 0; }}
-            .flourish::after {{ right: 0; }}
-            .recipient {{
-                font-size: 28pt;
-                color: #111827;
-                letter-spacing: 0.01em;
-                white-space: nowrap;
-            }}
-
-            .course-intro {{
-                font-size: 18pt;
-                font-weight: 600;
-                margin: 0 0 2mm;
-            }}
-
-            .course {{
-                font-size: 18pt;
-                font-weight: 600;
-                color: #0E4B36;
-                margin: 0 0 3mm;
-                line-height: 1.35;
-            }}
-
-            .score {{
-                font-size: 11pt;
-                color: #4B5563;
-                margin: 0 0 2mm;
-            }}
-
-            .score strong {{
-                color: #0E4B36;
-            }}
-
-            .date {{
-                font-size: 13pt;
-                color: #374151;
-                margin: 4mm 0 0;
-            }}
-
-            .sigs {{
-                margin: 8mm 0 0;
-                display: flex;
-                align-items: flex-start;
-                gap: 10mm;
-            }}
-            .sigs.dual {{
-                justify-content: space-around;
-            }}
-            .sigs.dual .sig {{
-                flex: 1;
-            }}
-            /* One-signer layout: don't stretch — fix to a sensible width and
-               center horizontally. Otherwise a single flex:1 block fills the
-               row, which looks like a layout bug. */
-            .sigs.single {{
-                justify-content: center;
-            }}
-            .sigs.single .sig {{
-                flex: 0 0 auto;
-                width: 90mm;
-            }}
-
-            .sig {{
-                text-align: center;
-                font-size: 13pt;
-                color: #374151;
-            }}
-
-            .sig-line {{
-                width: 60mm;
-                margin: 0 auto 2mm;
-                border-bottom: 1px dotted #6B7280;
-                height: 12mm;
-            }}
-
-            .sig-image {{
-                display: block;
-                max-width: 60mm;
-                max-height: 18mm;
-                margin: 0 auto 1mm;
-                object-fit: contain;
-            }}
-
-            .sig-name {{
-                font-weight: 600;
-                color: #1F2937;
-            }}
-
-            .sig-title {{
-                font-size: 13pt;
-                color: #4B5563;
-                margin-top: 0.5mm;
-            }}
-
-            .footer-row {{
-                position: absolute;
-                left: 16mm;
-                right: 16mm;
-                bottom: 3mm;
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-end;
-                font-size: 9pt;
-                color: #6B7280;
-            }}
-
-            .cert-no {{
-                text-align: left;
-            }}
-
-            .cert-no strong {{
-                font-family: 'DejaVu Sans Mono', monospace;
-                color: #1F2937;
-            }}
-
-            .qr {{
-                text-align: right;
-            }}
-
-            .qr img {{
-                margin-top: 2mm;
-                width: 18mm;
-                height: 18mm;
-                display: inline-block;
-            }}
-
-            .qr .qr-label {{
-                font-size: 7.5pt;
-                color: #6B7280;
-            }}
-        </style>
-    </head>
-    <body>
-      <div class="outer">
-        <div class="mid">
-          <div class="frame">
-            {logo_html}
-            <div class="org">{org}</div>
-            <div class="org-rule"></div>
-            <p class="intro">ขอมอบประกาศนียบัตรให้ไว้เพื่อแสดงว่า</p>
-            <div class="recipient-row">
-              <span class="flourish left"></span>
-              <span class="recipient">{user.full_name}</span>
-              <span class="flourish right"></span>
-            </div>
-            <p class="course-intro">ได้สำเร็จการฝึกอบรมหลักสูตร</p>
-            <div class="course">{course.title}</div>
-            {score_line}
-            <p class="date">ให้ไว้ ณ วันที่ {issued_date_th}</p>
-
-            <div class="sigs {sigs_class}">
-              {left_sig}
-              {right_sig}
-            </div>
-
-            <div class="footer-row">
-              <div class="cert-no">
-                เลขที่ใบรับรอง <strong>{cert.certificate_number}</strong>
-              </div>
-              <div class="qr">
-                <img src="{qr_uri}" alt="QR" />
-                <div class="qr-label">{verify_label}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-    """
-
-    return html
-
-
-def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=None) -> Path:
-    """Write a PDF for this certificate and return the path."""
-    html = _build_certificate_html(cert, user, course, db=db)
-    CERT_DIR.mkdir(parents=True, exist_ok=True)
-    path = CERT_DIR / f"{cert.certificate_number}.pdf"
-    HTML(string=html).write_pdf(target=str(path))
-    return path
-
-
-# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -639,7 +104,7 @@ def eligibility(
 ):
     """Tell the client whether the learner can claim a certificate for this course,
     and whether one was already issued (and whether it's still valid)."""
-    eligible, final_score, reason = _course_completion(db, current_user.id, course_id)
+    eligible, final_score, reason = course_completion(db, current_user.id, course_id)
     # The "current" cert is the most recent one — recertification flows can
     # have multiple historical certs per (user, course).
     existing = (
@@ -648,7 +113,7 @@ def eligibility(
         .order_by(Certificate.issued_at.desc())
         .first()
     )
-    cert_expired = bool(existing) and _is_expired(existing)
+    cert_expired = bool(existing) and is_expired(existing)
     cert_revoked = bool(existing) and existing.is_revoked
     return {
         "eligible": eligible,
@@ -685,10 +150,10 @@ def issue(
     )
     # A revoked cert counts as invalid here — a fresh one should be issued
     # (assuming the learner is still eligible). Treat it like an expired one.
-    if existing and not _is_expired(existing) and not existing.is_revoked:
+    if existing and not is_expired(existing) and not existing.is_revoked:
         # Regenerate the PDF if it's missing on disk (e.g. fresh container).
         if not existing.pdf_path or not Path(existing.pdf_path).exists():
-            path = _render_certificate_pdf(existing, current_user, course, db=db)
+            path = render_certificate_pdf(existing, current_user, course, db=db)
             existing.pdf_path = str(path)
             db.commit()
         return {
@@ -703,22 +168,22 @@ def issue(
     # Either no cert yet, or the most recent one expired → issue fresh.
     # Re-check eligibility — they may have retaken the final quiz between expiry
     # and now.
-    eligible, final_score, reason = _course_completion(db, current_user.id, course_id)
+    eligible, final_score, reason = course_completion(db, current_user.id, course_id)
     if not eligible:
         raise HTTPException(status_code=400, detail=reason or "ยังไม่มีสิทธิ์รับใบรับรอง")
 
     cert = Certificate(
         user_id=current_user.id,
         course_id=course_id,
-        certificate_number=_gen_certificate_number(),
+        certificate_number=generate_certificate_number(),
         final_score=final_score,
-        expires_at=_compute_expires_at(course),
+        expires_at=compute_expires_at(course),
     )
     db.add(cert)
     db.commit()
     db.refresh(cert)
 
-    path = _render_certificate_pdf(cert, current_user, course, db=db)
+    path = render_certificate_pdf(cert, current_user, course, db=db)
     cert.pdf_path = str(path)
     db.commit()
 
@@ -752,7 +217,7 @@ def my_certificates(
             "final_score": c.final_score,
             "issued_at": c.issued_at.isoformat() if c.issued_at else None,
             "expires_at": c.expires_at.isoformat() if c.expires_at else None,
-            "is_expired": _is_expired(c),
+            "is_expired": is_expired(c),
             "is_revoked": c.is_revoked,
             "course": {"id": course.id, "title": course.title},
         }
@@ -783,7 +248,7 @@ def download(
 
     # Regenerate if the PDF is missing (e.g. cert dir wiped on container rebuild).
     if not cert.pdf_path or not Path(cert.pdf_path).exists():
-        path = _render_certificate_pdf(cert, cert.user, cert.course, db=db)
+        path = render_certificate_pdf(cert, cert.user, cert.course, db=db)
         cert.pdf_path = str(path)
         db.commit()
 
@@ -814,7 +279,7 @@ def admin_list(
             "final_score": c.final_score,
             "issued_at": c.issued_at.isoformat() if c.issued_at else None,
             "expires_at": c.expires_at.isoformat() if c.expires_at else None,
-            "is_expired": _is_expired(c),
+            "is_expired": is_expired(c),
             "is_revoked": c.is_revoked,
             "revoked_reason": c.revoked_reason,
             "revoked_at": c.revoked_at.isoformat() if c.revoked_at else None,
@@ -879,7 +344,7 @@ def verify_certificate(
     cert, user, course = row
     if cert.is_revoked:
         status_str = "revoked"
-    elif _is_expired(cert):
+    elif is_expired(cert):
         status_str = "expired"
     else:
         status_str = "valid"

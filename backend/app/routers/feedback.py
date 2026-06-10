@@ -24,7 +24,7 @@ from app.models.course_feedback import CourseFeedback
 from app.models.user import User
 # Reuse the cert eligibility check so "completed" means the same thing
 # everywhere — single source of truth for what counts as finishing a course.
-from app.routers.certificates import _course_completion
+from app.services.completion import course_completion
 
 
 router = APIRouter(prefix="/api/courses", tags=["Course feedback"])
@@ -69,7 +69,7 @@ def submit_feedback(
     """
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
-    eligible, _final_score, reason = _course_completion(db, current_user.id, course_id)
+    eligible, _final_score, reason = course_completion(db, current_user.id, course_id)
     if not eligible:
         raise HTTPException(
             status_code=400,
@@ -131,7 +131,7 @@ def my_feedback(
         )
         .first()
     )
-    eligible, _score, reason = _course_completion(db, current_user.id, course_id)
+    eligible, _score, reason = course_completion(db, current_user.id, course_id)
     return {
         "has_feedback": row is not None,
         "rating": row.rating if row else None,

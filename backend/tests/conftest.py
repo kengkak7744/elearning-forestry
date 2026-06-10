@@ -175,5 +175,5 @@ def fake_pdf_render(monkeypatch, tmp_path):
         path.write_bytes(b"%PDF-1.4 test stub")
         return path
 
-    monkeypatch.setattr(certificates, "_render_certificate_pdf", _fake_render)
+    monkeypatch.setattr(certificates, "render_certificate_pdf", _fake_render)
     return _fake_render

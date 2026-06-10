@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
 from app.core.helpers import require_enrollment
 from app.database import get_db
@@ -10,6 +9,7 @@ from app.models.progress import LessonProgress
 from app.models.lesson import Lesson
 from app.models.course import Module
 from app.schemas.progress import ProgressUpdate
+from app.services.progress import upsert_lesson_progress
 
 router = APIRouter()
 
@@ -40,39 +40,14 @@ def update_progress(
     if current_user.role.value not in ("admin", "instructor"):
         require_enrollment(db, current_user.id, course_id, "ต้องลงทะเบียนหลักสูตรก่อน")
 
-    progress = db.query(LessonProgress).filter(
-        LessonProgress.user_id == current_user.id,
-        LessonProgress.lesson_id == lesson_id,
-    ).first()
-
-    now = datetime.now(timezone.utc)
-
-    if progress:
-        # Update correct field based on content type
-        if content_type == "pdf":
-            progress.current_page = current_position
-        else:
-            progress.position_seconds = current_position
-
-        if is_completed and not progress.completed:
-            progress.completed = True
-            progress.completed_at = now
-
-        progress.last_accessed_at = now
-    else:
-        progress = LessonProgress(
-            user_id=current_user.id,
-            lesson_id=lesson_id,
-            position_seconds=current_position if content_type != "pdf" else 0,
-            current_page=current_position if content_type == "pdf" else 1,
-            completed=is_completed,
-            completed_at=now if is_completed else None,
-            last_accessed_at=now,
-        )
-        db.add(progress)
-
-    db.commit()
-    db.refresh(progress)
+    progress = upsert_lesson_progress(
+        db,
+        current_user,
+        lesson_id,
+        current_position=current_position,
+        is_completed=is_completed,
+        content_type=content_type,
+    )
 
     # Return normalized shape for frontend
     return {

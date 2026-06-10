@@ -9,7 +9,6 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from weasyprint import HTML
 
 from app.config import settings
 from app.database import get_db
@@ -17,6 +16,7 @@ from app.dependencies import require_admin
 from app.models.cert_settings import CertSettings
 from app.models.user import User
 from app.services.audit import log_action
+from app.services.certificate import render_certificate_pdf_bytes
 
 
 # Signatures live alongside the cover-image storage, in a subfolder so
@@ -194,9 +194,6 @@ def preview_certificate(
       - certificate number: "CERT-PREVIEW-<random>" so each preview is
         traceable in the verify-rate-limit log if anyone scans the QR
     """
-    # Late import to avoid a circular dependency between the two routers.
-    from app.routers.certificates import _build_certificate_html
-
     now = datetime.now(timezone.utc)
     stamp = now.strftime("%Y%m%d")
     suffix = uuid.uuid4().hex[:6].upper()
@@ -212,8 +209,7 @@ def preview_certificate(
         issued_at=now,
     )
 
-    html_str = _build_certificate_html(fake_cert, fake_user, fake_course, db=db)
-    pdf_bytes = HTML(string=html_str).write_pdf()
+    pdf_bytes = render_certificate_pdf_bytes(fake_cert, fake_user, fake_course, db=db)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
