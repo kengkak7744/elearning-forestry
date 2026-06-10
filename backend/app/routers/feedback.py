@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.core.helpers import get_or_404
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_roles
+from app.models.user import UserRole
 from app.models.course import Course
 from app.models.course_feedback import CourseFeedback
 from app.models.user import User
@@ -163,11 +164,11 @@ def list_feedback(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.INSTRUCTOR, detail="ไม่มีสิทธิ์เข้าถึง")
+    ),
 ):
     """Full feedback list with author info — admin/instructor only."""
-    if current_user.role.value not in ("admin", "instructor"):
-        raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์เข้าถึง")
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     rows = (

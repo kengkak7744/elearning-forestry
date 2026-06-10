@@ -5,8 +5,8 @@ from typing import List
 
 from app.core.helpers import get_or_404, require_enrollment
 from app.database import get_db
-from app.dependencies import get_current_user
-from app.models.user import User
+from app.dependencies import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.models.quiz import Quiz, Question, QuizAttempt, QuestionType
 from app.models.lesson import Lesson
 from app.models.course import Course, Module
@@ -19,10 +19,11 @@ from app.services.quiz_grading import grade_attempt
 
 router = APIRouter()
 
-
-def require_admin(current_user: User):
-    if current_user.role.value not in ("admin", "instructor"):
-        raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์")
+# Quiz authoring is open to admins AND instructors; the short detail string
+# predates the shared dependency and is kept verbatim.
+require_quiz_editor = require_roles(
+    UserRole.ADMIN, UserRole.INSTRUCTOR, detail="ไม่มีสิทธิ์"
+)
 
 
 def _strip_question_answers(q):
@@ -101,12 +102,10 @@ def get_lesson_quizzes(
 def get_course_stats(
     course_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
     """Aggregate stats across every quiz in a course — per-quiz summary,
     per-learner roll-up, and overall numbers."""
-    require_admin(current_user)
-
     # All quizzes in this course (lesson-bound + the course-level final).
     lesson_quizzes = (
         db.query(Quiz)
@@ -219,11 +218,10 @@ def get_course_stats(
 def get_quiz_stats(
     quiz_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
     """Aggregate analytics for a quiz — per-question correctness rates,
     choice distributions, and free-text responses (written / opinion)."""
-    require_admin(current_user)
     quiz = (
         db.query(Quiz)
         .options(joinedload(Quiz.questions))
@@ -342,10 +340,9 @@ def get_quiz_stats(
 def get_lesson_quizzes_admin(
     lesson_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
     """Admin/instructor only: includes answer keys for editing."""
-    require_admin(current_user)
     quizzes = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
         Quiz.lesson_id == lesson_id
     ).order_by(Quiz.order_index).all()
@@ -409,10 +406,9 @@ def get_course_final_quiz(
 def get_course_final_quiz_admin(
     course_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
     """Admin/instructor only: includes answer keys for editing."""
-    require_admin(current_user)
     quiz = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
         Quiz.course_id == course_id,
         Quiz.placement == "final"
@@ -426,9 +422,8 @@ def get_course_final_quiz_admin(
 def create_quiz(
     payload: QuizCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
-    require_admin(current_user)
     quiz = Quiz(**payload.model_dump())
     db.add(quiz)
     db.commit()
@@ -441,9 +436,8 @@ def update_quiz(
     quiz_id: int,
     payload: QuizUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
-    require_admin(current_user)
     quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(quiz, key, value)
@@ -456,9 +450,8 @@ def update_quiz(
 def delete_quiz(
     quiz_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
-    require_admin(current_user)
     quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
     db.delete(quiz)
     db.commit()
@@ -472,9 +465,8 @@ def create_question(
     quiz_id: int,
     payload: QuestionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
-    require_admin(current_user)
     quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
     question = Question(quiz_id=quiz_id, **payload.model_dump())
     db.add(question)
@@ -488,9 +480,8 @@ def update_question(
     question_id: int,
     payload: QuestionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
-    require_admin(current_user)
     q = get_or_404(db, Question, question_id, "ไม่พบคำถาม")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(q, key, value)
@@ -503,9 +494,8 @@ def update_question(
 def delete_question(
     question_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_quiz_editor),
 ):
-    require_admin(current_user)
     q = get_or_404(db, Question, question_id, "ไม่พบคำถาม")
     db.delete(q)
     db.commit()

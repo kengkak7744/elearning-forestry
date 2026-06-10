@@ -430,8 +430,9 @@ async def bulk_import_users(
 
     # Snapshot what already exists so we don't have to query per row for
     # large imports — a couple hundred rows × 2 queries each adds up.
-    existing_usernames = {u for (u,) in db.query(User.username).all()}
-    existing_emails = {e.lower() for (e,) in db.query(User.email).all()}
+    existing_rows = db.query(User.username, User.email).all()
+    existing_usernames = {u for u, _ in existing_rows}
+    existing_emails = {e.lower() for _, e in existing_rows}
 
     created = []          # [{username, email, full_name, generated_password|null}]
     skipped = []          # [{row, username|email, reason}]

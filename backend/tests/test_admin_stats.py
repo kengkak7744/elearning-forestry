@@ -90,17 +90,14 @@ class TestDepartments:
         assert res.headers["content-type"].startswith("text/csv")
         assert "ชื่อผู้ใช้" in res.text
 
-    @pytest.mark.xfail(
-        reason="Pre-existing bug: safe_name uses isalnum(), which keeps Thai "
-        "characters, and the Content-Disposition header can't encode them "
-        "(latin-1) → 500 for every Thai-named department.",
-        raises=UnicodeEncodeError,
-    )
     def test_department_members_csv_thai_name(self, admin_client, learner_user):
+        # Thai department names used to 500 (Thai chars survived into the
+        # latin-1-only Content-Disposition header); now ASCII-sanitized.
         res = admin_client.get(
             f"/api/admin/stats/departments/{learner_user.department}/members.csv"
         )
         assert res.status_code == 200
+        assert "ชื่อผู้ใช้" in res.text
 
     def test_department_course_performance(self, admin_client, db, learner_user):
         course = make_course(db, is_mandatory=True)

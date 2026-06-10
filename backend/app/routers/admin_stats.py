@@ -407,8 +407,11 @@ def department_members_csv(
     body = build_department_members_csv(rows)
     stamp = datetime.now().strftime("%Y%m%d")
     # Department name may contain spaces / Thai chars; ASCII-fallback the
-    # filename so old User-Agent headers don't mangle the download.
-    safe_name = "".join(c if c.isalnum() else "_" for c in department)[:60]
+    # filename because HTTP headers are latin-1 only (Thai chars in the
+    # Content-Disposition header used to crash this endpoint with a 500).
+    safe_name = "".join(
+        c if (c.isascii() and c.isalnum()) else "_" for c in department
+    )[:60]
     filename = f"department-{safe_name}-{stamp}.csv"
     return StreamingResponse(
         iter([body]),
