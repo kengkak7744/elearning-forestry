@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import useFetchData from '@/hooks/useFetchData'
 import {
   Award,
-  Clock,
   Download,
   RotateCcw,
   Search,
@@ -28,16 +27,7 @@ import {
 } from '@/components/ui/table'
 import { toastApiError } from '@/utils/apiError'
 import { formatThaiDate } from '@/utils/formatting'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 
 function StatusBadge({ cert }) {
   if (cert.is_revoked) {
@@ -318,55 +308,46 @@ export default function AdminCertificatesPage() {
         </Card>
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={!!revokeTarget}
         onOpenChange={(o) => !o && setRevokeTarget(null)}
+        title="เพิกถอนใบรับรอง"
+        description={
+          'เมื่อเพิกถอนแล้ว หน้า "ตรวจสอบใบรับรอง" จะแสดงว่าใบรับรองนี้ถูกเพิกถอน ไฟล์ PDF เดิมยังคงอยู่แต่จะถือว่าใช้ไม่ได้'
+        }
+        confirmLabel={revokeBusy ? 'กำลังเพิกถอน...' : 'เพิกถอน'}
+        cancelLabel={BUTTONS.CANCEL}
+        destructive
+        busy={revokeBusy}
+        confirmDisabled={!revokeReason.trim()}
+        onConfirm={handleRevoke}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>เพิกถอนใบรับรอง</AlertDialogTitle>
-            <AlertDialogDescription>
-              เมื่อเพิกถอนแล้ว หน้า "ตรวจสอบใบรับรอง" จะแสดงว่าใบรับรองนี้ถูกเพิกถอน
-              ไฟล์ PDF เดิมยังคงอยู่แต่จะถือว่าใช้ไม่ได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {revokeTarget && (
-            <div className="space-y-3 text-sm">
-              <div className="rounded-md bg-muted/40 p-3">
-                <div className="font-mono text-xs">{revokeTarget.certificate_number}</div>
-                <div className="mt-1 font-medium">{revokeTarget.user?.full_name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {revokeTarget.course?.title}
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-foreground">
-                  เหตุผลในการเพิกถอน <span className="text-destructive">*</span>
-                </label>
-                <Textarea
-                  value={revokeReason}
-                  onChange={(e) => setRevokeReason(e.target.value.slice(0, 500))}
-                  placeholder="ตัวอย่าง: ออกผิดให้ผู้รับ / ตรวจพบทุจริตในการสอบ / ฯลฯ"
-                  rows={3}
-                />
-                <div className="mt-0.5 text-right text-[11px] text-muted-foreground tabular-nums">
-                  {revokeReason.length}/500
-                </div>
+        {revokeTarget && (
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md bg-muted/40 p-3">
+              <div className="font-mono text-xs">{revokeTarget.certificate_number}</div>
+              <div className="mt-1 font-medium">{revokeTarget.user?.full_name}</div>
+              <div className="text-xs text-muted-foreground">
+                {revokeTarget.course?.title}
               </div>
             </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={revokeBusy}>{BUTTONS.CANCEL}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRevoke}
-              disabled={revokeBusy || !revokeReason.trim()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {revokeBusy ? 'กำลังเพิกถอน...' : 'เพิกถอน'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                เหตุผลในการเพิกถอน <span className="text-destructive">*</span>
+              </label>
+              <Textarea
+                value={revokeReason}
+                onChange={(e) => setRevokeReason(e.target.value.slice(0, 500))}
+                placeholder="ตัวอย่าง: ออกผิดให้ผู้รับ / ตรวจพบทุจริตในการสอบ / ฯลฯ"
+                rows={3}
+              />
+              <div className="mt-0.5 text-right text-[11px] text-muted-foreground tabular-nums">
+                {revokeReason.length}/500
+              </div>
+            </div>
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

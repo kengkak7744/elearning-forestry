@@ -20,16 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { toastApiError } from '@/utils/apiError'
 
@@ -361,29 +352,20 @@ export default function CoursesListPage() {
         </>
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={!!confirmTarget}
         onOpenChange={(open) => !open && setConfirmTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ลบหลักสูตร</AlertDialogTitle>
-            <AlertDialogDescription>
-              ต้องการลบหลักสูตร &ldquo;{confirmTarget?.title}&rdquo; และข้อมูลทั้งหมด?
-              การกระทำนี้ไม่สามารถย้อนกลับได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              ยืนยันลบ
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title="ลบหลักสูตร"
+        description={
+          <>
+            ต้องการลบหลักสูตร &ldquo;{confirmTarget?.title}&rdquo; และข้อมูลทั้งหมด?
+            การกระทำนี้ไม่สามารถย้อนกลับได้
+          </>
+        }
+        confirmLabel="ยืนยันลบ"
+        destructive
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

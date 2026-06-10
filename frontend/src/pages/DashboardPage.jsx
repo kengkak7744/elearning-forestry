@@ -21,26 +21,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
 import CourseCard from '@/components/learner/CourseCard'
+import StatCard from '@/components/shared/StatCard'
 import { formatThaiDate } from '@/utils/formatting'
 
 const FALLBACK_COVER = '/elearning/forest_logo.png'
-
-function StatCard({ icon: Icon, label, value, hint }) {
-  return (
-    <Card className="border-border/60">
-      <CardContent className="flex items-center gap-4 p-5">
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
-          {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function DashboardPage() {
   useDocumentTitle('หน้าหลัก')
@@ -238,16 +222,19 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
+          size="lg"
           icon={BookOpen}
           label="กำลังเรียน"
           value={enrollments === null ? '—' : inProgress.length}
         />
         <StatCard
+          size="lg"
           icon={Award}
           label="เรียนจบแล้ว"
           value={enrollments === null ? '—' : completed.length}
         />
         <StatCard
+          size="lg"
           icon={Trophy}
           label="ใบรับรอง"
           value={certs === null ? '—' : certs.length}

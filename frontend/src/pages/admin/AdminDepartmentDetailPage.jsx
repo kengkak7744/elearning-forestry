@@ -45,6 +45,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
+import StatCard from '@/components/shared/StatCard'
 import { toastApiError } from '@/utils/apiError'
 
 const ROLE_TONE = {
@@ -67,23 +68,6 @@ function RoleChip({ role, count }) {
         <span className="font-semibold tabular-nums">{count}</span>
       )}
     </span>
-  )
-}
-
-function KpiCard({ icon: Icon, label, value, hint }) {
-  return (
-    <Card className="border-border/60">
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
-          {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -213,13 +197,15 @@ export default function AdminDepartmentDetailPage() {
         <>
           {/* KPI strip */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard
+            <StatCard
+              size="sm"
               icon={Users}
               label="สมาชิกทั้งหมด"
               value={stats.totalUsers}
               hint={`ใช้งานอยู่ ${stats.active}`}
             />
-            <KpiCard
+            <StatCard
+              size="sm"
               icon={GraduationCap}
               label="การลงทะเบียน"
               value={stats.totalEnroll}
@@ -229,12 +215,14 @@ export default function AdminDepartmentDetailPage() {
                   : 0
               } หลักสูตร/คน`}
             />
-            <KpiCard
+            <StatCard
+              size="sm"
               icon={Award}
               label="ใบรับรองที่ใช้งานได้"
               value={stats.totalCerts}
             />
-            <KpiCard
+            <StatCard
+              size="sm"
               icon={ShieldAlert}
               label="หลักสูตรบังคับที่ต้องเร่ง"
               value={mandatoryAttention.length}

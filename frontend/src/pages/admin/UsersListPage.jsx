@@ -25,16 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import UserFormSheet from '@/components/admin/UserFormSheet'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
 import ResetPasswordDialog from '@/components/admin/ResetPasswordDialog'
@@ -328,34 +319,26 @@ export default function UsersListPage() {
         onDone={loadUsers}
       />
 
-      <AlertDialog
+      <ConfirmDialog
         open={!!confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ลบผู้ใช้</AlertDialogTitle>
-            <AlertDialogDescription>
-              ต้องการลบบัญชี &ldquo;{confirmDelete?.full_name}&rdquo; ออกจากระบบ?
+        title="ลบผู้ใช้"
+        description={
+          <>
+            ต้องการลบบัญชี &ldquo;{confirmDelete?.full_name}&rdquo; ออกจากระบบ?
+            <br />
+            <span className="mt-2 block font-medium text-destructive">
+              การกระทำนี้จะลบประวัติการเรียน ใบรับรอง และการลงทะเบียนทั้งหมดของผู้ใช้
               <br />
-              <span className="mt-2 block font-medium text-destructive">
-                การกระทำนี้จะลบประวัติการเรียน ใบรับรอง และการลงทะเบียนทั้งหมดของผู้ใช้
-                <br />
-                และไม่สามารถย้อนกลับได้
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{BUTTONS.CANCEL}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {BUTTONS.CONFIRM_DELETE}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              และไม่สามารถย้อนกลับได้
+            </span>
+          </>
+        }
+        confirmLabel={BUTTONS.CONFIRM_DELETE}
+        cancelLabel={BUTTONS.CANCEL}
+        destructive
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

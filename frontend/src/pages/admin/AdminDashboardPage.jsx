@@ -28,23 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import CourseFeedbackDialog from '@/components/admin/CourseFeedbackDialog'
-
-function KPICard({ icon: Icon, label, value, hint }) {
-  return (
-    <Card className="border-border/60">
-      <CardContent className="flex items-start gap-4 p-5">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl font-semibold tabular-nums text-foreground">{value}</div>
-          {hint && <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+import StatCard from '@/components/shared/StatCard'
 
 export default function AdminDashboardPage() {
   useDocumentTitle('แดชบอร์ดผู้ดูแลระบบ')
@@ -101,25 +85,25 @@ export default function AdminDashboardPage() {
         </div>
       ) : overview ? (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <KPICard
+          <StatCard
             icon={Users}
             label="ผู้ใช้ทั้งหมด"
             value={overview.total_users}
             hint={`ใช้งานอยู่ ${overview.active_users} คน`}
           />
-          <KPICard
+          <StatCard
             icon={BookOpen}
             label="หลักสูตรทั้งหมด"
             value={overview.total_courses}
             hint={`เผยแพร่ ${overview.published_courses} หลักสูตร`}
           />
-          <KPICard
+          <StatCard
             icon={TrendingUp}
             label="การลงทะเบียน"
             value={overview.total_enrollments}
             hint={`จบหลักสูตร ${overview.completed_enrollments} ครั้ง`}
           />
-          <KPICard
+          <StatCard
             icon={Award}
             label="อัตราการเรียนจบ"
             value={`${overview.completion_rate}%`}
