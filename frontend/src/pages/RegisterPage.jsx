@@ -12,11 +12,10 @@ import StepIndicator from '@/components/auth/StepIndicator'
 import {
   AccountStep,
   PersonalStep,
-  REGISTER_STEPS,
   ReviewSummary,
   StudyStep,
-  validateStep,
 } from '@/components/auth/RegisterSteps'
+import { REGISTER_STEPS, validateStep } from '@/utils/registerValidation'
 import { toastApiError } from '@/utils/apiError'
 
 const initialForm = {
