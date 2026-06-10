@@ -9,15 +9,16 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from starlette.responses import StreamingResponse
+from app.config import settings
 from app.dependencies import require_media_token
 from app.models.user import User
 
 
 router = APIRouter(tags=["Files"])
 
-VIDEO_DIR = Path("/app/videos")
-PDF_DIR = Path("/app/pdf_documents")
-IMAGE_DIR = Path("/app/images")
+VIDEO_DIR = Path(settings.VIDEO_DIR)
+PDF_DIR = Path(settings.PDF_DIR)
+IMAGE_DIR = Path(settings.IMAGE_DIR)
 
 
 def _safe_resolve(base: Path, name: str) -> Path:

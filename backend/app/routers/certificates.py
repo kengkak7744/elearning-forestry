@@ -39,8 +39,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/certificates", tags=["Certificates"])
 
-CERT_DIR = Path("/app/certificates")
-CERT_DIR.mkdir(parents=True, exist_ok=True)
+CERT_DIR = Path(settings.CERT_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -57,8 +56,8 @@ CERT_DIR.mkdir(parents=True, exist_ok=True)
 #    limit is `_VERIFY_RATE_LIMIT * num_workers`. With the current 2-worker
 #    setup that's 60/min, still well below useful-attack speeds.
 #  - For stricter limits in prod, add a Traefik rate-limit middleware in front.
-_VERIFY_RATE_LIMIT = 30   # requests per window
-_VERIFY_RATE_WINDOW = 60  # seconds
+_VERIFY_RATE_LIMIT = settings.VERIFY_RATE_LIMIT
+_VERIFY_RATE_WINDOW = settings.VERIFY_RATE_WINDOW
 _verify_hits: dict[str, deque] = {}
 _verify_hits_lock = threading.Lock()
 
@@ -285,8 +284,8 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
         gymnastics. Returns None if the file isn't on disk."""
         if not url:
             return None
-        # All signature paths are under /app prefix on the filesystem.
-        fs = Path("/app" + url) if url.startswith("/") else Path("/app/" + url)
+        # Signature URLs always point into the signatures dir; resolve by name.
+        fs = Path(settings.SIGNATURE_DIR) / Path(url).name
         if not fs.exists() or not fs.is_file():
             return None
         try:
@@ -303,7 +302,7 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
     # no DB row, no upload endpoint. /app/images is the same volume that
     # holds cover images, so existing infra carries it.
     logo_uri = None
-    _logo_fs = Path("/app/images/forest_logo.png")
+    _logo_fs = Path(settings.IMAGE_DIR) / "forest_logo.png"
     if _logo_fs.exists() and _logo_fs.is_file():
         try:
             logo_uri = (
@@ -621,6 +620,7 @@ def _build_certificate_html(cert, user, course, db=None) -> str:
 def _render_certificate_pdf(cert: Certificate, user: User, course: Course, db=None) -> Path:
     """Write a PDF for this certificate and return the path."""
     html = _build_certificate_html(cert, user, course, db=db)
+    CERT_DIR.mkdir(parents=True, exist_ok=True)
     path = CERT_DIR / f"{cert.certificate_number}.pdf"
     HTML(string=html).write_pdf(target=str(path))
     return path

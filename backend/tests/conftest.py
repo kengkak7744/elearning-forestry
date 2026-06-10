@@ -6,10 +6,25 @@ QueuePool args that crash create_engine for sqlite URLs, so we keep a dummy
 test against our own in-memory SQLite engine via a get_db override.
 """
 import os
+import tempfile
 
 # Must be set BEFORE anything imports app.config / app.database.
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://t:t@127.0.0.1:1/t")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
+
+# Point all media storage at a throwaway dir so tests never touch /app (or
+# C:\app on Windows). Settings reads these at import time.
+_MEDIA_ROOT = tempfile.mkdtemp(prefix="elearning-test-media-")
+for _name, _sub in {
+    "VIDEO_DIR": "videos",
+    "PDF_DIR": "pdf_documents",
+    "IMAGE_DIR": "images",
+    "CERT_DIR": "certificates",
+    "SIGNATURE_DIR": os.path.join("images", "signatures"),
+}.items():
+    _path = os.path.join(_MEDIA_ROOT, _sub)
+    os.makedirs(_path, exist_ok=True)
+    os.environ.setdefault(_name, _path)
 
 import bcrypt
 import pytest

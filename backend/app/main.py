@@ -1,9 +1,25 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats, certificates, search, audit, feedback, cert_settings
 from app.config import settings
 import os
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    for directory in (
+        settings.VIDEO_DIR,
+        settings.PDF_DIR,
+        settings.IMAGE_DIR,
+        settings.CERT_DIR,
+        settings.SIGNATURE_DIR,
+    ):
+        os.makedirs(directory, exist_ok=True)
+    yield
+
 
 # In prod (COOKIE_SECURE=True), suppress the auto-generated Swagger UI, ReDoc,
 # and openapi.json so the full API surface isn't a public attack reconnaissance
@@ -16,6 +32,7 @@ app = FastAPI(
     docs_url=None if _PROD else "/docs",
     redoc_url=None if _PROD else "/redoc",
     openapi_url=None if _PROD else "/openapi.json",
+    lifespan=lifespan,
 )
 
 #React
@@ -72,11 +89,6 @@ async def security_headers(request: Request, call_next):
             "max-age=31536000; includeSubDomains",
         )
     return response
-
-os.makedirs("/app/videos", exist_ok=True)
-os.makedirs("/app/pdf_documents", exist_ok=True)
-os.makedirs("/app/images", exist_ok=True)
-os.makedirs("/app/certificates", exist_ok=True)
 
 # รวม routers
 app.include_router(auth.router)

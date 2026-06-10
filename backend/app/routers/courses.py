@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 from typing import Optional
+from app.config import settings
 from app.database import get_db
 from app.models.bookmark import Bookmark
 from app.models.course import Course, Module, CourseCategory
@@ -26,15 +27,13 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
 
-IMAGE_DIR = Path("/app/images")
-IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+IMAGE_DIR = Path(settings.IMAGE_DIR)
+MAX_IMAGE_SIZE = settings.MAX_IMAGE_SIZE
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
-# Duplicate-course media copy uses these dirs — must match the upload paths in
-# lessons.py. Kept here (not imported) to avoid a circular dependency.
-_VIDEO_DIR = Path("/app/videos")
-_PDF_DIR = Path("/app/pdf_documents")
+# Duplicate-course media copy uses the same dirs as the upload paths in lessons.py.
+_VIDEO_DIR = Path(settings.VIDEO_DIR)
+_PDF_DIR = Path(settings.PDF_DIR)
 
 
 def _copy_media_file(content_url: Optional[str]) -> Optional[str]:
@@ -469,6 +468,7 @@ async def upload_cover_image(
         )
 
     # Stream to disk (chunked, with size limit enforced during streaming)
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = IMAGE_DIR / unique_name
     total = 0

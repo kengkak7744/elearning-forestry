@@ -17,6 +17,7 @@ from app.schemas.lesson import (
     LessonUpdate,
     LessonResponse,
 )
+from app.config import settings
 from app.dependencies import get_current_user, require_instructor_or_admin
 
 
@@ -24,15 +25,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/lessons", tags=["Lessons"])
 
 # Storage paths
-VIDEO_DIR = Path("/app/videos")
-PDF_DIR = Path("/app/pdf_documents")
-
-VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-PDF_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_DIR = Path(settings.VIDEO_DIR)
+PDF_DIR = Path(settings.PDF_DIR)
 
 # Max file sizes (bytes)
-MAX_VIDEO_SIZE = 2000 * 1024 * 1024  # 2 GB
-MAX_PDF_SIZE = 500 * 1024 * 1024     # 500 MB
+MAX_VIDEO_SIZE = settings.MAX_VIDEO_SIZE
+MAX_PDF_SIZE = settings.MAX_PDF_SIZE
 
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".mkv"}
 ALLOWED_PDF_EXTENSIONS = {".pdf"}
@@ -43,6 +41,7 @@ CHUNK_SIZE = 1024 * 1024  # 1 MB
 async def _stream_upload_to_disk(file: UploadFile, dest: Path, max_size: int) -> None:
     """Stream UploadFile chunks to disk; raise 400 if max_size exceeded. Deletes partial file on failure."""
     total = 0
+    dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         with dest.open("wb") as out:
             while True:

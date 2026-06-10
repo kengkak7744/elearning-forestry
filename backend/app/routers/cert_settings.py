@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from weasyprint import HTML
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import require_admin
 from app.models.cert_settings import CertSettings
@@ -18,11 +19,10 @@ from app.models.user import User
 from app.services.audit import log_action
 
 
-# Signatures live alongside the existing /app/images cover-image storage,
-# in a subfolder so they're easy to spot and back up separately.
-_SIGNATURE_DIR = Path("/app/images/signatures")
-_SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
-_SIGNATURE_MAX_BYTES = 2 * 1024 * 1024  # 2 MB — signatures are small line art
+# Signatures live alongside the cover-image storage, in a subfolder so
+# they're easy to spot and back up separately.
+_SIGNATURE_DIR = Path(settings.SIGNATURE_DIR)
+_SIGNATURE_MAX_BYTES = settings.SIGNATURE_MAX_BYTES
 _SIGNATURE_URL_PREFIX = "/images/signatures"
 
 
@@ -145,6 +145,7 @@ def upload_signature(
         )
 
     new_name = f"{uuid.uuid4().hex}.png"
+    _SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
     dest = _SIGNATURE_DIR / new_name
     with open(dest, "wb") as f:
         f.write(contents)
