@@ -2,22 +2,78 @@ import client from './client'
 
 export const quizzesApi = {
   // Learner-safe — answer keys stripped
-  getByLesson: (lessonId) => client.get(`/quizzes/lesson/${lessonId}`).then(r => r.data),
-  getFinal: (courseId) => client.get(`/quizzes/course/${courseId}/final`).then(r => r.data),
-  getCourseAll: (courseId) => client.get(`/quizzes/course/${courseId}/all`).then(r => r.data),
+  getByLesson: async (lessonId) => {
+    const response = await client.get(`/quizzes/lesson/${lessonId}`)
+    return response.data
+  },
+
+  getFinal: async (courseId) => {
+    const response = await client.get(`/quizzes/course/${courseId}/final`)
+    return response.data
+  },
+
+  getCourseAll: async (courseId) => {
+    const response = await client.get(`/quizzes/course/${courseId}/all`)
+    return response.data
+  },
+
   // Admin/instructor — full data with answers, for QuizEditor
-  getByLessonAdmin: (lessonId) => client.get(`/quizzes/admin/lesson/${lessonId}`).then(r => r.data),
-  getFinalAdmin: (courseId) => client.get(`/quizzes/admin/course/${courseId}/final`).then(r => r.data),
-  getStats: (quizId) => client.get(`/quizzes/admin/${quizId}/stats`).then(r => r.data),
-  getCourseStats: (courseId) => client.get(`/quizzes/admin/course/${courseId}/stats`).then(r => r.data),
-  create: (data) => client.post('/quizzes/', data).then(r => r.data),
-  update: (id, data) => client.patch(`/quizzes/${id}`, data).then(r => r.data),
-  delete: (id) => client.delete(`/quizzes/${id}`).then(r => r.data),
-  submit: (quizId, answers, questionIds) =>
-    client.post(`/quizzes/${quizId}/submit`, { answers, question_ids: questionIds }).then(r => r.data),
-  
+  getByLessonAdmin: async (lessonId) => {
+    const response = await client.get(`/quizzes/admin/lesson/${lessonId}`)
+    return response.data
+  },
+
+  getFinalAdmin: async (courseId) => {
+    const response = await client.get(`/quizzes/admin/course/${courseId}/final`)
+    return response.data
+  },
+
+  getStats: async (quizId) => {
+    const response = await client.get(`/quizzes/admin/${quizId}/stats`)
+    return response.data
+  },
+
+  getCourseStats: async (courseId) => {
+    const response = await client.get(`/quizzes/admin/course/${courseId}/stats`)
+    return response.data
+  },
+
+  create: async (data) => {
+    const response = await client.post('/quizzes/', data)
+    return response.data
+  },
+
+  update: async (id, data) => {
+    const response = await client.patch(`/quizzes/${id}`, data)
+    return response.data
+  },
+
+  delete: async (id) => {
+    const response = await client.delete(`/quizzes/${id}`)
+    return response.data
+  },
+
+  submit: async (quizId, answers, questionIds) => {
+    const response = await client.post(`/quizzes/${quizId}/submit`, {
+      answers,
+      question_ids: questionIds,
+    })
+    return response.data
+  },
+
   // Questions
-  addQuestion: (quizId, data) => client.post(`/quizzes/${quizId}/questions`, data).then(r => r.data),
-  updateQuestion: (questionId, data) => client.patch(`/quizzes/questions/${questionId}`, data).then(r => r.data),
-  deleteQuestion: (questionId) => client.delete(`/quizzes/questions/${questionId}`).then(r => r.data),
+  addQuestion: async (quizId, data) => {
+    const response = await client.post(`/quizzes/${quizId}/questions`, data)
+    return response.data
+  },
+
+  updateQuestion: async (questionId, data) => {
+    const response = await client.patch(`/quizzes/questions/${questionId}`, data)
+    return response.data
+  },
+
+  deleteQuestion: async (questionId) => {
+    const response = await client.delete(`/quizzes/questions/${questionId}`)
+    return response.data
+  },
 }

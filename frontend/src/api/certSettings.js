@@ -1,4 +1,4 @@
-import apiClient from './client'
+import apiClient, { apiPathPrefix } from './client'
 
 export const certSettingsApi = {
   get: () => apiClient.get('/admin/cert-settings').then((r) => r.data),
@@ -20,9 +20,5 @@ export const certSettingsApi = {
       .then((r) => r.data),
   // Direct URL the browser navigates to — auth cookie rides along, PDF
   // opens in a new tab. Same pattern as departmentMembersCsvUrl.
-  previewUrl: () => {
-    const path = typeof window !== 'undefined' ? window.location.pathname : ''
-    const prefix = path.startsWith('/elearning') ? '/elearning/api' : '/api'
-    return `${prefix}/admin/cert-settings/preview`
-  },
+  previewUrl: () => `${apiPathPrefix()}/admin/cert-settings/preview`,
 }

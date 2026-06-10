@@ -1,4 +1,4 @@
-import client from './client'
+import client, { apiPathPrefix } from './client'
 
 export const certificatesApi = {
   eligibility: (courseId) =>
@@ -17,9 +17,5 @@ export const certificatesApi = {
   unrevoke: (certId) =>
     client.post(`/certificates/${certId}/unrevoke`).then((r) => r.data),
   // Returns the full URL the browser can open (auth cookie is sent automatically)
-  downloadUrl: (certId) => {
-    const path = typeof window !== 'undefined' ? window.location.pathname : ''
-    const prefix = path.startsWith('/elearning') ? '/elearning/api' : '/api'
-    return `${prefix}/certificates/${certId}/download`
-  },
+  downloadUrl: (certId) => `${apiPathPrefix()}/certificates/${certId}/download`,
 }

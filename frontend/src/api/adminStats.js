@@ -1,4 +1,4 @@
-import apiClient from './client'
+import apiClient, { apiPathPrefix } from './client'
 
 export const adminStatsApi = {
   overview: () => apiClient.get('/admin/stats/overview').then(r => r.data),
@@ -25,16 +25,10 @@ export const adminStatsApi = {
       .then((r) => r.data),
   // Built like departmentComplianceCsvUrl — direct browser navigation so the
   // auth cookie rides along automatically.
-  departmentMembersCsvUrl: (name) => {
-    const path = typeof window !== 'undefined' ? window.location.pathname : ''
-    const prefix = path.startsWith('/elearning') ? '/elearning/api' : '/api'
-    return `${prefix}/admin/stats/departments/${encodeURIComponent(name)}/members.csv`
-  },
+  departmentMembersCsvUrl: (name) =>
+    `${apiPathPrefix()}/admin/stats/departments/${encodeURIComponent(name)}/members.csv`,
   // Built like certificatesApi.downloadUrl — same path the API client uses,
   // so the browser navigates directly and the auth cookie rides along.
-  departmentComplianceCsvUrl: () => {
-    const path = typeof window !== 'undefined' ? window.location.pathname : ''
-    const prefix = path.startsWith('/elearning') ? '/elearning/api' : '/api'
-    return `${prefix}/admin/stats/department-compliance.csv`
-  },
+  departmentComplianceCsvUrl: () =>
+    `${apiPathPrefix()}/admin/stats/department-compliance.csv`,
 }
