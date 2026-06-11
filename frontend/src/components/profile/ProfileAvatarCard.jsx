@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { authApi } from '@/api/auth'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
+import { toastApiError } from '@/utils/apiError'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -45,7 +46,7 @@ export default function ProfileAvatarCard() {
       updateUser(updated)
       showToast('อัปเดตรูปโปรไฟล์สำเร็จ', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'อัปโหลดรูปไม่สำเร็จ', 'error')
+      toastApiError(err, 'อัปโหลดรูปไม่สำเร็จ')
     } finally {
       setBusy(false)
     }
@@ -58,7 +59,7 @@ export default function ProfileAvatarCard() {
       updateUser(updated)
       showToast('ลบรูปโปรไฟล์แล้ว', 'success')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'ลบรูปไม่สำเร็จ', 'error')
+      toastApiError(err, 'ลบรูปไม่สำเร็จ')
     } finally {
       setBusy(false)
     }

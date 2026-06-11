@@ -134,7 +134,21 @@ export default function CourseEditPage() {
 
   const handleCoverUpload = async (e) => {
     const file = e.target.files[0]
+    // Reset so re-picking the same file still fires onChange.
+    e.target.value = ''
     if (!file) return
+    // Client-side guards — backend re-validates regardless. Catches the common
+    // failures (wrong format / too big) with an immediate popup instead of a
+    // round-trip.
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!ALLOWED.includes(file.type)) {
+      showToast('รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WEBP, GIF)', 'error')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('ไฟล์ใหญ่เกิน 10 MB', 'error')
+      return
+    }
     setCoverUploading(true)
     setCoverProgress(0)
     try {

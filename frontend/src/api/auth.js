@@ -25,13 +25,17 @@ export const authApi = {
     return response.data
   },
 
-  // Upload/replace my profile picture. Don't set Content-Type — the browser
-  // adds the multipart boundary itself (setting it manually drops the boundary
-  // and the backend can't parse the file). Returns the updated user.
+  // Upload/replace my profile picture. The apiClient defaults to
+  // Content-Type: application/json, and axios will JSON-serialise a FormData
+  // body under that header (sending {"file":{}} → backend 422). Setting
+  // 'multipart/form-data' here makes axios pass the FormData through; the
+  // browser then fills in the real boundary. Returns the updated user.
   uploadAvatar: async (file) => {
     const form = new FormData()
     form.append('file', file)
-    const response = await apiClient.post('/auth/me/avatar', form)
+    const response = await apiClient.post('/auth/me/avatar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return response.data
   },
 
