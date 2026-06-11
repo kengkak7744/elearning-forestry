@@ -33,11 +33,22 @@ export default function MidVideoQuizModal({
 
   const open = !!quiz
   const canContinue = quiz?.can_skip || passed
+  // Dismissing the modal (X button / overlay click / Esc) is only allowed when
+  // the learner is actually permitted past the quiz — i.e. it's skippable or
+  // already passed. For a mandatory, not-yet-passed quiz we block every close
+  // path so the gate can't be bypassed; the only ways forward are to pass it
+  // or to rewind and re-watch.
+  const canDismiss = canContinue
   const showRewind = !!onRewind && failed && !passed
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onSkip?.()}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+    <Dialog open={open} onOpenChange={(o) => { if (!o && canDismiss) onSkip?.() }}>
+      <DialogContent
+        className="max-h-[92vh] overflow-y-auto sm:max-w-2xl"
+        showCloseButton={canDismiss}
+        onEscapeKeyDown={(e) => { if (!canDismiss) e.preventDefault() }}
+        onInteractOutside={(e) => { if (!canDismiss) e.preventDefault() }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pause className="h-5 w-5 text-primary" />

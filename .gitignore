@@ -12,3 +12,4 @@ skills-lock.json
 FEATURES.txt
 .VSCodeCounter/
 docker-compose.yml
+backend/images/

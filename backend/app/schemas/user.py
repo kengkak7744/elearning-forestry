@@ -50,7 +50,8 @@ class UserResponse(UserBase):
     role: UserRole
     is_active: bool
     created_at: datetime
-    
+    profile_image: Optional[str] = None
+
     class Config:
         from_attributes = True
 

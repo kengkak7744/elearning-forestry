@@ -1,5 +1,8 @@
+import uuid
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from pathlib import Path
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
@@ -22,6 +25,28 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         samesite="lax",
         path="/",
     )
+
+
+# Profile-picture uploads land in the same media dir as other images and are
+# served through the auth-gated /images route (see app.routers.files).
+_IMAGE_DIR = Path(settings.IMAGE_DIR)
+_ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+def _delete_avatar_file(stored_url: Optional[str]) -> None:
+    """Best-effort delete of a previously-uploaded avatar so files don't pile up.
+
+    Only touches files under our own IMAGE_DIR; anything that doesn't look like
+    one of our media URLs is left alone.
+    """
+    if not stored_url or "/images/" not in stored_url:
+        return
+    old_path = _IMAGE_DIR / Path(stored_url).name
+    try:
+        if old_path.exists():
+            old_path.unlink()
+    except OSError:
+        pass
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -110,10 +135,70 @@ def update_me(
     db: Session = Depends(get_db)
 ):
     update_data = data.model_dump(exclude_unset=True)
-    
+
     for field, value in update_data.items():
         setattr(current_user, field, value)
-    
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """อัปโหลด/เปลี่ยนรูปโปรไฟล์ของตัวเอง (optional). ทำได้เฉพาะเจ้าของบัญชี."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in _ALLOWED_AVATAR_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"รองรับเฉพาะไฟล์ {', '.join(sorted(_ALLOWED_AVATAR_EXTENSIONS))}",
+        )
+
+    # Stream to disk with a hard size cap enforced mid-stream (don't trust
+    # Content-Length). Mirrors the course cover-image upload path.
+    _IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    file_path = _IMAGE_DIR / unique_name
+    total = 0
+    CHUNK = 1024 * 256  # 256 KB
+    try:
+        with file_path.open("wb") as out:
+            while True:
+                chunk = await file.read(CHUNK)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > settings.MAX_IMAGE_SIZE:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไฟล์ใหญ่เกิน {settings.MAX_IMAGE_SIZE // (1024 * 1024)} MB",
+                    )
+                out.write(chunk)
+    except HTTPException:
+        if file_path.exists():
+            try: file_path.unlink()
+            except OSError: pass
+        raise
+
+    _delete_avatar_file(current_user.profile_image)
+    current_user.profile_image = f"/elearning/images/{unique_name}"
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.delete("/me/avatar", response_model=UserResponse)
+def delete_my_avatar(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """ลบรูปโปรไฟล์ กลับไปใช้รูปตัวอักษรย่อ."""
+    _delete_avatar_file(current_user.profile_image)
+    current_user.profile_image = None
     db.commit()
     db.refresh(current_user)
     return current_user

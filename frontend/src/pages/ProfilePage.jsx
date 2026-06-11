@@ -1,7 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_LABELS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { mediaUrl } from '@/utils/media'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ProfileTab from '@/components/profile/ProfileTab'
@@ -26,6 +27,9 @@ export default function ProfilePage() {
       <Card className="mb-6 border-border/60">
         <CardContent className="flex items-center gap-4 p-5">
           <Avatar className="h-14 w-14">
+            {user?.profile_image && (
+              <AvatarImage src={mediaUrl(user.profile_image)} alt={user?.full_name || ''} />
+            )}
             <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
               {initials(user?.full_name)}
             </AvatarFallback>

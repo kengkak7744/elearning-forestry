@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import ProfileAvatarCard from './ProfileAvatarCard'
 
 function ViewField({ label, value, mono }) {
   return (
@@ -69,7 +70,9 @@ export default function ProfileTab() {
 
   if (!editing) {
     return (
-      <Card className="border-border/60">
+      <div className="space-y-6">
+        <ProfileAvatarCard />
+        <Card className="border-border/60">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div>
             <h3 className="text-base font-semibold">ข้อมูลส่วนตัว</h3>
@@ -99,12 +102,15 @@ export default function ProfileTab() {
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     )
   }
 
   return (
-    <Card className="border-border/60">
+    <div className="space-y-6">
+      <ProfileAvatarCard />
+      <Card className="border-border/60">
       <CardHeader className="pb-4">
         <h3 className="text-base font-semibold">แก้ไขข้อมูลส่วนตัว</h3>
       </CardHeader>
@@ -170,6 +176,7 @@ export default function ProfileTab() {
           </div>
         </form>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   )
 }

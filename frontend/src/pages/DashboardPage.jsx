@@ -17,7 +17,8 @@ import { mediaUrl } from '@/utils/media'
 import { BUTTONS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
 import CourseCard from '@/components/learner/CourseCard'
@@ -25,6 +26,12 @@ import StatCard from '@/components/shared/StatCard'
 import { formatThaiDate } from '@/utils/formatting'
 
 const FALLBACK_COVER = '/elearning/forest_logo.png'
+
+function initials(name) {
+  if (!name) return 'U'
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U'
+}
 
 export default function DashboardPage() {
   useDocumentTitle('หน้าหลัก')
@@ -101,9 +108,19 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-        <Sparkles className="h-4 w-4 text-primary" />
-        สวัสดี {user?.full_name?.split(' ')[0] || 'คุณ'}
+      <div className="mb-6 flex items-center gap-3">
+        <Avatar className="h-10 w-10">
+          {user?.profile_image && (
+            <AvatarImage src={mediaUrl(user.profile_image)} alt={user?.full_name || ''} />
+          )}
+          <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+            {initials(user?.full_name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          สวัสดี {user?.full_name?.split(' ')[0] || 'คุณ'}
+        </div>
       </div>
 
       {/* Mandatory courses nudge — shown above the hero so it's the first thing

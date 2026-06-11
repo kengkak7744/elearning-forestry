@@ -33,6 +33,10 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # Optional profile picture the user uploads on the profile page. Stored as a
+    # media URL path (e.g. "/elearning/images/abc.png"); NULL → initials avatar.
+    # Served through the auth-gated /images route like other media.
+    profile_image = Column(String(500), nullable=True)
     ##end auto implement
     
     progresses = relationship("LessonProgress", back_populates="user")

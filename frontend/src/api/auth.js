@@ -25,6 +25,22 @@ export const authApi = {
     return response.data
   },
 
+  // Upload/replace my profile picture. Don't set Content-Type — the browser
+  // adds the multipart boundary itself (setting it manually drops the boundary
+  // and the backend can't parse the file). Returns the updated user.
+  uploadAvatar: async (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await apiClient.post('/auth/me/avatar', form)
+    return response.data
+  },
+
+  // Remove my profile picture (back to the initials avatar). Returns updated user.
+  deleteAvatar: async () => {
+    const response = await apiClient.delete('/auth/me/avatar')
+    return response.data
+  },
+
 
   changePassword: async (currentPassword, newPassword) => {
     const response = await apiClient.post('/auth/change-password', {
@@ -37,7 +53,7 @@ export const authApi = {
   logout: async () => {
     try {
       await apiClient.post('/auth/logout')
-    } catch (e) {
+    } catch {
       // ignore
     }
     localStorage.removeItem('access_token')
