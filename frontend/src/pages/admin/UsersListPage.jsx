@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -26,12 +25,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminEmptyState from '@/components/admin/AdminEmptyState'
+import SkeletonRows from '@/components/admin/SkeletonRows'
+import LoadMoreButton from '@/components/admin/LoadMoreButton'
 import UserFormSheet from '@/components/admin/UserFormSheet'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
 import ResetPasswordDialog from '@/components/admin/ResetPasswordDialog'
 import BulkImportDialog from '@/components/admin/BulkImportDialog'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { toastApiError } from '@/utils/apiError'
+
+const PAGE_SIZE = 50
 
 export default function UsersListPage() {
   useDocumentTitle('จัดการผู้ใช้')
@@ -47,24 +52,52 @@ export default function UsersListPage() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [summaryUserId, setSummaryUserId] = useState(null)
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [reachedEnd, setReachedEnd] = useState(false)
+
+  const buildParams = () => ({
+    skip: 0,
+    limit: PAGE_SIZE,
+    search,
+    role: roleFilter === 'all' ? undefined : roleFilter,
+  })
 
   const {
     data: users,
     loading,
+    setData,
     reload: loadUsers,
-  } = useFetchData(
-    () =>
-      usersApi.list({
-        search,
-        role: roleFilter === 'all' ? undefined : roleFilter,
-      }),
-    [search, roleFilter],
-    {
-      errorFallback: 'โหลดรายการไม่สำเร็จ',
-      initialData: [],
-      debounceMs: search ? 400 : 0,
+  } = useFetchData(() => usersApi.list(buildParams()), [search, roleFilter], {
+    errorFallback: 'โหลดรายการไม่สำเร็จ',
+    initialData: [],
+    debounceMs: search ? 400 : 0,
+  })
+
+  // Reset paging on filter change in the handlers (not an effect).
+  const onSearchChange = (e) => {
+    setSearch(e.target.value)
+    setReachedEnd(false)
+  }
+  const onRoleChange = (value) => {
+    setRoleFilter(value)
+    setReachedEnd(false)
+  }
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const next = await usersApi.list({ ...buildParams(), skip: users.length })
+      setData((prev) => [...prev, ...next])
+      if (next.length < PAGE_SIZE) setReachedEnd(true)
+    } catch (err) {
+      toastApiError(err, 'โหลดเพิ่มเติมไม่สำเร็จ')
+    } finally {
+      setLoadingMore(false)
     }
-  )
+  }
+
+  const canLoadMore =
+    !loading && !reachedEnd && users.length >= PAGE_SIZE && users.length % PAGE_SIZE === 0
 
   const handleDelete = async () => {
     if (!confirmDelete) return
@@ -73,6 +106,7 @@ export default function UsersListPage() {
     try {
       await usersApi.delete(target.id)
       showToast(`ลบบัญชี ${target.full_name} เรียบร้อย`, 'success')
+      setReachedEnd(false)
       loadUsers()
     } catch (err) {
       toastApiError(err, 'ลบไม่สำเร็จ')
@@ -85,24 +119,26 @@ export default function UsersListPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">จัดการผู้ใช้</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            รายการเจ้าหน้าที่ทั้งหมดในระบบ
-          </p>
-        </div>
-        <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
-          <Button variant="outline" onClick={() => setBulkOpen(true)} className="w-full sm:w-auto">
-            <Upload className="mr-1 h-4 w-4" />
-            นำเข้าจาก CSV
-          </Button>
-          <Button onClick={openAdd} className="w-full sm:w-auto">
-            <Plus className="mr-1 h-4 w-4" />
-            {BUTTONS.ADD_USER}
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="จัดการผู้ใช้"
+        subtitle="รายการเจ้าหน้าที่ทั้งหมดในระบบ"
+        actions={
+          <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setBulkOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <Upload className="mr-1 h-4 w-4" />
+              นำเข้าจาก CSV
+            </Button>
+            <Button onClick={openAdd} className="w-full sm:w-auto">
+              <Plus className="mr-1 h-4 w-4" />
+              {BUTTONS.ADD_USER}
+            </Button>
+          </div>
+        }
+      />
 
       <Card className="mb-4 border-border/60">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
@@ -112,11 +148,11 @@ export default function UsersListPage() {
               type="search"
               placeholder="ค้นหาชื่อ username หรืออีเมล..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={onSearchChange}
               className="pl-9"
             />
           </div>
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <Select value={roleFilter} onValueChange={onRoleChange}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue />
             </SelectTrigger>
@@ -132,17 +168,9 @@ export default function UsersListPage() {
       </Card>
 
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-lg" />
-          ))}
-        </div>
+        <SkeletonRows count={5} className="h-14" />
       ) : users.length === 0 ? (
-        <Card className="border-dashed border-border/60">
-          <CardContent className="p-12 text-center text-sm text-muted-foreground">
-            ไม่พบข้อมูล
-          </CardContent>
-        </Card>
+        <AdminEmptyState>ไม่พบข้อมูล</AdminEmptyState>
       ) : (
         <>
           {/* Desktop table */}
@@ -293,6 +321,8 @@ export default function UsersListPage() {
           </div>
         </>
       )}
+
+      {canLoadMore && <LoadMoreButton onClick={loadMore} loading={loadingMore} />}
 
       <div className="mt-4 text-sm text-muted-foreground">
         แสดง {users.length} รายการ

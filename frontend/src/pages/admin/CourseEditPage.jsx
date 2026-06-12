@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, LineChart, Plus, Save } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { LineChart, Plus, Save } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
 import { modulesApi } from '@/api/modules'
 import { lessonsApi } from '@/api/lessons'
@@ -17,6 +17,7 @@ import {
 import QuizManager from '@/components/QuizManager'
 import CourseStatsModal from '@/components/CourseStatsModal'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import CourseOverviewTab from '@/components/admin/course-edit/CourseOverviewTab'
 import CourseSettingsTab from '@/components/admin/course-edit/CourseSettingsTab'
 import ModuleEditor from '@/components/admin/course-edit/ModuleEditor'
@@ -85,6 +86,7 @@ export default function CourseEditPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isNew) loadCourse()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -296,36 +298,26 @@ export default function CourseEditPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl p-4 sm:p-8">
-      <Link
-        to="/admin/courses"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        จัดการหลักสูตร
-      </Link>
-
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
-            {isNew ? 'สร้างหลักสูตรใหม่' : courseData.title || 'แก้ไขหลักสูตร'}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {isNew ? 'กรอกข้อมูลพื้นฐานเพื่อเริ่มต้น' : 'จัดการเนื้อหา แบบทดสอบ และการเผยแพร่'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!isNew && (
-            <Button variant="outline" onClick={() => setStatsOpen(true)}>
-              <LineChart className="mr-1.5 h-4 w-4" />
-              ดูสถิติ
+      <AdminPageHeader
+        backTo="/admin/courses"
+        backLabel="จัดการหลักสูตร"
+        title={isNew ? 'สร้างหลักสูตรใหม่' : courseData.title || 'แก้ไขหลักสูตร'}
+        subtitle={isNew ? 'กรอกข้อมูลพื้นฐานเพื่อเริ่มต้น' : 'จัดการเนื้อหา แบบทดสอบ และการเผยแพร่'}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {!isNew && (
+              <Button variant="outline" onClick={() => setStatsOpen(true)}>
+                <LineChart className="mr-1.5 h-4 w-4" />
+                ดูสถิติ
+              </Button>
+            )}
+            <Button onClick={handleSaveCourse} disabled={saving}>
+              <Save className="mr-1.5 h-4 w-4" />
+              {saving ? 'กำลังบันทึก...' : isNew ? 'สร้างหลักสูตร' : 'บันทึก'}
             </Button>
-          )}
-          <Button onClick={handleSaveCourse} disabled={saving}>
-            <Save className="mr-1.5 h-4 w-4" />
-            {saving ? 'กำลังบันทึก...' : isNew ? 'สร้างหลักสูตร' : 'บันทึก'}
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="mb-6 w-full justify-start overflow-x-auto sm:w-auto">

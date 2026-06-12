@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   ScrollText,
+  Settings,
   Users,
   ArrowLeft,
 } from 'lucide-react'
@@ -38,7 +39,7 @@ const groups = [
     items: [
       { to: '/admin/audit-logs', label: 'บันทึกการเปลี่ยนแปลง', icon: ScrollText },
       { to: '/admin/certificates', label: 'ใบรับรองทั้งหมด', icon: Award },
-      { to: '/admin/cert-settings', label: 'ตั้งค่าใบรับรอง', icon: Award },
+      { to: '/admin/cert-settings', label: 'ตั้งค่าใบรับรอง', icon: Settings },
     ],
   },
 ]

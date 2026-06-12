@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft,
   Award,
   Building2,
   Download,
@@ -16,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
 import RoleChip from '@/components/admin/department/RoleChip'
 import DeptCoursesTab from '@/components/admin/department/DeptCoursesTab'
@@ -32,6 +32,9 @@ export default function AdminDepartmentDetailPage() {
   const [summaryUserId, setSummaryUserId] = useState(null)
   // Drill-in: open the "who's enrolled vs not" sheet when a course is clicked.
   const [activeCourse, setActiveCourse] = useState(null)
+  // Persist the active tab in the URL so reload/back keeps context.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') === 'members' ? 'members' : 'courses'
 
   const { data, loading } = useFetchData(
     async () => {
@@ -79,32 +82,21 @@ export default function AdminDepartmentDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      {/* Header */}
-      <Link
-        to="/admin/departments"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        หน่วยงานทั้งหมด
-      </Link>
-
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="inline-flex items-center gap-2 text-2xl font-semibold text-foreground sm:text-3xl">
-            <Building2 className="h-6 w-6 text-muted-foreground" />
-            {department}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ข้อมูลสมาชิก ความคืบหน้าหลักสูตร และการได้รับใบรับรอง
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <a href={csvHref} target="_blank" rel="noopener noreferrer">
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            ดาวน์โหลด CSV สมาชิก
-          </a>
-        </Button>
-      </div>
+      <AdminPageHeader
+        icon={Building2}
+        title={department}
+        subtitle="ข้อมูลสมาชิก ความคืบหน้าหลักสูตร และการได้รับใบรับรอง"
+        backTo="/admin/departments"
+        backLabel="หน่วยงานทั้งหมด"
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <a href={csvHref} target="_blank" rel="noopener noreferrer">
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              ดาวน์โหลด CSV สมาชิก
+            </a>
+          </Button>
+        }
+      />
 
       {loading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -168,7 +160,11 @@ export default function AdminDepartmentDetailPage() {
           </Card>
 
           {/* Tabs */}
-          <Tabs defaultValue="courses" className="w-full">
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setSearchParams({ tab: v }, { replace: true })}
+            className="w-full"
+          >
             <TabsList>
               <TabsTrigger value="courses">
                 หลักสูตร ({courses.length})

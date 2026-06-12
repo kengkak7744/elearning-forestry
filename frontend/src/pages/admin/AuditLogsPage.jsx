@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import useFetchData from '@/hooks/useFetchData'
 import {
   ChevronLeft,
   ChevronRight,
   History,
   RefreshCw,
+  X,
 } from 'lucide-react'
 import { auditApi } from '@/api/audit'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
@@ -18,7 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminEmptyState from '@/components/admin/AdminEmptyState'
+import SkeletonRows from '@/components/admin/SkeletonRows'
 import {
   Table,
   TableBody,
@@ -106,35 +109,41 @@ export default function AuditLogsPage() {
     { errorFallback: 'โหลดบันทึกไม่สำเร็จ', initialData: [] }
   )
 
-  // Reset to page 0 when filters change (prevents landing on an empty page).
-  useEffect(() => {
+  // Reset to page 0 whenever a filter changes — handled here (not an effect) so
+  // the clear button and the Selects share one path and we avoid a cascading
+  // set-state-in-effect.
+  const onActionChange = (v) => {
+    setActionFilter(v)
     setPage(0)
-  }, [actionFilter, targetTypeFilter])
+  }
+  const onTargetTypeChange = (v) => {
+    setTargetTypeFilter(v)
+    setPage(0)
+  }
+  const clearFilters = () => {
+    setActionFilter('all')
+    setTargetTypeFilter('all')
+    setPage(0)
+  }
+  const hasFilters = actionFilter !== 'all' || targetTypeFilter !== 'all'
 
   const hasNext = rows.length === PAGE_SIZE
 
   return (
     <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="inline-flex items-center gap-2 text-2xl font-semibold text-foreground sm:text-3xl">
-            <History className="h-6 w-6 text-muted-foreground" />
-            บันทึกการดำเนินการของผู้ดูแล
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ใครทำอะไรกับใคร เมื่อไหร่ — สำหรับตรวจสอบและตามรอยการเปลี่ยนแปลง
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={reload}
-          disabled={loading}
-        >
-          <RefreshCw className={loading ? 'mr-1.5 h-3.5 w-3.5 animate-spin' : 'mr-1.5 h-3.5 w-3.5'} />
-          รีเฟรช
-        </Button>
-      </div>
+      <AdminPageHeader
+        icon={History}
+        title="บันทึกการดำเนินการของผู้ดูแล"
+        subtitle="ใครทำอะไรกับใคร เมื่อไหร่ — สำหรับตรวจสอบและตามรอยการเปลี่ยนแปลง"
+        actions={
+          <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
+            <RefreshCw
+              className={loading ? 'mr-1.5 h-3.5 w-3.5 animate-spin' : 'mr-1.5 h-3.5 w-3.5'}
+            />
+            รีเฟรช
+          </Button>
+        }
+      />
 
       <Card className="mb-4 border-border/60">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
@@ -142,7 +151,7 @@ export default function AuditLogsPage() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               ประเภทการดำเนินการ
             </label>
-            <Select value={actionFilter} onValueChange={setActionFilter}>
+            <Select value={actionFilter} onValueChange={onActionChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -163,7 +172,7 @@ export default function AuditLogsPage() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               ประเภทเป้าหมาย
             </label>
-            <Select value={targetTypeFilter} onValueChange={setTargetTypeFilter}>
+            <Select value={targetTypeFilter} onValueChange={onTargetTypeChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -174,21 +183,26 @@ export default function AuditLogsPage() {
               </SelectContent>
             </Select>
           </div>
+          {hasFilters && (
+            <div className="flex items-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="w-full sm:w-auto"
+              >
+                <X className="mr-1.5 h-3.5 w-3.5" />
+                ล้างตัวกรอง
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-lg" />
-          ))}
-        </div>
+        <SkeletonRows count={6} className="h-14" />
       ) : rows.length === 0 ? (
-        <Card className="border-dashed border-border/60">
-          <CardContent className="p-12 text-center text-sm text-muted-foreground">
-            ไม่มีรายการบันทึก
-          </CardContent>
-        </Card>
+        <AdminEmptyState>ไม่มีรายการบันทึก</AdminEmptyState>
       ) : (
         <Card className="border-border/60">
           <div className="overflow-x-auto">

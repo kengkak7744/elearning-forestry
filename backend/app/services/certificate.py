@@ -362,7 +362,7 @@ def build_certificate_html(cert, user, course, db=None) -> str:
             }}
             .sigs.single .sig {{
                 flex: 0 0 auto;
-                width: 90mm;
+                width: 95mm;
             }}
 
             .sig {{
@@ -372,7 +372,7 @@ def build_certificate_html(cert, user, course, db=None) -> str:
             }}
 
             .sig-line {{
-                width: 60mm;
+                width: 65mm;
                 margin: 0 auto 2mm;
                 border-bottom: 1px dotted #6B7280;
                 height: 12mm;

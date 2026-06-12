@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Table,
@@ -28,6 +27,10 @@ import {
 import { toastApiError } from '@/utils/apiError'
 import { formatThaiDate } from '@/utils/formatting'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminEmptyState from '@/components/admin/AdminEmptyState'
+import SkeletonRows from '@/components/admin/SkeletonRows'
+import LoadMoreButton from '@/components/admin/LoadMoreButton'
 
 function StatusBadge({ cert }) {
   if (cert.is_revoked) {
@@ -55,6 +58,7 @@ export default function AdminCertificatesPage() {
   useDocumentTitle('ใบรับรองทั้งหมด')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [visibleCount, setVisibleCount] = useState(50)
   const [revokeTarget, setRevokeTarget] = useState(null)
   const [revokeReason, setRevokeReason] = useState('')
   const [revokeBusy, setRevokeBusy] = useState(false)
@@ -100,6 +104,17 @@ export default function AdminCertificatesPage() {
     return { valid, expired, revoked, total: certs.length }
   }, [certs])
 
+  // Reset the client-side page window when the filter narrows/changes.
+  const onSearchChange = (e) => {
+    setSearch(e.target.value)
+    setVisibleCount(50)
+  }
+  const onStatusChange = (v) => {
+    setStatusFilter(v)
+    setVisibleCount(50)
+  }
+  const visible = filtered.slice(0, visibleCount)
+
   const openRevoke = (cert) => {
     setRevokeTarget(cert)
     setRevokeReason('')
@@ -137,44 +152,11 @@ export default function AdminCertificatesPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      <div className="mb-6">
-        <h1 className="inline-flex items-center gap-2 text-2xl font-semibold text-foreground sm:text-3xl">
-          <Award className="h-6 w-6 text-muted-foreground" />
-          ใบรับรองทั้งหมด
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          ค้นหา ตรวจสอบ และเพิกถอนใบรับรองที่ออกให้ผู้เรียน
-        </p>
-      </div>
-
-      {/* Counts strip */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        {[
-          { label: 'ทั้งหมด', value: counts.total, tone: 'neutral' },
-          { label: 'ใช้งานได้', value: counts.valid, tone: 'success' },
-          { label: 'หมดอายุ', value: counts.expired, tone: 'warning' },
-          { label: 'เพิกถอน', value: counts.revoked, tone: 'destructive' },
-        ].map((s) => (
-          <Card key={s.label} className="border-border/60">
-            <CardContent className="p-3">
-              <div className="text-xs text-muted-foreground">{s.label}</div>
-              <div
-                className={`text-xl font-semibold tabular-nums ${
-                  s.tone === 'success'
-                    ? 'text-success'
-                    : s.tone === 'warning'
-                    ? 'text-warning'
-                    : s.tone === 'destructive'
-                    ? 'text-destructive'
-                    : 'text-foreground'
-                }`}
-              >
-                {s.value}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <AdminPageHeader
+        icon={Award}
+        title="ใบรับรองทั้งหมด"
+        subtitle="ค้นหา ตรวจสอบ และเพิกถอนใบรับรองที่ออกให้ผู้เรียน"
+      />
 
       {/* Filters */}
       <Card className="mb-4 border-border/60">
@@ -183,25 +165,25 @@ export default function AdminCertificatesPage() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={onSearchChange}
               placeholder="ค้นหา: เลขที่ / ชื่อผู้ได้รับ / หลักสูตร / หน่วยงาน"
               className="pl-8"
             />
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {[
-              { v: 'all', label: 'ทั้งหมด' },
-              { v: 'valid', label: 'ใช้งานได้' },
-              { v: 'expired', label: 'หมดอายุ' },
-              { v: 'revoked', label: 'เพิกถอน' },
+              { v: 'all', label: 'ทั้งหมด', count: counts.total },
+              { v: 'valid', label: 'ใช้งานได้', count: counts.valid },
+              { v: 'expired', label: 'หมดอายุ', count: counts.expired },
+              { v: 'revoked', label: 'เพิกถอน', count: counts.revoked },
             ].map((t) => (
               <Button
                 key={t.v}
                 variant={statusFilter === t.v ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setStatusFilter(t.v)}
+                onClick={() => onStatusChange(t.v)}
               >
-                {t.label}
+                {t.label} ({t.count})
               </Button>
             ))}
           </div>
@@ -209,17 +191,9 @@ export default function AdminCertificatesPage() {
       </Card>
 
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-md" />
-          ))}
-        </div>
+        <SkeletonRows count={6} className="h-14 rounded-md" />
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed border-border/60">
-          <CardContent className="p-12 text-center text-sm text-muted-foreground">
-            ไม่พบใบรับรองที่ตรงกับเงื่อนไข
-          </CardContent>
-        </Card>
+        <AdminEmptyState>ไม่พบใบรับรองที่ตรงกับเงื่อนไข</AdminEmptyState>
       ) : (
         <Card className="border-border/60">
           <div className="overflow-x-auto">
@@ -236,7 +210,7 @@ export default function AdminCertificatesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c) => (
+                {visible.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="whitespace-nowrap font-mono text-xs">
                       {c.certificate_number}
@@ -276,6 +250,7 @@ export default function AdminCertificatesPage() {
                             aria-label="ดาวน์โหลด PDF"
                           >
                             <Download className="h-3.5 w-3.5" />
+                            <span className="ml-1 sm:hidden">ดาวน์โหลด</span>
                           </a>
                         </Button>
                         {c.is_revoked ? (
@@ -306,6 +281,10 @@ export default function AdminCertificatesPage() {
             </Table>
           </div>
         </Card>
+      )}
+
+      {!loading && filtered.length > visibleCount && (
+        <LoadMoreButton onClick={() => setVisibleCount((v) => v + 50)} />
       )}
 
       <ConfirmDialog

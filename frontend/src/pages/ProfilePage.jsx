@@ -10,12 +10,7 @@ import SecurityTab from '@/components/profile/SecurityTab'
 import MyCoursesTab from '@/components/profile/MyCoursesTab'
 import BookmarksTab from '@/components/profile/BookmarksTab'
 import CertificatesTab from '@/components/profile/CertificatesTab'
-
-function initials(name) {
-  if (!name) return 'U'
-  const parts = name.trim().split(/\s+/)
-  return (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')
-}
+import { initials } from '@/utils/formatting'
 
 export default function ProfilePage() {
   useDocumentTitle('โปรไฟล์')

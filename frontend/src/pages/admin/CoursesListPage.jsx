@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -21,8 +20,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminEmptyState from '@/components/admin/AdminEmptyState'
+import SkeletonRows from '@/components/admin/SkeletonRows'
+import LoadMoreButton from '@/components/admin/LoadMoreButton'
 import { cn } from '@/lib/utils'
 import { toastApiError } from '@/utils/apiError'
+
+const PAGE_SIZE = 50
 
 const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
   value,
@@ -54,26 +59,54 @@ export default function CoursesListPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [duplicatingId, setDuplicatingId] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [reachedEnd, setReachedEnd] = useState(false)
   const navigate = useNavigate()
+
+  const buildParams = () => {
+    const params = { limit: PAGE_SIZE }
+    if (search) params.search = search
+    if (categoryFilter) params.category = categoryFilter
+    return params
+  }
 
   const {
     data: courses,
     loading,
+    setData,
     reload,
-  } = useFetchData(
-    () => {
-      const params = {}
-      if (search) params.search = search
-      if (categoryFilter) params.category = categoryFilter
-      return coursesApi.list(params)
-    },
-    [search, categoryFilter],
-    {
-      errorFallback: 'โหลดรายการไม่สำเร็จ',
-      initialData: [],
-      debounceMs: search ? 350 : 0,
+  } = useFetchData(() => coursesApi.list(buildParams()), [search, categoryFilter], {
+    errorFallback: 'โหลดรายการไม่สำเร็จ',
+    initialData: [],
+    debounceMs: search ? 350 : 0,
+  })
+
+  // Reset paging when filters change — done in the change handlers (not an
+  // effect) to avoid a cascading set-state-in-effect.
+  const onSearchChange = (e) => {
+    setSearch(e.target.value)
+    setReachedEnd(false)
+  }
+  const onCategoryChange = (value) => {
+    setCategoryFilter(value)
+    setReachedEnd(false)
+  }
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const next = await coursesApi.list({ ...buildParams(), skip: courses.length })
+      setData((prev) => [...prev, ...next])
+      if (next.length < PAGE_SIZE) setReachedEnd(true)
+    } catch (err) {
+      toastApiError(err, 'โหลดเพิ่มเติมไม่สำเร็จ')
+    } finally {
+      setLoadingMore(false)
     }
-  )
+  }
+
+  const canLoadMore =
+    !loading && !reachedEnd && courses.length >= PAGE_SIZE && courses.length % PAGE_SIZE === 0
 
   const handleDelete = async () => {
     if (!confirmTarget) return
@@ -82,6 +115,7 @@ export default function CoursesListPage() {
     try {
       await coursesApi.delete(target.id)
       showToast('ลบหลักสูตรเรียบร้อย', 'success')
+      setReachedEnd(false)
       reload()
     } catch (err) {
       toastApiError(err, 'ลบไม่สำเร็จ')
@@ -109,22 +143,18 @@ export default function CoursesListPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
-            จัดการหลักสูตร
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            รายการหลักสูตรทั้งหมด
-          </p>
-        </div>
-        <Button asChild className="w-full sm:w-auto">
-          <Link to="/admin/courses/new/edit">
-            <Plus className="mr-1 h-4 w-4" />
-            สร้างหลักสูตรใหม่
-          </Link>
-        </Button>
-      </div>
+      <AdminPageHeader
+        title="จัดการหลักสูตร"
+        subtitle="รายการหลักสูตรทั้งหมด"
+        actions={
+          <Button asChild className="w-full sm:w-auto">
+            <Link to="/admin/courses/new/edit">
+              <Plus className="mr-1 h-4 w-4" />
+              สร้างหลักสูตรใหม่
+            </Link>
+          </Button>
+        }
+      />
 
       <Card className="mb-4 border-border/60">
         <CardContent className="space-y-3 p-4">
@@ -134,7 +164,7 @@ export default function CoursesListPage() {
               type="search"
               placeholder="ค้นหาหลักสูตร..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={onSearchChange}
               className="pl-9"
             />
           </div>
@@ -142,7 +172,7 @@ export default function CoursesListPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setCategoryFilter('')}
+              onClick={() => onCategoryChange('')}
               className={cn(
                 'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                 categoryFilter === ''
@@ -158,7 +188,7 @@ export default function CoursesListPage() {
                 <button
                   key={c.value}
                   type="button"
-                  onClick={() => setCategoryFilter(active ? '' : c.value)}
+                  onClick={() => onCategoryChange(active ? '' : c.value)}
                   className={cn(
                     'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                     active
@@ -176,17 +206,9 @@ export default function CoursesListPage() {
       </Card>
 
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-lg" />
-          ))}
-        </div>
+        <SkeletonRows count={5} className="h-16" />
       ) : courses.length === 0 ? (
-        <Card className="border-dashed border-border/60">
-          <CardContent className="p-12 text-center text-sm text-muted-foreground">
-            ไม่พบหลักสูตร
-          </CardContent>
-        </Card>
+        <AdminEmptyState>ไม่พบหลักสูตร</AdminEmptyState>
       ) : (
         <>
           {/* Desktop table */}
@@ -348,6 +370,15 @@ export default function CoursesListPage() {
                 </Card>
               )
             })}
+          </div>
+        </>
+      )}
+
+      {!loading && courses.length > 0 && (
+        <>
+          {canLoadMore && <LoadMoreButton onClick={loadMore} loading={loadingMore} />}
+          <div className="mt-4 text-sm text-muted-foreground">
+            แสดง {courses.length} รายการ
           </div>
         </>
       )}

@@ -14,7 +14,16 @@ import { ROLE_LABELS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import AdminEmptyState from '@/components/admin/AdminEmptyState'
 
 const ROLE_TONE = {
   admin: 'bg-destructive/15 text-destructive',
@@ -88,6 +97,7 @@ function DepartmentCard({ dept }) {
 export default function AdminDepartmentsPage() {
   useDocumentTitle('หน่วยงานทั้งหมด')
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('users')
 
   const { data: departments, loading } = useFetchData(
     () => adminStatsApi.departments(),
@@ -97,9 +107,16 @@ export default function AdminDepartmentsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return departments
-    return departments.filter((d) => d.name.toLowerCase().includes(q))
-  }, [departments, search])
+    const list = q
+      ? departments.filter((d) => d.name.toLowerCase().includes(q))
+      : [...departments]
+    const sorters = {
+      users: (a, b) => b.user_count - a.user_count,
+      name: (a, b) => a.name.localeCompare(b.name, 'th'),
+      certs: (a, b) => b.cert_count - a.cert_count,
+    }
+    return list.sort(sorters[sortBy] ?? sorters.users)
+  }, [departments, search, sortBy])
 
   const totalUsers = useMemo(
     () => departments.reduce((sum, d) => sum + d.user_count, 0),
@@ -112,15 +129,11 @@ export default function AdminDepartmentsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      <div className="mb-6">
-        <h1 className="inline-flex items-center gap-2 text-2xl font-semibold text-foreground sm:text-3xl">
-          <Building2 className="h-6 w-6 text-muted-foreground" />
-          หน่วยงานทั้งหมด
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          คลิกที่หน่วยงานเพื่อดูสมาชิก ความคืบหน้าหลักสูตร และส่งออก CSV
-        </p>
-      </div>
+      <AdminPageHeader
+        icon={Building2}
+        title="หน่วยงานทั้งหมด"
+        subtitle="คลิกที่หน่วยงานเพื่อดูสมาชิก ความคืบหน้าหลักสูตร และส่งออก CSV"
+      />
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         {[
@@ -141,8 +154,8 @@ export default function AdminDepartmentsPage() {
       </div>
 
       <Card className="mb-4 border-border/60">
-        <CardContent className="p-3">
-          <div className="relative">
+        <CardContent className="flex flex-col gap-2 p-3 sm:flex-row">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -151,6 +164,16 @@ export default function AdminDepartmentsPage() {
               className="pl-8"
             />
           </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full sm:w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="users">ผู้ใช้งานมากสุด</SelectItem>
+              <SelectItem value="name">ชื่อหน่วยงาน</SelectItem>
+              <SelectItem value="certs">ใบรับรองมากสุด</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
@@ -161,12 +184,7 @@ export default function AdminDepartmentsPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed border-border/60">
-          <CardContent className="p-12 text-center text-sm text-muted-foreground">
-            <Users className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-            ไม่พบหน่วยงาน
-          </CardContent>
-        </Card>
+        <AdminEmptyState icon={Users}>ไม่พบหน่วยงาน</AdminEmptyState>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((d) => (

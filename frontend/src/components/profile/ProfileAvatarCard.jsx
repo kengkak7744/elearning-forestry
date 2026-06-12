@@ -8,15 +8,10 @@ import { toastApiError } from '@/utils/apiError'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { initials } from '@/utils/formatting'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB — matches backend MAX_IMAGE_SIZE
-
-function initials(name) {
-  if (!name) return 'U'
-  const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U'
-}
 
 export default function ProfileAvatarCard() {
   const { user, updateUser } = useAuth()

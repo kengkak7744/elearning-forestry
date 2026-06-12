@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Award, Eye, Save, Trash2, Upload } from 'lucide-react'
+import { Eye, Save, Settings, Trash2, Upload } from 'lucide-react'
 import { certSettingsApi } from '@/api/certSettings'
 import { showToast } from '@/lib/toast'
 import { mediaUrl } from '@/utils/media'
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { toastApiError } from '@/utils/apiError'
 
 // `side` controls visibility per signature_mode. 'org' always shows;
@@ -198,16 +199,11 @@ export default function AdminCertSettingsPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl p-4 sm:p-8">
-      <div className="mb-6">
-        <h1 className="inline-flex items-center gap-2 text-2xl font-semibold text-foreground sm:text-3xl">
-          <Award className="h-6 w-6 text-muted-foreground" />
-          ตั้งค่าใบรับรอง
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          ปรับชื่อหน่วยงานและผู้ลงนามที่ปรากฏบนใบรับรอง — ใบรับรองทุกใบที่ออก
-          หลังจากบันทึกจะใช้ค่าใหม่
-        </p>
-      </div>
+      <AdminPageHeader
+        icon={Settings}
+        title="ตั้งค่าใบรับรอง"
+        subtitle="ปรับชื่อหน่วยงานและผู้ลงนามที่ปรากฏบนใบรับรอง — ใบรับรองทุกใบที่ออกหลังจากบันทึกจะใช้ค่าใหม่"
+      />
 
       {loading || !data ? (
         <Card className="border-border/60">

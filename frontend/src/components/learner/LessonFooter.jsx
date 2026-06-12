@@ -18,7 +18,7 @@ export default function LessonFooter({
   currentLessonGated,
   onPrev,
   onNext,
-  onViewScores,
+  onFinish,
 }) {
   if (!currentLesson && !viewingFinal) return null
 
@@ -73,11 +73,11 @@ export default function LessonFooter({
           {viewingFinal ? (
             finalQuiz?.is_passed ? (
               <Button
-                onClick={onViewScores}
+                onClick={onFinish}
                 className="flex-1 bg-warning text-warning-foreground hover:bg-warning/90 sm:flex-none"
               >
                 <Trophy className="mr-1.5 h-4 w-4" />
-                จบหลักสูตร · ดูคะแนน
+                จบหลักสูตร
               </Button>
             ) : (
               <Button variant="secondary" onClick={onPrev} className="flex-1 sm:flex-none">
@@ -90,7 +90,7 @@ export default function LessonFooter({
               disabled={!timeGateMet}
               title={blocked ? 'คลิกเพื่อไปทำแบบทดสอบที่ต้องผ่าน' : undefined}
               className={cn(
-                'flex-1 sm:flex-none',
+                'h-auto min-h-9 flex-1 py-1 sm:flex-none',
                 blocked && 'bg-warning text-warning-foreground hover:bg-warning/90',
                 !blocked && !nextDest && 'bg-success text-success-foreground hover:bg-success/90'
               )}
@@ -111,10 +111,19 @@ export default function LessonFooter({
                   {BUTTONS.GO_TO_FINAL_EXAM}
                 </>
               ) : (
-                <>
-                  {BUTTONS.NEXT}
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </>
+                // The destination lesson title sits under the label on sm+ so
+                // learners know what's coming — "ถัดไป — {title}".
+                <span className="flex flex-col items-center leading-tight">
+                  <span className="inline-flex items-center">
+                    {BUTTONS.NEXT}
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </span>
+                  {nextDest.lesson?.title && (
+                    <span className="hidden max-w-[14rem] truncate text-[10px] font-normal opacity-80 sm:block">
+                      {nextDest.lesson.title}
+                    </span>
+                  )}
+                </span>
               )}
             </Button>
           )}

@@ -11,12 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-
-function initials(name) {
-  if (!name) return 'U'
-  const parts = name.trim().split(/\s+/)
-  return (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')
-}
+import { initials } from '@/utils/formatting'
 
 export default function LearnerTopBar() {
   const { user, logout } = useAuth()

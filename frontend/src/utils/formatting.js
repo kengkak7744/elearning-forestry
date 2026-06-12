@@ -25,3 +25,22 @@ export function fmtBytes(bytes) {
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
+
+/**
+ * Avatar initials from a full name — first letter of the first two words,
+ * uppercased, falling back to 'U'. Consolidates the copies that lived in
+ * DashboardPage, ProfilePage, LearnerTopBar and ProfileAvatarCard.
+ */
+export function initials(name) {
+  if (!name) return 'U'
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || 'U'
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Whole days from now until `iso` (negative if already past). null when no date. */
+export function daysUntil(iso) {
+  if (!iso) return null
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / DAY_MS)
+}
