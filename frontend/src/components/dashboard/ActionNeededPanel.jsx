@@ -49,7 +49,9 @@ function buildItems(enrollmentList, certList, mandatoryList) {
     items.push({
       key: `m-${c.id}`,
       title: c.title,
-      to: linkTo(c.id),
+      // Expired → course detail page, where the "เริ่มอบรมใหม่" retake CTA
+      // lives (the viewer alone won't reset progress for recertification).
+      to: expired ? `/courses/${c.id}` : linkTo(c.id),
       statusLabel,
       tone: expired ? 'destructive' : 'muted',
     })
@@ -77,7 +79,8 @@ function buildItems(enrollmentList, certList, mandatoryList) {
     items.push({
       key: `x-${cid}`,
       title: cert.course?.title,
-      to: linkTo(cid),
+      // Detail page hosts the recertification retake CTA.
+      to: `/courses/${cid}`,
       statusLabel: 'หมดอายุแล้ว — ต้องอบรมใหม่',
       tone: 'destructive',
     })

@@ -5,6 +5,10 @@ export const certificatesApi = {
     client.get(`/certificates/course/${courseId}/eligibility`).then((r) => r.data),
   issue: (courseId) =>
     client.post(`/certificates/course/${courseId}/issue`).then((r) => r.data),
+  // Start a recertification retake for an expired cert — resets stale lesson
+  // progress so the learner must re-watch + re-pass before renewing.
+  recertify: (courseId) =>
+    client.post(`/certificates/course/${courseId}/recertify`).then((r) => r.data),
   mine: () => client.get('/certificates/me').then((r) => r.data),
   adminAll: () => client.get('/certificates/admin/all').then((r) => r.data),
   // Public — no auth, rate-limited server-side. Returns

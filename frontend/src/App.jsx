@@ -5,13 +5,29 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Toaster } from '@/components/ui/sonner'
-import { LearnerShell, ViewerShell, AdminShell } from '@/components/layout/AppShell'
 
-// Login/Register are small and accessed first — keep eager.
+// LoginPage is the universal entry point — keep eager. The shells and every
+// other page are lazy so the pre-auth login screen doesn't pay for the top
+// bar / admin sidebar / mobile nav (and their Radix + icon deps) it never
+// renders.
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
+
+// Shells pull in the top bar, admin sidebar, mobile nav and their Radix
+// overlay primitives — none of which the login screen needs. Lazy-loading
+// them keeps that weight off first paint; the chunk loads once after auth and
+// stays mounted across child-route navigations.
+const LearnerShell = lazy(() =>
+  import('@/components/layout/AppShell').then((m) => ({ default: m.LearnerShell }))
+)
+const ViewerShell = lazy(() =>
+  import('@/components/layout/AppShell').then((m) => ({ default: m.ViewerShell }))
+)
+const AdminShell = lazy(() =>
+  import('@/components/layout/AppShell').then((m) => ({ default: m.AdminShell }))
+)
 
 // Heavier pages are lazy-loaded.
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const CoursesPage = lazy(() => import('./pages/CoursesPage'))
@@ -48,7 +64,7 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Toaster />
-        <BrowserRouter>
+        <BrowserRouter basename="/elearning">
           <Suspense fallback={<PageFallback />}>
             <Routes>
               {/* Public */}

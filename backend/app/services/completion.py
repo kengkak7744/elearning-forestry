@@ -13,12 +13,19 @@ from app.models.progress import LessonProgress
 from app.models.quiz import Quiz, QuizAttempt
 
 
-def course_completion(db: Session, user_id: int, course_id: int):
+def course_completion(db: Session, user_id: int, course_id: int, since=None):
     """Return (eligible, final_score_or_None, reason_if_not).
 
     Eligible iff: enrolled, all lessons completed, and the course's final quiz
     (if it has one) has been passed. final_score is the best final-exam attempt
     when a final exists, otherwise None (course without a final still issues).
+
+    `since` (recertification): when given, only completions dated AFTER it count
+    — a lesson must have been completed and the final passed after `since`.
+    Used to require a genuine retake when renewing an expired certificate: the
+    learner's original completion (which predates the expired cert) no longer
+    qualifies, so they must re-watch and re-pass. Default None = count all
+    completions (first issuance and feedback gating are unchanged).
     """
     enrolled = db.query(Enrollment).filter(
         Enrollment.user_id == user_id,
@@ -36,7 +43,7 @@ def course_completion(db: Session, user_id: int, course_id: int):
     if total_lessons == 0:
         return False, None, "หลักสูตรยังไม่มีบทเรียน"
 
-    completed_lessons = (
+    completed_q = (
         db.query(func.count(LessonProgress.id))
         .join(Lesson, Lesson.id == LessonProgress.lesson_id)
         .join(Module, Module.id == Lesson.module_id)
@@ -45,8 +52,10 @@ def course_completion(db: Session, user_id: int, course_id: int):
             LessonProgress.user_id == user_id,
             LessonProgress.completed == True,
         )
-        .scalar()
-    ) or 0
+    )
+    if since is not None:
+        completed_q = completed_q.filter(LessonProgress.completed_at > since)
+    completed_lessons = completed_q.scalar() or 0
     if completed_lessons < total_lessons:
         return False, None, f"เรียนยังไม่ครบ ({completed_lessons}/{total_lessons} บทเรียน)"
 
@@ -57,16 +66,17 @@ def course_completion(db: Session, user_id: int, course_id: int):
         .first()
     )
     if final_quiz:
-        best = (
+        best_q = (
             db.query(QuizAttempt)
             .filter(
                 QuizAttempt.user_id == user_id,
                 QuizAttempt.quiz_id == final_quiz.id,
                 QuizAttempt.is_passed == True,
             )
-            .order_by(QuizAttempt.score.desc())
-            .first()
         )
+        if since is not None:
+            best_q = best_q.filter(QuizAttempt.attempted_at > since)
+        best = best_q.order_by(QuizAttempt.score.desc()).first()
         if not best:
             return False, None, "ยังไม่ผ่านแบบทดสอบสุดท้าย"
         final_score = float(best.score)

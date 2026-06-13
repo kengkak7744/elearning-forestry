@@ -112,6 +112,17 @@ class TestVisibility:
         titles = [c["title"] for c in res.json()]
         assert titles == ["การดับไฟป่าเบื้องต้น"]
 
+    def test_list_reports_enrolled_count(self, learner_client, db, learner_user):
+        """The catalog list must carry per-course enrollment counts, not the
+        schema default of 0 — regression for the admin 'ผู้ลงทะเบียน' column."""
+        enrolled = make_course(db, title="มีผู้ลงทะเบียน")
+        make_course(db, title="ยังไม่มีผู้ลงทะเบียน")
+        enroll(db, learner_user, enrolled)
+
+        rows = {c["title"]: c["enrolled_count"] for c in learner_client.get("/api/courses").json()}
+        assert rows["มีผู้ลงทะเบียน"] == 1
+        assert rows["ยังไม่มีผู้ลงทะเบียน"] == 0
+
 
 class TestEnrollment:
     def test_enroll(self, learner_client, db):

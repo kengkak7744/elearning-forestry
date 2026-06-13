@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
 import { quizzesApi } from '@/api/quizzes'
+import { certificatesApi } from '@/api/certificates'
 import { useAuth } from '@/contexts/AuthContext'
 import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
 import { mediaUrl } from '@/utils/media'
@@ -92,6 +93,10 @@ export default function CourseDetailPage() {
   const [error, setError] = useState('')
   const [enrollLoading, setEnrollLoading] = useState(false)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
+  // Certificate eligibility — only fetched once we know the learner is enrolled.
+  // Drives the "ใบรับรองหมดอายุ → ต้องอบรมใหม่" recertification CTA.
+  const [elig, setElig] = useState(null)
+  const [recertLoading, setRecertLoading] = useState(false)
 
   // Drive the tab/bookmark title from the loaded course title once it's known.
   useDocumentTitle(course?.title)
@@ -117,6 +122,36 @@ export default function CourseDetailPage() {
     loadCourse()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Check cert status once enrolled — tells us whether an expired cert needs a
+  // recertification retake. Skipped for non-enrolled learners (nothing to
+  // renew); `needsRecert` is gated on `enrolled` below so a stale value from a
+  // previously-viewed course can't leak through.
+  useEffect(() => {
+    if (!course?.is_enrolled) return
+    let cancelled = false
+    certificatesApi
+      .eligibility(id)
+      .then((data) => {
+        if (!cancelled) setElig(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [id, course?.is_enrolled])
+
+  const handleRecertify = async () => {
+    setRecertLoading(true)
+    try {
+      await certificatesApi.recertify(course.id)
+      showToast('เริ่มการอบรมใหม่เพื่อต่ออายุใบรับรอง', 'success')
+      navigate(`/courses/${course.id}/learn`)
+    } catch (err) {
+      toastApiError(err, 'ไม่สามารถเริ่มการอบรมใหม่ได้')
+      setRecertLoading(false)
+    }
+  }
 
   const handleEnroll = async () => {
     setEnrollLoading(true)
@@ -233,6 +268,22 @@ export default function CourseDetailPage() {
     >
       <GraduationCap className="mr-1.5 h-4 w-4" />
       {enrollLoading ? BUTTONS.ENROLLING : BUTTONS.ENROLL}
+    </Button>
+  )
+
+  // Expired cert on a recertifiable course — the learner must redo the course
+  // before a new cert issues. Starting the retake resets their stale progress,
+  // then drops them into the viewer to re-watch.
+  const needsRecert = enrolled && !!elig?.needs_recertification
+  const recertCta = (
+    <Button
+      onClick={handleRecertify}
+      disabled={recertLoading}
+      size="lg"
+      className="w-full"
+    >
+      <GraduationCap className="mr-1.5 h-4 w-4" />
+      {recertLoading ? 'กำลังเริ่ม...' : 'เริ่มอบรมใหม่เพื่อต่ออายุ'}
     </Button>
   )
 
@@ -374,14 +425,19 @@ export default function CourseDetailPage() {
         <aside className="md:sticky md:top-20 md:h-fit">
           <Card className="border-border/60">
             <CardContent className="space-y-4 p-5">
-              {enrolled && (
+              {needsRecert ? (
+                <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+                  <Clock className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>ใบรับรองหมดอายุแล้ว — ต้องอบรมใหม่เพื่อต่ออายุใบรับรอง</span>
+                </div>
+              ) : enrolled ? (
                 <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
                   <CheckCircle2 className="h-4 w-4" />
                   คุณลงทะเบียนแล้ว
                 </div>
-              )}
+              ) : null}
 
-              <div className="hidden md:block">{enrollCta}</div>
+              <div className="hidden md:block">{needsRecert ? recertCta : enrollCta}</div>
 
               {enrolled && (
                 <Button
@@ -481,7 +537,17 @@ export default function CourseDetailPage() {
             </Button>
           )}
           <div className="flex-1">
-            {enrolled ? (
+            {needsRecert ? (
+              <Button
+                onClick={handleRecertify}
+                disabled={recertLoading}
+                size="lg"
+                className="w-full"
+              >
+                <GraduationCap className="mr-1.5 h-4 w-4" />
+                {recertLoading ? 'กำลังเริ่ม...' : 'เริ่มอบรมใหม่เพื่อต่ออายุ'}
+              </Button>
+            ) : enrolled ? (
               <Button
                 onClick={() => navigate(`/courses/${course.id}/learn`)}
                 size="lg"

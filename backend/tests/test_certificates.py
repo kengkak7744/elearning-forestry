@@ -1,5 +1,7 @@
 """Characterization tests for /api/certificates — eligibility, issuance,
 public verification (+ rate limit), revocation, download."""
+from datetime import datetime, timezone
+
 from tests.conftest import auth_client, make_user
 from tests.factories import (
     complete_all_lessons,
@@ -100,6 +102,106 @@ class TestIssue:
         res = learner_client.post("/api/certificates/course/99999/issue")
         assert res.status_code == 404
         assert res.json()["detail"] == "ไม่พบหลักสูตร"
+
+
+class TestRecertification:
+    """Expired cert → must retake the course before a new cert issues."""
+
+    def _expired_setup(self, db, user):
+        """A recertifiable course completed long ago, with a now-expired cert.
+        Lesson completion + final pass are dated before the cert lapsed (stale)."""
+        from datetime import timedelta
+        from app.models.certificate import Certificate
+        from app.models.progress import LessonProgress
+        from app.models.quiz import QuizAttempt
+
+        long_ago = datetime.now(timezone.utc) - timedelta(days=400)
+        lapsed = datetime.now(timezone.utc) - timedelta(days=35)
+
+        course = make_course(db, recertify_after_days=365)
+        module = make_module(db, course)
+        lesson = make_lesson(db, module)
+        quiz = make_quiz(db, course=course)
+        enroll(db, user, course)
+        db.add(LessonProgress(
+            user_id=user.id, lesson_id=lesson.id, completed=True, completed_at=long_ago,
+        ))
+        db.add(QuizAttempt(
+            user_id=user.id, quiz_id=quiz.id, score=90, answers={},
+            is_passed=True, attempted_at=long_ago,
+        ))
+        db.add(Certificate(
+            user_id=user.id, course_id=course.id, certificate_number="CERT-OLD-000001",
+            final_score=90, issued_at=long_ago, expires_at=lapsed,
+        ))
+        db.commit()
+        return course, lesson, quiz
+
+    def test_expired_cert_is_not_renewable_on_stale_progress(
+        self, learner_client, db, learner_user
+    ):
+        course, _, _ = self._expired_setup(db, learner_user)
+        body = learner_client.get(
+            f"/api/certificates/course/{course.id}/eligibility"
+        ).json()
+        assert body["is_expired"] is True
+        assert body["needs_recertification"] is True
+        # The original completion predates the lapse, so it no longer counts.
+        assert body["eligible"] is False
+        assert "เรียนยังไม่ครบ" in body["reason"]
+
+    def test_issue_blocked_before_retake(self, learner_client, db, learner_user):
+        course, _, _ = self._expired_setup(db, learner_user)
+        res = learner_client.post(f"/api/certificates/course/{course.id}/issue")
+        assert res.status_code == 400
+
+    def test_recertify_then_renew(
+        self, learner_client, db, learner_user, fake_pdf_render
+    ):
+        from app.models.progress import LessonProgress
+        from app.models.quiz import QuizAttempt
+
+        course, lesson, quiz = self._expired_setup(db, learner_user)
+
+        # Start the retake — stale completion gets reset.
+        res = learner_client.post(f"/api/certificates/course/{course.id}/recertify")
+        assert res.status_code == 200
+        assert res.json()["reset_lessons"] == 1
+
+        prog = (
+            db.query(LessonProgress)
+            .filter_by(user_id=learner_user.id, lesson_id=lesson.id)
+            .first()
+        )
+        assert prog.completed is False
+
+        # Re-watch the lesson + re-pass the final (fresh, post-lapse timestamps).
+        prog.completed = True
+        prog.completed_at = datetime.now(timezone.utc)
+        db.add(QuizAttempt(
+            user_id=learner_user.id, quiz_id=quiz.id, score=88, answers={},
+            is_passed=True, attempted_at=datetime.now(timezone.utc),
+        ))
+        db.commit()
+
+        body = learner_client.get(
+            f"/api/certificates/course/{course.id}/eligibility"
+        ).json()
+        assert body["eligible"] is True
+
+        res = learner_client.post(f"/api/certificates/course/{course.id}/issue")
+        assert res.status_code == 201
+        assert res.json()["already_existed"] is False
+        assert res.json()["expires_at"] is not None
+
+    def test_recertify_requires_an_expired_cert(
+        self, learner_client, db, learner_user, fake_pdf_render
+    ):
+        # Freshly completed, no expired cert → nothing to recertify.
+        course = completed_course(db, learner_user, recertify_after_days=365)
+        res = learner_client.post(f"/api/certificates/course/{course.id}/recertify")
+        assert res.status_code == 400
+        assert res.json()["detail"] == "ไม่มีใบรับรองที่หมดอายุสำหรับหลักสูตรนี้"
 
 
 class TestMyCertificates:

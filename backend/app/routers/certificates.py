@@ -104,7 +104,6 @@ def eligibility(
 ):
     """Tell the client whether the learner can claim a certificate for this course,
     and whether one was already issued (and whether it's still valid)."""
-    eligible, final_score, reason = course_completion(db, current_user.id, course_id)
     # The "current" cert is the most recent one — recertification flows can
     # have multiple historical certs per (user, course).
     existing = (
@@ -115,6 +114,15 @@ def eligibility(
     )
     cert_expired = bool(existing) and is_expired(existing)
     cert_revoked = bool(existing) and existing.is_revoked
+    # An expired (non-revoked) cert means the learner must RE-complete the course
+    # before renewing — only completions dated after the cert lapsed count. A
+    # revoked cert is an admin action, not a lapse, so it reissues on the
+    # original completion (since=None).
+    needs_recert = cert_expired and not cert_revoked
+    since = existing.expires_at if needs_recert else None
+    eligible, final_score, reason = course_completion(
+        db, current_user.id, course_id, since=since
+    )
     return {
         "eligible": eligible,
         "reason": reason,
@@ -125,6 +133,8 @@ def eligibility(
         "expires_at": existing.expires_at.isoformat() if existing and existing.expires_at else None,
         "is_expired": cert_expired,
         "is_revoked": cert_revoked,
+        # True → learner has an expired cert and must retake before renewing.
+        "needs_recertification": needs_recert,
     }
 
 
@@ -165,10 +175,17 @@ def issue(
             "already_existed": True,
         }
 
-    # Either no cert yet, or the most recent one expired → issue fresh.
-    # Re-check eligibility — they may have retaken the final quiz between expiry
-    # and now.
-    eligible, final_score, reason = course_completion(db, current_user.id, course_id)
+    # Either no cert yet, or the most recent one expired/revoked → issue fresh.
+    # For an EXPIRED cert, renewal requires a genuine retake: only lessons
+    # re-completed and a final re-passed AFTER the lapse count (since=expires_at).
+    # The learner resets their progress via the /recertify endpoint first, then
+    # re-watches and re-passes. A revoked-but-not-expired cert reissues on the
+    # original completion (since=None).
+    recertifying = bool(existing) and is_expired(existing) and not existing.is_revoked
+    since = existing.expires_at if recertifying else None
+    eligible, final_score, reason = course_completion(
+        db, current_user.id, course_id, since=since
+    )
     if not eligible:
         raise HTTPException(status_code=400, detail=reason or "ยังไม่มีสิทธิ์รับใบรับรอง")
 
@@ -194,6 +211,79 @@ def issue(
         "issued_at": cert.issued_at.isoformat() if cert.issued_at else None,
         "expires_at": cert.expires_at.isoformat() if cert.expires_at else None,
         "already_existed": False,
+    }
+
+
+@router.post("/course/{course_id}/recertify")
+def recertify(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Start a recertification retake for an expired certificate.
+
+    Resets the learner's *stale* lesson completions (those dated on/before the
+    cert's expiry) back to not-completed so the viewer makes them re-watch.
+    Quiz attempts are left intact — renewal eligibility instead only counts a
+    final-exam pass dated after the lapse, so the learner simply re-takes the
+    final. Once they've re-watched every lesson and re-passed, /issue grants a
+    fresh certificate.
+
+    Idempotent: lessons already re-completed for this new cycle (completed_at
+    after the lapse) are preserved, so calling it again won't wipe in-progress
+    retake work.
+    """
+    from app.models.enrollment import Enrollment
+    from app.models.lesson import Lesson
+    from app.models.course import Module
+    from app.models.progress import LessonProgress
+
+    get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+
+    enrolled = (
+        db.query(Enrollment)
+        .filter(Enrollment.user_id == current_user.id, Enrollment.course_id == course_id)
+        .first()
+    )
+    if not enrolled:
+        raise HTTPException(status_code=400, detail="ยังไม่ได้ลงทะเบียนหลักสูตรนี้")
+
+    existing = (
+        db.query(Certificate)
+        .filter(Certificate.user_id == current_user.id, Certificate.course_id == course_id)
+        .order_by(Certificate.issued_at.desc())
+        .first()
+    )
+    if not (existing and is_expired(existing) and not existing.is_revoked):
+        raise HTTPException(
+            status_code=400, detail="ไม่มีใบรับรองที่หมดอายุสำหรับหลักสูตรนี้"
+        )
+
+    cutoff = existing.expires_at
+    stale = (
+        db.query(LessonProgress)
+        .join(Lesson, Lesson.id == LessonProgress.lesson_id)
+        .join(Module, Module.id == Lesson.module_id)
+        .filter(
+            Module.course_id == course_id,
+            LessonProgress.user_id == current_user.id,
+            LessonProgress.completed == True,
+            (LessonProgress.completed_at == None)  # noqa: E711 — SQL IS NULL
+            | (LessonProgress.completed_at <= cutoff),
+        )
+        .all()
+    )
+    for p in stale:
+        p.completed = False
+        p.completed_at = None
+        p.position_seconds = 0
+        p.current_page = 1
+        p.pages_read_count = 0
+    db.commit()
+
+    return {
+        "message": "เริ่มการอบรมใหม่เพื่อต่ออายุใบรับรอง",
+        "reset_lessons": len(stale),
     }
 
 

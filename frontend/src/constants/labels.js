@@ -64,6 +64,7 @@ export const BUTTONS = {
   GO_TO_FINAL_EXAM: 'แบบทดสอบสุดท้าย',
   COMPLETED_COURSE: 'จบหลักสูตรแล้ว',
   CLAIM_CERTIFICATE: 'รับใบรับรอง',
+  RENEW_CERTIFICATE: 'ต่ออายุใบรับรอง',
   ISSUING_CERTIFICATE: 'กำลังออก...',
   DOWNLOAD_CERTIFICATE: 'ดาวน์โหลด',
 

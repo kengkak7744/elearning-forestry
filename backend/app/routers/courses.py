@@ -132,7 +132,23 @@ def list_courses(
         like = f"%{search}%"
         query = query.filter(_or(Course.title.ilike(like), Course.description.ilike(like)))
     
-    return query.order_by(Course.created_at.desc()).offset(skip).limit(limit).all()
+    courses = query.order_by(Course.created_at.desc()).offset(skip).limit(limit).all()
+
+    # Enrollment count per course for this page. One grouped query keyed by the
+    # ids actually being returned (no N+1), then stamp the non-mapped attribute
+    # CourseListItem serialises from. Without this the schema default of 0 ships
+    # for every row, so the admin "ผู้ลงทะเบียน" column always read 0.
+    if courses:
+        counts = dict(
+            db.query(Enrollment.course_id, func.count(Enrollment.id))
+            .filter(Enrollment.course_id.in_([c.id for c in courses]))
+            .group_by(Enrollment.course_id)
+            .all()
+        )
+        for c in courses:
+            c.enrolled_count = counts.get(c.id, 0)
+
+    return courses
 
 
 @router.get("/{course_id}")

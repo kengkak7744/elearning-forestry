@@ -39,7 +39,17 @@ export default function CourseCompleteView({
       .then((data) => {
         if (cancelled) return
         setElig(data)
-        if (data?.has_certificate && data?.certificate_id && !data?.is_revoked) {
+        // Only treat the cert as the "current" downloadable one when it's
+        // actually valid. An expired (or revoked) cert must fall through to the
+        // claim/renew branch so the learner can issue a fresh one — otherwise
+        // they'd just see a download button for a certificate that no longer
+        // counts, with no way to renew.
+        if (
+          data?.has_certificate &&
+          data?.certificate_id &&
+          !data?.is_revoked &&
+          !data?.is_expired
+        ) {
           setCertId(data.certificate_id)
         }
       })
@@ -53,12 +63,21 @@ export default function CourseCompleteView({
   }, [courseId])
 
   const handleIssue = async () => {
+    const wasExpired = elig?.is_expired
     setIssuing(true)
     try {
       const data = await certificatesApi.issue(courseId)
       setCertId(data.id)
+      // The fresh cert supersedes the expired one — clear the expired flag so
+      // the render shows the new (valid) cert's download instead of the
+      // "หมดอายุแล้ว" renewal prompt.
+      setElig((prev) => (prev ? { ...prev, is_expired: false, has_certificate: true } : prev))
       showToast(
-        data.already_existed ? 'เปิดใบรับรองที่เคยออกแล้ว' : 'ออกใบรับรองเรียบร้อย',
+        wasExpired
+          ? 'ต่ออายุใบรับรองเรียบร้อย'
+          : data.already_existed
+            ? 'เปิดใบรับรองที่เคยออกแล้ว'
+            : 'ออกใบรับรองเรียบร้อย',
         'success'
       )
     } catch (err) {
@@ -100,32 +119,47 @@ export default function CourseCompleteView({
             {loading ? (
               <Skeleton className="h-9 w-44" />
             ) : certId ? (
-              <div className="space-y-2">
-                <Button asChild>
-                  <a
-                    href={certificatesApi.downloadUrl(certId)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Download className="mr-1.5 h-4 w-4" />
-                    {BUTTONS.DOWNLOAD_CERTIFICATE}ใบรับรอง
-                  </a>
-                </Button>
-                {elig?.is_expired && (
-                  <p className="text-xs text-warning">ใบรับรองนี้หมดอายุแล้ว</p>
-                )}
-              </div>
+              <Button asChild>
+                <a
+                  href={certificatesApi.downloadUrl(certId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  {BUTTONS.DOWNLOAD_CERTIFICATE}ใบรับรอง
+                </a>
+              </Button>
             ) : elig?.is_revoked ? (
               <p className="text-sm text-destructive">ใบรับรองถูกเพิกถอน</p>
             ) : elig?.eligible ? (
-              <Button onClick={handleIssue} disabled={issuing}>
-                <Award className="mr-1.5 h-4 w-4" />
-                {issuing ? BUTTONS.ISSUING_CERTIFICATE : BUTTONS.CLAIM_CERTIFICATE}
-              </Button>
+              // Eligible — either a first claim, or a renewal of an expired cert.
+              <div className="space-y-2">
+                {elig?.is_expired && (
+                  <p className="text-xs text-warning">
+                    ใบรับรองหมดอายุแล้ว — ออกใบรับรองใหม่เพื่อต่ออายุ
+                  </p>
+                )}
+                <Button onClick={handleIssue} disabled={issuing}>
+                  <Award className="mr-1.5 h-4 w-4" />
+                  {issuing
+                    ? BUTTONS.ISSUING_CERTIFICATE
+                    : elig?.is_expired
+                      ? BUTTONS.RENEW_CERTIFICATE
+                      : BUTTONS.CLAIM_CERTIFICATE}
+                </Button>
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {elig?.reason || 'ยังไม่สามารถออกใบรับรองได้'}
-              </p>
+              // Not currently eligible. If a cert exists but expired, the learner
+              // must finish whatever's now outstanding (e.g. a re-added final
+              // exam) before they can renew — surface that explicitly.
+              <div className="space-y-1">
+                {elig?.is_expired && (
+                  <p className="text-xs text-warning">ใบรับรองหมดอายุแล้ว</p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  {elig?.reason || 'ยังไม่สามารถออกใบรับรองได้'}
+                </p>
+              </div>
             )}
           </div>
         </CardContent>

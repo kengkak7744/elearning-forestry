@@ -63,6 +63,7 @@ class CourseListItem(BaseModel):
     instructor_name: Optional[str] = None
     created_at: datetime
     recertify_after_days: Optional[int] = None
+    enrolled_count: int = 0
 
     class Config:
         from_attributes = True
