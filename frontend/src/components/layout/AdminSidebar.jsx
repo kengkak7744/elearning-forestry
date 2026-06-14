@@ -46,9 +46,26 @@ const groups = [
 
 const STORAGE_KEY = 'admin.sidebar.collapsed'
 
+const routeRoles = {
+  '/admin/dashboard': ['admin'],
+  '/admin/courses': ['admin', 'instructor'],
+  '/admin/users': ['admin'],
+  '/admin/departments': ['admin'],
+  '/admin/audit-logs': ['admin'],
+  '/admin/certificates': ['admin'],
+  '/admin/cert-settings': ['admin'],
+}
+
 export default function AdminSidebar({ onNavigate }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const adminHome = user?.role === 'instructor' ? '/admin/courses' : '/admin/dashboard'
+  const visibleGroups = groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => (routeRoles[item.to] ?? ['admin']).includes(user?.role)),
+    }))
+    .filter((group) => group.items.length > 0)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.localStorage.getItem(STORAGE_KEY) === 'true'
@@ -74,7 +91,7 @@ export default function AdminSidebar({ onNavigate }) {
       aria-label="เมนูจัดการระบบ"
     >
       <div className="flex h-16 items-center gap-2 px-3 border-b border-border">
-        <Link to="/admin/dashboard" onClick={handleClickItem} className="flex min-w-0 flex-1 items-center gap-2.5">
+        <Link to={adminHome} onClick={handleClickItem} className="flex min-w-0 flex-1 items-center gap-2.5">
           <img
             src="/elearning/forest_logo.png"
             alt=""
@@ -111,7 +128,7 @@ export default function AdminSidebar({ onNavigate }) {
       )}
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-4">
             {!collapsed && (
               <div className="px-2 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">

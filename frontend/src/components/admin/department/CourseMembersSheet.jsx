@@ -4,6 +4,7 @@ import { adminStatsApi } from '@/api/adminStats'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -22,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import UserAvatar from '@/components/admin/UserAvatar'
 import { toastApiError } from '@/utils/apiError'
 
 /**
@@ -97,8 +99,12 @@ export default function CourseMembersSheet({ department, course, open, onOpenCha
 
         <div className="space-y-3 p-4">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Label htmlFor="course-member-search" className="sr-only">
+              ค้นหาสมาชิกในหลักสูตร
+            </Label>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="course-member-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหาชื่อ / อีเมล / ตำแหน่ง"
@@ -202,13 +208,19 @@ function CourseMemberList({ rows, showProgress, onPickMember, emptyText }) {
                   <button
                     type="button"
                     onClick={() => onPickMember(m.id)}
-                    className="block text-left"
+                    aria-label={`ดูประวัติการเรียนของ ${m.full_name}`}
+                    className="group flex items-center gap-2 text-left"
                     title="ดูประวัติการเรียนของผู้ใช้นี้"
                   >
-                    <div className="text-sm font-medium text-foreground hover:text-primary hover:underline">
-                      {m.full_name}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">@{m.username}</div>
+                    <UserAvatar user={m} className="h-8 w-8" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground group-hover:text-primary group-hover:underline">
+                        {m.full_name}
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        @{m.username}
+                      </span>
+                    </span>
                   </button>
                 </TableCell>
                 <TableCell className="max-w-[160px]">
@@ -221,6 +233,7 @@ function CourseMemberList({ rows, showProgress, onPickMember, emptyText }) {
                     <div className="flex items-center gap-2">
                       <Progress
                         value={m.progress_percent}
+                        aria-label={`ความคืบหน้าของ ${m.full_name}`}
                         className={`h-1.5 flex-1 ${
                           m.progress_percent >= 100
                             ? '[&>div]:bg-success'
@@ -245,7 +258,7 @@ function CourseMemberList({ rows, showProgress, onPickMember, emptyText }) {
                           href={`mailto:${m.email}`}
                           className="inline-flex items-center gap-1 text-foreground hover:text-primary"
                         >
-                          <Mail className="h-3 w-3" />
+                          <Mail className="h-3 w-3" aria-hidden="true" />
                           {m.email}
                         </a>
                       )}
@@ -254,7 +267,7 @@ function CourseMemberList({ rows, showProgress, onPickMember, emptyText }) {
                           href={`tel:${m.phone.replace(/\s+/g, '')}`}
                           className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
                         >
-                          <Phone className="h-3 w-3" />
+                          <Phone className="h-3 w-3" aria-hidden="true" />
                           {m.phone}
                         </a>
                       )}

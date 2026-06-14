@@ -60,6 +60,36 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    authorization: Optional[str] = Header(None),
+    access_token: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Return the current user when a valid token exists; otherwise return None.
+
+    This is for non-authorizing session probes. Protected endpoints must keep
+    using get_current_user so missing/invalid credentials still return 401.
+    """
+    token = _extract_token(authorization, access_token)
+    if not token:
+        return None
+
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        return None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or not user.is_active:
+        return None
+
+    return user
+
+
 def require_roles(*roles: UserRole, detail: str):
     """Factory for role-gate dependencies. Each call site keeps its own Thai
     403 message — do NOT merge messages across routes when consolidating."""

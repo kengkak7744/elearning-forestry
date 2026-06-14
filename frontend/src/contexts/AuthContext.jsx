@@ -11,10 +11,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const userData = await authApi.getMe()
-        setUser(userData)
+        const session = await authApi.session()
+        setUser(session.authenticated ? session.user : null)
       } catch {
-        // Not logged in — leave user null.
+        // Session check failed unexpectedly — leave user null.
         localStorage.removeItem('access_token')
       }
       setLoading(false)

@@ -18,6 +18,7 @@
 
     <!-- Internal staff system — do NOT index in public search engines. -->
     <meta name="robots" content="noindex, nofollow" />
+    <link rel="canonical" href="https://wildfire.forest.go.th/elearning/" />
 
     <title>ระบบ e-Learning กรมป่าไม้</title>
     <meta
@@ -29,6 +30,7 @@
          These render even without indexing — the share-preview crawler hits the
          URL directly when a user pastes the link, regardless of robots meta. -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://wildfire.forest.go.th/elearning/" />
     <meta property="og:locale" content="th_TH" />
     <meta property="og:site_name" content="ระบบ e-Learning กรมป่าไม้" />
     <meta property="og:title" content="ระบบ e-Learning กรมป่าไม้" />
@@ -36,8 +38,14 @@
       property="og:description"
       content="ระบบ e-Learning สำหรับเจ้าหน้าที่กรมป่าไม้ — หลักสูตรอบรม ทดสอบ และติดตามความคืบหน้าการเรียนรู้ออนไลน์"
     />
-    <meta property="og:image" content="/elearning/forest_logo.png" />
+    <meta property="og:image" content="https://wildfire.forest.go.th/elearning/forest_logo.png" />
     <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="ระบบ e-Learning กรมป่าไม้" />
+    <meta
+      name="twitter:description"
+      content="ระบบ e-Learning สำหรับเจ้าหน้าที่กรมป่าไม้: หลักสูตรอบรม แบบทดสอบ และติดตามความคืบหน้าการเรียน"
+    />
+    <meta name="twitter:image" content="https://wildfire.forest.go.th/elearning/forest_logo.png" />
 
     <!-- Font: preconnect so the TCP/TLS handshake overlaps with HTML parse,
          then load via <link> (not CSS @import) so the preload scanner
@@ -53,10 +61,11 @@
     <link rel="dns-prefetch" href="https://www.youtube.com" />
     <link rel="dns-prefetch" href="https://i.ytimg.com" />
     <!-- Weights 400/500/600/700 only — 300 is unused in the UI and would
-         add ~30KB of Thai + Latin glyphs we never render. -->
+         add ~30KB of Thai + Latin glyphs we never render. display=optional
+         avoids late font swaps that can move text on slow connections. -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=optional"
     />
     <!-- Speculation Rules: prerender likely-next pages on hover so navigation
          feels instant. Chromium-only (Safari/Firefox ignore silently — pure
@@ -86,10 +95,15 @@
           "and": [
             { "href_matches": "/*" },
             { "not": { "href_matches": "/login" } },
+            { "not": { "href_matches": "/elearning/login" } },
             { "not": { "href_matches": "/register" } },
+            { "not": { "href_matches": "/elearning/register" } },
             { "not": { "href_matches": "/verify*" } },
+            { "not": { "href_matches": "/elearning/verify*" } },
             { "not": { "href_matches": "/admin/*" } },
-            { "not": { "href_matches": "/courses/*/learn*" } }
+            { "not": { "href_matches": "/elearning/admin/*" } },
+            { "not": { "href_matches": "/courses/*/learn*" } },
+            { "not": { "href_matches": "/elearning/courses/*/learn*" } }
           ]
         },
         "eagerness": "moderate"

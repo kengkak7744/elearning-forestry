@@ -21,6 +21,11 @@ import CourseCompleteView from '@/components/viewer/CourseCompleteView'
 import UpNextOverlay from '@/components/viewer/UpNextOverlay'
 import SaveErrorBanner from '@/components/viewer/SaveErrorBanner'
 
+function scrollToPageTop() {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' })
+}
+
 /**
  * Course viewer / player. This component is the orchestrator: it owns the
  * lesson-selection + completion UI state and ties together three hooks —
@@ -158,7 +163,7 @@ export default function CourseViewerPage() {
     setViewingFinal(false)
     setMobileTreeOpen(false)
     navigate(`/courses/${id}/learn/${lesson.id}`)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToPageTop()
   }
 
   const switchToFinal = () => {
@@ -170,7 +175,7 @@ export default function CourseViewerPage() {
     setShowComplete(false)
     setViewingFinal(true)
     setMobileTreeOpen(false)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToPageTop()
   }
 
   const blockingQuiz = useMemo(() => {
@@ -213,7 +218,7 @@ export default function CourseViewerPage() {
       flushProgress()
       setUpNextOpen(false)
       setShowComplete(true)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      scrollToPageTop()
       return
     }
     if (nextDest.type === 'final') switchToFinal()
@@ -229,7 +234,7 @@ export default function CourseViewerPage() {
       flushProgress()
       setViewingFinal(false)
       navigate(`/courses/${id}/learn/${prevDest.lesson.id}`)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      scrollToPageTop()
     }
   }
 
@@ -255,6 +260,8 @@ export default function CourseViewerPage() {
     nextDest?.type === 'final'
       ? finalQuiz?.title || 'แบบทดสอบสุดท้าย'
       : nextDest?.lesson?.title || ''
+  const emptyLessonMessage =
+    totalLessons === 0 ? 'ยังไม่มีบทเรียนในหลักสูตรนี้' : 'เปิดรายการบทเรียนเพื่อเลือกบทเรียน'
 
   if (loading) {
     return (
@@ -404,7 +411,7 @@ export default function CourseViewerPage() {
             ) : (
               <Card className="border-dashed border-border/60">
                 <CardContent className="p-12 text-center text-sm text-muted-foreground">
-                  เลือกบทเรียนจากเมนูด้านขวา
+                  {emptyLessonMessage}
                 </CardContent>
               </Card>
             )}

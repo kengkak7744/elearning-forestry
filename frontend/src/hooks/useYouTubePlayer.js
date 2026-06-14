@@ -52,7 +52,7 @@ export default function useYouTubePlayer({
               if (pollRef.current) clearInterval(pollRef.current)
               pollRef.current = setInterval(() => {
                 if (!playerRef.current?.getCurrentTime) return
-                let t = 0
+                let t
                 try {
                   t = playerRef.current.getCurrentTime()
                 } catch {

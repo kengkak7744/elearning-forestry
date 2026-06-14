@@ -101,6 +101,16 @@ export default function LessonInfoTabs({
                 {lesson.description}
               </div>
             )}
+            {lesson.transcript && (
+              <div className="mt-3 rounded-md border border-border bg-background p-3">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Transcript / สรุปเนื้อหา
+                </h3>
+                <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                  {lesson.transcript}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {showResources && (

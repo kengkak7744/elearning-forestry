@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.schemas.auth import LoginRequest, Token
+from app.schemas.auth import LoginRequest, SessionStatus, Token
 from app.schemas.user import UserResponse, UserRegister, PasswordChange, UserSelfUpdate
 from app.core.helpers import ensure_unique_user_fields
 from app.core.security import verify_password, hash_password, create_access_token
 from app.config import settings
-from app.dependencies import get_current_user, ACCESS_COOKIE_NAME
+from app.dependencies import get_current_user, get_optional_current_user, ACCESS_COOKIE_NAME
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -22,7 +22,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="lax",
+        samesite=settings.COOKIE_SAMESITE,
         path="/",
     )
 
@@ -126,6 +126,14 @@ def login(credentials: LoginRequest, response: Response, db: Session = Depends(g
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/session", response_model=SessionStatus)
+def get_session(current_user: Optional[User] = Depends(get_optional_current_user)):
+    return SessionStatus(
+        authenticated=current_user is not None,
+        user=UserResponse.model_validate(current_user) if current_user else None,
+    )
 
 
 @router.patch("/me", response_model=UserResponse)

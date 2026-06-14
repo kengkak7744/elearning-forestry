@@ -247,7 +247,8 @@ export default function CourseDetailPage() {
   }
 
   const cat = CATEGORY_BADGES[course.category]
-  const cover = course.cover_image ? mediaUrl(course.cover_image) : '/elearning/forest_logo.png'
+  const hasCover = Boolean(course.cover_image)
+  const cover = hasCover ? mediaUrl(course.cover_image) : ''
   const enrolled = !!course.is_enrolled
 
   const enrollCta = enrolled ? (
@@ -288,10 +289,10 @@ export default function CourseDetailPage() {
   )
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10 pb-32 md:pb-10">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-44 pt-6 sm:px-6 sm:pt-10 md:pb-10">
       <Link
         to="/courses"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         {BUTTONS.BACK_TO_COURSES}
@@ -301,13 +302,22 @@ export default function CourseDetailPage() {
       <div className="grid gap-6 md:grid-cols-[1fr_320px]">
         <div className="min-w-0">
           <div className="relative mb-5 aspect-[16/9] w-full overflow-hidden rounded-xl bg-muted">
-            <img
-              src={cover}
-              alt=""
-              loading="eager"
-              fetchpriority="high"
-              className="h-full w-full object-cover"
-            />
+            {hasCover ? (
+              <img
+                src={cover}
+                alt=""
+                loading="eager"
+                fetchPriority="high"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/12 via-card to-accent/12 px-6 text-center">
+                <BookOpen className="h-10 w-10 text-primary/80" aria-hidden="true" />
+                <span className="line-clamp-2 max-w-md text-base font-medium text-foreground">
+                  {course.title}
+                </span>
+              </div>
+            )}
             <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
               {cat && (
                 <Badge variant="secondary" className="bg-background/90">
@@ -344,7 +354,7 @@ export default function CourseDetailPage() {
                 <CardContent className="space-y-4 p-5 sm:p-6">
                   <h2 className="text-base font-semibold text-foreground">รายละเอียดหลักสูตร</h2>
                   {course.description ? (
-                    <p className="whitespace-pre-wrap leading-relaxed text-sm text-foreground">
+                    <p className="whitespace-pre-wrap break-words leading-relaxed text-sm text-foreground [overflow-wrap:anywhere]">
                       {course.description}
                     </p>
                   ) : (
@@ -521,7 +531,7 @@ export default function CourseDetailPage() {
 
       {/* Mobile sticky bottom CTA */}
       <div
-        className="fixed inset-x-0 bottom-14 z-20 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-16 z-40 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden"
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center gap-2">

@@ -13,3 +13,6 @@ FEATURES.txt
 .VSCodeCounter/
 docker-compose.yml
 backend/images/
+FIX_IMPLEMENTATION_SUMMARY.md
+UX_UI_CODE_QA_AUDIT_REPORT.md
+WEB_QUALITY_AUDIT_REPORT.md

@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 
-export default function AdminRoute({ children }) {
+export default function AdminRoute({ children, allowedRoles = ['admin'], unauthorizedTo = '/' }) {
   const { user, loading, isAuthenticated } = useAuth()
 
   if (loading) {
@@ -25,8 +25,8 @@ export default function AdminRoute({ children }) {
   // markup was unreachable. Home shows the proper learner UI; if a non-admin
   // landed here it's a wrong-URL situation, not something to celebrate with a
   // warning card.
-  if (user?.role !== 'admin') {
-    return <Navigate to="/" replace />
+  if (!allowedRoles.includes(user?.role)) {
+    return <Navigate to={unauthorizedTo} replace />
   }
 
   return children

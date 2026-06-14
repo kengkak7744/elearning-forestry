@@ -86,7 +86,6 @@ export default function CourseEditPage() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isNew) loadCourse()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])

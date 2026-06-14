@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Star } from 'lucide-react'
 import { feedbackApi } from '@/api/feedback'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,

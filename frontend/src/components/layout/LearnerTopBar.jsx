@@ -16,6 +16,8 @@ import { initials } from '@/utils/formatting'
 export default function LearnerTopBar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const canManageCourses = user?.role === 'admin' || user?.role === 'instructor'
+  const manageHref = user?.role === 'instructor' ? '/admin/courses' : '/admin/dashboard'
 
   const handleLogout = async () => {
     await logout()
@@ -25,13 +27,13 @@ export default function LearnerTopBar() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5 min-w-0">
+        <Link to="/" className="flex min-h-11 min-w-0 items-center gap-2.5">
           <img
             src="/elearning/forest_logo.png"
             alt=""
             width="36"
             height="36"
-            fetchpriority="high"
+            fetchPriority="high"
             className="h-9 w-9 flex-shrink-0"
           />
           <div className="min-w-0 leading-tight">
@@ -68,9 +70,9 @@ export default function LearnerTopBar() {
                 โปรไฟล์
               </Link>
             </DropdownMenuItem>
-            {(user?.role === 'admin' || user?.role === 'instructor' || user?.role === 'manager') && (
+            {canManageCourses && (
               <DropdownMenuItem asChild>
-                <Link to="/admin/dashboard" className="cursor-pointer">
+                <Link to={manageHref} className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
                   จัดการระบบ
                 </Link>

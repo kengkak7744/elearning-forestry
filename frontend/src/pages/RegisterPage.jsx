@@ -31,6 +31,19 @@ const initialForm = {
   motivation: '',
 }
 
+const FIELD_IDS = {
+  username: 'reg-username',
+  email: 'reg-email',
+  password: 'reg-password',
+  confirm_password: 'reg-confirm',
+  full_name: 'reg-fullname',
+  phone: 'reg-phone',
+  department: 'reg-department',
+  position: 'reg-position',
+  responsibility: 'reg-responsibility',
+  motivation: 'reg-motivation',
+}
+
 export default function RegisterPage() {
   useDocumentTitle('สมัครสมาชิก')
 
@@ -53,10 +66,20 @@ export default function RegisterPage() {
     }
   }
 
+  const focusFirstError = (stepErrors) => {
+    const firstKey = Object.keys(stepErrors)[0]
+    const firstId = FIELD_IDS[firstKey]
+    if (!firstId) return
+    requestAnimationFrame(() => {
+      document.getElementById(firstId)?.focus()
+    })
+  }
+
   const handleNext = () => {
     const stepErrors = validateStep(step, form)
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors)
+      focusFirstError(stepErrors)
       return
     }
     if (step < REGISTER_STEPS.length - 1) {
@@ -92,6 +115,7 @@ export default function RegisterPage() {
     : Math.round(((step + 1) / REGISTER_STEPS.length) * 100)
 
   const stepProps = { form, errors, update }
+  const errorCount = Object.keys(errors).length
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-background p-4 sm:items-center sm:py-10">
@@ -115,9 +139,21 @@ export default function RegisterPage() {
               current={reviewing ? REGISTER_STEPS.length : step}
               label="ขั้นตอนการสมัคร"
             />
-            <Progress value={progress} className="h-1.5" />
+            <Progress
+              value={progress}
+              className="h-1.5"
+              aria-label="ความคืบหน้าการสมัครสมาชิก"
+            />
           </CardHeader>
           <CardContent>
+            {errorCount > 0 && (
+              <div
+                role="alert"
+                className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                พบข้อมูลที่ต้องแก้ไข {errorCount} รายการ โปรดตรวจสอบช่องที่มีข้อความสีแดง
+              </div>
+            )}
             {reviewing ? (
               <ReviewSummary form={form} />
             ) : step === 0 ? (

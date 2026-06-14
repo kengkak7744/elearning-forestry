@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ import SkeletonRows from '@/components/admin/SkeletonRows'
 import LoadMoreButton from '@/components/admin/LoadMoreButton'
 import UserFormSheet from '@/components/admin/UserFormSheet'
 import UserSummarySheet from '@/components/admin/UserSummarySheet'
+import UserAvatar from '@/components/admin/UserAvatar'
 import ResetPasswordDialog from '@/components/admin/ResetPasswordDialog'
 import BulkImportDialog from '@/components/admin/BulkImportDialog'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
@@ -129,11 +131,11 @@ export default function UsersListPage() {
               onClick={() => setBulkOpen(true)}
               className="w-full sm:w-auto"
             >
-              <Upload className="mr-1 h-4 w-4" />
+              <Upload className="mr-1 h-4 w-4" aria-hidden="true" />
               นำเข้าจาก CSV
             </Button>
             <Button onClick={openAdd} className="w-full sm:w-auto">
-              <Plus className="mr-1 h-4 w-4" />
+              <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
               {BUTTONS.ADD_USER}
             </Button>
           </div>
@@ -143,8 +145,12 @@ export default function UsersListPage() {
       <Card className="mb-4 border-border/60">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Label htmlFor="admin-user-search" className="sr-only">
+              ค้นหาผู้ใช้
+            </Label>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="admin-user-search"
               type="search"
               placeholder="ค้นหาชื่อ username หรืออีเมล..."
               value={search}
@@ -152,8 +158,11 @@ export default function UsersListPage() {
               className="pl-9"
             />
           </div>
+          <Label htmlFor="admin-role-filter" className="sr-only">
+            กรองตามบทบาท
+          </Label>
           <Select value={roleFilter} onValueChange={onRoleChange}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger id="admin-role-filter" className="w-full sm:w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -191,19 +200,29 @@ export default function UsersListPage() {
                   const roleMeta = ROLE_BADGES[u.role]
                   return (
                     <TableRow key={u.id}>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell>
                         <button
                           type="button"
                           onClick={() => setSummaryUserId(u.id)}
-                          className="text-left text-foreground hover:text-primary hover:underline"
+                          aria-label={`ดูสรุปการเรียนของ ${u.full_name}`}
+                          className="group flex items-center gap-2 text-left"
                         >
-                          {u.username}
+                          <UserAvatar user={u} className="h-8 w-8" />
+                          <span className="min-w-0">
+                            <span className="block font-mono text-xs text-foreground group-hover:text-primary group-hover:underline">
+                              @{u.username}
+                            </span>
+                            <span className="block text-[11px] text-muted-foreground">
+                              {u.is_active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+                            </span>
+                          </span>
                         </button>
                       </TableCell>
                       <TableCell>
                         <button
                           type="button"
                           onClick={() => setSummaryUserId(u.id)}
+                          aria-label={`ดูสรุปการเรียนของ ${u.full_name}`}
                           className="text-left font-medium text-foreground hover:text-primary hover:underline"
                         >
                           {u.full_name}
@@ -226,7 +245,7 @@ export default function UsersListPage() {
                             onClick={() => openEdit(u.id)}
                             title={BUTTONS.EDIT}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="sr-only">{BUTTONS.EDIT}</span>
                           </Button>
                           <Button
@@ -235,7 +254,7 @@ export default function UsersListPage() {
                             onClick={() => setResetTarget(u)}
                             title={BUTTONS.RESET_PASSWORD}
                           >
-                            <KeyRound className="h-3.5 w-3.5" />
+                            <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="sr-only">{BUTTONS.RESET_PASSWORD}</span>
                           </Button>
                           <Button
@@ -245,7 +264,7 @@ export default function UsersListPage() {
                             className="text-destructive hover:text-destructive"
                             title={BUTTONS.DELETE}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="sr-only">{BUTTONS.DELETE}</span>
                           </Button>
                         </div>
@@ -265,18 +284,22 @@ export default function UsersListPage() {
                 <Card key={u.id} className="border-border/60">
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSummaryUserId(u.id)}
-                        className="min-w-0 text-left"
-                      >
-                        <div className="truncate font-medium text-foreground hover:text-primary hover:underline">
-                          {u.full_name}
-                        </div>
-                        <div className="truncate font-mono text-xs text-muted-foreground">
-                          @{u.username}
-                        </div>
-                      </button>
+                      <div className="flex min-w-0 items-start gap-3">
+                        <UserAvatar user={u} className="h-10 w-10" />
+                        <button
+                          type="button"
+                          onClick={() => setSummaryUserId(u.id)}
+                          aria-label={`ดูสรุปการเรียนของ ${u.full_name}`}
+                          className="min-w-0 text-left"
+                        >
+                          <div className="truncate font-medium text-foreground hover:text-primary hover:underline">
+                            {u.full_name}
+                          </div>
+                          <div className="truncate font-mono text-xs text-muted-foreground">
+                            @{u.username}
+                          </div>
+                        </button>
+                      </div>
                       <Badge variant="secondary" className="flex-shrink-0 font-normal">
                         {roleMeta?.label ?? u.role}
                       </Badge>
@@ -292,7 +315,7 @@ export default function UsersListPage() {
                         className="flex-1"
                         onClick={() => openEdit(u.id)}
                       >
-                        <Pencil className="mr-1 h-3 w-3" />
+                        <Pencil className="mr-1 h-3 w-3" aria-hidden="true" />
                         {BUTTONS.EDIT}
                       </Button>
                       <Button
@@ -301,7 +324,7 @@ export default function UsersListPage() {
                         className="flex-1"
                         onClick={() => setResetTarget(u)}
                       >
-                        <KeyRound className="mr-1 h-3 w-3" />
+                        <KeyRound className="mr-1 h-3 w-3" aria-hidden="true" />
                         รีเซ็ตรหัส
                       </Button>
                       <Button
@@ -310,7 +333,7 @@ export default function UsersListPage() {
                         className="flex-1 text-destructive hover:text-destructive"
                         onClick={() => setConfirmDelete(u)}
                       >
-                        <Trash2 className="mr-1 h-3 w-3" />
+                        <Trash2 className="mr-1 h-3 w-3" aria-hidden="true" />
                         {BUTTONS.DELETE}
                       </Button>
                     </div>

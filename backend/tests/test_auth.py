@@ -50,6 +50,9 @@ class TestLogin:
         assert body["access_token"]
         assert body["user"]["username"] == learner_user.username
         assert "access_token" in res.cookies
+        set_cookie = res.headers["set-cookie"].lower()
+        assert "httponly" in set_cookie
+        assert "samesite=lax" in set_cookie
 
     def test_login_with_email(self, client, learner_user):
         res = client.post(
@@ -93,6 +96,18 @@ class TestMe:
         res = learner_client.get("/api/auth/me")
         assert res.status_code == 200
         assert res.json()["id"] == learner_user.id
+
+    def test_session_returns_unauthenticated_without_401(self, client):
+        res = client.get("/api/auth/session")
+        assert res.status_code == 200
+        assert res.json() == {"authenticated": False, "user": None}
+
+    def test_session_returns_current_user(self, learner_client, learner_user):
+        res = learner_client.get("/api/auth/session")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["authenticated"] is True
+        assert body["user"]["id"] == learner_user.id
 
     def test_patch_me_updates_fields(self, learner_client):
         res = learner_client.patch(

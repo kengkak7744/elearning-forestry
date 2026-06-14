@@ -111,13 +111,13 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
     <Card className="border-border/60">
       <CardContent className="space-y-3 p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-base font-semibold text-foreground sm:text-lg">
-            <ClipboardList className="h-5 w-5 text-primary" />
+          <h2 className="inline-flex items-center gap-1.5 text-base font-semibold text-foreground sm:text-lg">
+            <ClipboardList className="h-5 w-5 text-primary" aria-hidden="true" />
             {quiz.title}
-          </span>
+          </h2>
           {currentlyPassed ? (
             <Badge className="bg-success text-success-foreground hover:bg-success">
-              <Check className="mr-0.5 h-3 w-3" />
+              <Check className="mr-0.5 h-3 w-3" aria-hidden="true" />
               ผ่านแล้ว
             </Badge>
           ) : quiz.can_skip ? (
@@ -152,7 +152,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
           <Button onClick={start}>
             {currentlyPassed ? (
               <>
-                <RotateCcw className="mr-1.5 h-4 w-4" />
+                <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 {BUTTONS.RETRY_QUIZ}
               </>
             ) : (
@@ -191,7 +191,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
               role="status"
               className="flex flex-wrap items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3"
             >
-              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" aria-hidden="true" />
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-sm font-medium text-foreground">
                   ตอบผิด {wrong.length} ข้อ — ดูคำอธิบายด้านล่าง
@@ -202,7 +202,8 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                       key={q.id}
                       type="button"
                       onClick={() => scrollTo(q.id)}
-                      className="rounded border border-destructive/30 bg-background px-2 py-0.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                      aria-label={`ไปยังข้อ ${idx + 1} ที่ตอบผิด`}
+                      className="min-h-7 rounded border border-destructive/30 bg-background px-2 py-0.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
                     >
                       ข้อ {idx + 1}
                     </button>
@@ -218,6 +219,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
             {activeQuestions.map((q, idx) => {
               const qResult = result?.results?.[q.id]
               const isOpinion = q.question_type === 'opinion'
+              const questionLabelId = `q-title-${quiz.id}-${q.id}`
               const stateClass =
                 qResult && !isOpinion
                   ? qResult.correct
@@ -234,7 +236,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                     stateClass,
                   )}
                 >
-                  <p className="break-words text-sm font-medium text-foreground">
+                  <p id={questionLabelId} className="break-words text-sm font-medium text-foreground">
                     {idx + 1}. {q.question_text}
                     {isOpinion && (
                       <Badge variant="secondary" className="ml-2 font-normal">
@@ -249,9 +251,9 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                         )}
                       >
                         {qResult.correct ? (
-                          <Check className="h-3.5 w-3.5" />
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
                         ) : (
-                          <XIcon className="h-3.5 w-3.5" />
+                          <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
                         )}
                         {qResult.correct ? 'ถูกต้อง' : 'ผิด'}
                       </span>
@@ -259,7 +261,11 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                   </p>
 
                   {q.question_type === 'single_choice' && (
-                    <div className="space-y-1.5">
+                    <div
+                      className="space-y-1.5"
+                      role="radiogroup"
+                      aria-labelledby={questionLabelId}
+                    >
                       {orderedChoiceIndices(q).map((origIdx) => {
                         const c = q.choices[origIdx]
                         const isCorrectChoice = qResult?.correct_answer === origIdx
@@ -286,7 +292,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                             >
                               {c.text}
                               {isCorrectChoice && (
-                                <Check className="ml-1 inline h-3.5 w-3.5 text-success" />
+                                <Check className="ml-1 inline h-3.5 w-3.5 text-success" aria-hidden="true" />
                               )}
                             </span>
                           </label>
@@ -296,7 +302,11 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                   )}
 
                   {q.question_type === 'multiple_choice' && (
-                    <div className="space-y-1.5">
+                    <div
+                      className="space-y-1.5"
+                      role="group"
+                      aria-labelledby={questionLabelId}
+                    >
                       {orderedChoiceIndices(q).map((origIdx) => {
                         const c = q.choices[origIdx]
                         const selected = (answers[q.id] || []).includes(origIdx)
@@ -308,6 +318,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                           >
                             <input
                               type="checkbox"
+                              name={`q-${q.id}`}
                               checked={selected}
                               onChange={() => {
                                 const current = answers[q.id] || []
@@ -329,7 +340,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                             >
                               {c.text}
                               {isCorrectChoice && (
-                                <Check className="ml-1 inline h-3.5 w-3.5 text-success" />
+                                <Check className="ml-1 inline h-3.5 w-3.5 text-success" aria-hidden="true" />
                               )}
                             </span>
                           </label>
@@ -345,6 +356,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                         value={answers[q.id] || ''}
                         onChange={(e) => setAnswer(q.id, e.target.value)}
                         disabled={!!result}
+                        aria-labelledby={questionLabelId}
                         placeholder="พิมพ์คำตอบ..."
                       />
                       {qResult && qResult.correct_answer && (
@@ -360,6 +372,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                       value={answers[q.id] || ''}
                       onChange={(e) => setAnswer(q.id, e.target.value)}
                       disabled={!!result}
+                      aria-labelledby={questionLabelId}
                       placeholder="พิมพ์ความคิดเห็น... (จะเว้นว่างก็ได้)"
                       rows={3}
                     />
@@ -382,6 +395,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                           'mt-0.5 h-4 w-4 flex-shrink-0',
                           qResult.correct ? 'text-success' : 'text-warning',
                         )}
+                        aria-hidden="true"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -401,7 +415,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
               {!result ? (
                 <>
                   <Button onClick={handleSubmit} disabled={submitting}>
-                    <Send className="mr-1.5 h-4 w-4" />
+                    <Send className="mr-1.5 h-4 w-4" aria-hidden="true" />
                     {submitting ? BUTTONS.SUBMITTING_ANSWERS : BUTTONS.SUBMIT_ANSWERS}
                   </Button>
                   <Button
@@ -428,7 +442,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                     {result.is_passed ? '· ผ่านเกณฑ์' : '· ไม่ผ่านเกณฑ์'}
                   </Badge>
                   <Button onClick={reset}>
-                    <RotateCcw className="mr-1.5 h-4 w-4" />
+                    <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
                     {BUTTONS.RETRY_QUIZ}
                   </Button>
                 </>

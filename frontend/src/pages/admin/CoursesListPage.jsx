@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -46,7 +47,7 @@ function CoverThumb({ src, alt }) {
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
-          <ImageIcon className="h-4 w-4 text-muted-foreground/60" />
+          <ImageIcon className="h-4 w-4 text-muted-foreground/60" aria-hidden="true" />
         </div>
       )}
     </div>
@@ -149,7 +150,7 @@ export default function CoursesListPage() {
         actions={
           <Button asChild className="w-full sm:w-auto">
             <Link to="/admin/courses/new/edit">
-              <Plus className="mr-1 h-4 w-4" />
+              <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
               สร้างหลักสูตรใหม่
             </Link>
           </Button>
@@ -159,8 +160,12 @@ export default function CoursesListPage() {
       <Card className="mb-4 border-border/60">
         <CardContent className="space-y-3 p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Label htmlFor="admin-course-search" className="sr-only">
+              ค้นหาหลักสูตร
+            </Label>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="admin-course-search"
               type="search"
               placeholder="ค้นหาหลักสูตร..."
               value={search}
@@ -173,6 +178,7 @@ export default function CoursesListPage() {
             <button
               type="button"
               onClick={() => onCategoryChange('')}
+              aria-pressed={categoryFilter === ''}
               className={cn(
                 'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                 categoryFilter === ''
@@ -276,7 +282,7 @@ export default function CoursesListPage() {
                         <div className="flex justify-end gap-1">
                           <Button asChild variant="ghost" size="sm" title="แก้ไข">
                             <Link to={`/admin/courses/${c.id}/edit`}>
-                              <Pencil className="h-3.5 w-3.5" />
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                               <span className="sr-only">แก้ไข</span>
                             </Link>
                           </Button>
@@ -287,7 +293,7 @@ export default function CoursesListPage() {
                             disabled={duplicatingId === c.id}
                             title="ทำสำเนา"
                           >
-                            <Copy className="h-3.5 w-3.5" />
+                            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="sr-only">ทำสำเนา</span>
                           </Button>
                           <Button
@@ -297,7 +303,7 @@ export default function CoursesListPage() {
                             className="text-destructive hover:text-destructive"
                             title="ลบ"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="sr-only">ลบ</span>
                           </Button>
                         </div>
@@ -343,7 +349,7 @@ export default function CoursesListPage() {
                     <div className="flex flex-col gap-1">
                       <Button asChild variant="ghost" size="icon">
                         <Link to={`/admin/courses/${c.id}/edit`}>
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
                           <span className="sr-only">แก้ไข</span>
                         </Link>
                       </Button>
@@ -353,7 +359,7 @@ export default function CoursesListPage() {
                         onClick={() => handleDuplicate(c)}
                         disabled={duplicatingId === c.id}
                       >
-                        <Copy className="h-4 w-4" />
+                        <Copy className="h-4 w-4" aria-hidden="true" />
                         <span className="sr-only">ทำสำเนา</span>
                       </Button>
                       <Button
@@ -362,7 +368,7 @@ export default function CoursesListPage() {
                         onClick={() => setConfirmTarget(c)}
                         className="text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                         <span className="sr-only">ลบ</span>
                       </Button>
                     </div>

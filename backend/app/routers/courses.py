@@ -186,6 +186,7 @@ def get_course(
         Bookmark.user_id == current_user.id,
         Bookmark.course_id == course_id,
     ).first() is not None
+    can_access_content = is_enrolled or current_user.role.value in ("admin", "instructor")
 
     modules_data = []
     for module in sorted(course.modules, key=lambda m: m.order_index):
@@ -197,10 +198,12 @@ def get_course(
                 "title": lesson.title,
                 "description": lesson.description,
                 "content_type": lesson.content_type.value if lesson.content_type else None,
-                "content_url": lesson.content_url,
+                "content_url": lesson.content_url if can_access_content else None,
+                "caption_url": lesson.caption_url if can_access_content else None,
+                "transcript": lesson.transcript if can_access_content else None,
                 "duration_seconds": lesson.duration_seconds,
                 "total_pages": lesson.total_pages,
-                "notes_content": lesson.notes_content,
+                "notes_content": lesson.notes_content if can_access_content else None,
                 "order_index": lesson.order_index,
                 "min_view_seconds": lesson.min_view_seconds,
                 # Supplementary downloads / external links attached to this
@@ -215,7 +218,7 @@ def get_course(
                         "resource_type": r.resource_type,
                         "file_size": r.file_size,
                     }
-                    for r in (lesson.resources or [])
+                    for r in ((lesson.resources or []) if can_access_content else [])
                 ],
             })
         modules_data.append({
@@ -416,6 +419,7 @@ def duplicate_course(
             new_content_url = source_lesson.content_url
             if source_lesson.content_type in (ContentType.VIDEO_FILE, ContentType.PDF):
                 new_content_url = _copy_media_file(source_lesson.content_url)
+            new_caption_url = _copy_media_file(source_lesson.caption_url)
 
             new_lesson = Lesson(
                 module_id=new_module.id,
@@ -423,6 +427,8 @@ def duplicate_course(
                 description=source_lesson.description,
                 content_type=source_lesson.content_type,
                 content_url=new_content_url,
+                caption_url=new_caption_url,
+                transcript=source_lesson.transcript,
                 duration_seconds=source_lesson.duration_seconds,
                 total_pages=source_lesson.total_pages,
                 notes_content=source_lesson.notes_content,
@@ -698,6 +704,8 @@ def add_bookmark(
 ):
     """Idempotent: bookmarking an already-bookmarked course is a no-op."""
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+    if current_user.role.value in ("learner", "manager") and not course.is_published:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
     existing = (
         db.query(Bookmark)
         .filter(Bookmark.user_id == current_user.id, Bookmark.course_id == course_id)

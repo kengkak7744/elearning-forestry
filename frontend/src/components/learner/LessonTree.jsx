@@ -50,12 +50,22 @@ function LessonRow({
     : PlayCircle
 
   const resourceCount = Array.isArray(lesson.resources) ? lesson.resources.length : 0
+  const lessonLabel = [
+    `บทเรียน ${index + 1}: ${lesson.title}`,
+    isActive ? 'กำลังเปิดอยู่' : '',
+    isCompleted ? 'เรียนจบแล้ว' : '',
+    !isClickable ? 'ยังไม่สามารถเปิดได้' : '',
+    hasQuiz ? (quizPassed ? 'มีแบบทดสอบ ผ่านแล้ว' : 'มีแบบทดสอบ') : '',
+    resourceCount > 0 ? `มีเอกสารประกอบ ${resourceCount} ไฟล์` : '',
+  ].filter(Boolean).join(' ')
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!isClickable}
+      aria-current={isActive ? 'page' : undefined}
+      aria-label={lessonLabel}
       title={!isReached ? 'ต้องเรียนตามลำดับ — ยังไม่ปลดล็อกบทนี้' : undefined}
       className={cn(
         'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
@@ -76,13 +86,14 @@ function LessonRow({
             : 'bg-muted text-foreground'
         )}
       >
-        {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
+        {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : index + 1}
       </span>
       <Icon
         className={cn(
           'h-4 w-4 flex-shrink-0',
           isActive ? 'text-primary' : 'text-muted-foreground'
         )}
+        aria-hidden="true"
       />
       <span
         className={cn(
@@ -98,7 +109,7 @@ function LessonRow({
           title={`มีเอกสารประกอบ ${resourceCount} ไฟล์`}
           aria-label={`มีเอกสารประกอบ ${resourceCount} ไฟล์`}
         >
-          <Paperclip className="h-3 w-3" />
+          <Paperclip className="h-3 w-3" aria-hidden="true" />
           {resourceCount}
         </span>
       )}
@@ -109,11 +120,11 @@ function LessonRow({
             quizPassed ? 'text-success' : 'text-warning'
           )}
         >
-          แบบทดสอบ{quizPassed && <CheckCircle2 className="h-3 w-3" />}
+          แบบทดสอบ{quizPassed && <CheckCircle2 className="h-3 w-3" aria-hidden="true" />}
         </span>
       )}
       {!isReached && (
-        <Lock className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" />
+        <Lock className="h-4 w-4 flex-shrink-0 text-muted-foreground/60" aria-hidden="true" />
       )}
     </button>
   )
@@ -156,21 +167,23 @@ export default function LessonTree({
             <button
               type="button"
               onClick={() => onToggleModule(module.id)}
+              aria-expanded={expanded}
+              aria-controls={`module-lessons-${module.id}`}
               className="flex w-full items-center gap-2 bg-muted/30 px-3 py-2.5 text-left transition hover:bg-muted/60"
             >
               {expanded ? (
-                <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
               ) : (
-                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
               )}
               <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
                 โมดูล {mIdx + 1}
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium text-foreground">
                 <span className="truncate">{module.title}</span>
-                {!unlocked && <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
+                {!unlocked && <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />}
                 {unlocked && cleared && (
-                  <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-success" />
+                  <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-success" aria-hidden="true" />
                 )}
               </span>
               <span className="flex-shrink-0 text-[11px] text-muted-foreground">
@@ -179,7 +192,7 @@ export default function LessonTree({
             </button>
 
             {expanded && (
-              <div className="divide-y divide-border">
+              <div id={`module-lessons-${module.id}`} className="divide-y divide-border">
                 {module.lessons.length === 0 ? (
                   <p className="px-3 py-3 text-center text-sm text-muted-foreground">
                     ยังไม่มีบทเรียน
@@ -222,6 +235,14 @@ export default function LessonTree({
           type="button"
           onClick={onSwitchToFinal}
           disabled={!allModulesCleared}
+          aria-current={viewingFinal ? 'page' : undefined}
+          aria-label={[
+            finalQuiz.title,
+            viewingFinal ? 'กำลังเปิดอยู่' : '',
+            allModulesCleared ? '' : 'ยังไม่สามารถเปิดได้ ต้องผ่านทุกโมดูลก่อน',
+            finalQuiz.is_passed ? 'ผ่านแล้ว' : '',
+            `${finalQuiz.questions.length} คำถาม`,
+          ].filter(Boolean).join(' ')}
           className={cn(
             'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition',
             viewingFinal
@@ -231,15 +252,15 @@ export default function LessonTree({
               : 'cursor-not-allowed border-border bg-muted/20 opacity-60'
           )}
         >
-          <Trophy className="h-5 w-5 flex-shrink-0 text-warning" />
+          <Trophy className="h-5 w-5 flex-shrink-0 text-warning" aria-hidden="true" />
           <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-foreground">
             <span className="truncate">{finalQuiz.title}</span>
             {!allModulesCleared && (
-              <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+              <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
             {finalQuiz.is_passed && (
               <span className="inline-flex items-center gap-0.5 text-[11px] text-success">
-                <CheckCircle2 className="h-3 w-3" /> ผ่านแล้ว
+                <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> ผ่านแล้ว
               </span>
             )}
           </span>
@@ -284,7 +305,7 @@ function CourseDownloads({ course }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex items-center gap-2 bg-muted/30 px-3 py-2.5">
-        <Download className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <Download className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-sm font-medium text-foreground">เอกสารประกอบทั้งหมด</span>
         <span className="ml-auto text-[11px] text-muted-foreground">{items.length} ไฟล์</span>
       </div>
@@ -299,11 +320,11 @@ function CourseDownloads({ course }) {
                 download={`${lesson.title || 'lesson'}.${ext}`}
                 className="flex items-center gap-2 px-3 py-2 text-sm transition hover:bg-muted/30"
               >
-                <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-foreground">
                   {lesson.title}
                 </span>
-                <Download className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+                <Download className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
               </a>
             </li>
           )

@@ -20,6 +20,11 @@ export const authApi = {
     return response.data
   },
 
+  session: async () => {
+    const response = await apiClient.get('/auth/session')
+    return response.data
+  },
+
   updateMe: async (userData) => {
     const response = await apiClient.patch('/auth/me', userData)
     return response.data

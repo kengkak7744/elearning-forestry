@@ -23,6 +23,7 @@ export default function LessonPlayer({
   overlay,
 }) {
   const isPdf = lesson.content_type === 'pdf'
+  const captionUrl = lesson.caption_url || lesson.captions_url
   return (
     <Card className="mb-4 overflow-hidden border-border/60">
       <div
@@ -40,7 +41,17 @@ export default function LessonPlayer({
             onTimeUpdate={onTimeUpdate}
             onEnded={onEnded}
             onLoadedMetadata={onLoadedMetadata}
-          />
+          >
+            {captionUrl && (
+              <track
+                kind="captions"
+                src={mediaUrl(captionUrl)}
+                srcLang="th"
+                label="ไทย"
+                default
+              />
+            )}
+          </video>
         )}
         {lesson.content_type === 'video_youtube' && lesson.content_url && (
           <iframe

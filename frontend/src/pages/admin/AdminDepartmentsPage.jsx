@@ -14,6 +14,7 @@ import { ROLE_LABELS } from '@/constants/labels'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -60,7 +61,7 @@ function DepartmentCard({ dept }) {
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
+          <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <span className="line-clamp-2">{dept.name}</span>
         </h3>
         <span className="flex-shrink-0 text-2xl font-semibold tabular-nums text-foreground">
@@ -78,15 +79,15 @@ function DepartmentCard({ dept }) {
 
       <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
-          <Check className="h-3 w-3 text-success" />
+          <Check className="h-3 w-3 text-success" aria-hidden="true" />
           ใช้งานอยู่ {dept.active_count}
         </span>
         <span className="inline-flex items-center gap-1">
-          <GraduationCap className="h-3 w-3" />
+          <GraduationCap className="h-3 w-3" aria-hidden="true" />
           ลงทะเบียน {dept.enrollment_count}
         </span>
         <span className="inline-flex items-center gap-1">
-          <Award className="h-3 w-3" />
+          <Award className="h-3 w-3" aria-hidden="true" />
           ใบรับรอง {dept.cert_count}
         </span>
       </div>
@@ -156,16 +157,23 @@ export default function AdminDepartmentsPage() {
       <Card className="mb-4 border-border/60">
         <CardContent className="flex flex-col gap-2 p-3 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Label htmlFor="admin-department-search" className="sr-only">
+              ค้นหาหน่วยงาน
+            </Label>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="admin-department-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหาหน่วยงาน"
               className="pl-8"
             />
           </div>
+          <Label htmlFor="admin-department-sort" className="sr-only">
+            เรียงลำดับหน่วยงาน
+          </Label>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-56">
+            <SelectTrigger id="admin-department-sort" className="w-full sm:w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

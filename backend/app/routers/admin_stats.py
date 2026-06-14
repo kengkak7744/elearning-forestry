@@ -21,6 +21,7 @@ from app.services.stats import (
     build_department_members_csv,
     department_compliance_data,
     department_course_members_data,
+    department_member_report_rows,
     department_members_rows,
     overview_stats,
 )
@@ -292,6 +293,7 @@ def department_members(
             "username": u.username,
             "full_name": u.full_name,
             "email": u.email,
+            "profile_image": u.profile_image,
             "role": u.role.value if u.role else None,
             "position": u.position,
             "phone": u.phone,
@@ -403,7 +405,7 @@ def department_members_csv(
     """CSV download of a department's members. UTF-8 + BOM so Excel
     opens the Thai headers without garbling, matching the existing
     compliance CSV pattern."""
-    rows = department_members_rows(db, department)
+    rows = department_member_report_rows(db, department)
     body = build_department_members_csv(rows)
     stamp = datetime.now().strftime("%Y%m%d")
     # Department name may contain spaces / Thai chars; ASCII-fallback the

@@ -103,13 +103,19 @@ class TestAnswerKeyStripping:
         make_question(db, quiz, correct_text=None)
         return course, lesson, quiz
 
-    def test_learner_endpoint_strips_answers(self, learner_client, db):
-        _, lesson, _ = self._lesson_quiz(db)
+    def test_learner_endpoint_strips_answers(self, learner_client, db, learner_user):
+        course, lesson, _ = self._lesson_quiz(db)
+        enroll(db, learner_user, course)
         res = learner_client.get(f"/api/quizzes/lesson/{lesson.id}")
         assert res.status_code == 200
         question = res.json()[0]["questions"][0]
         assert question["correct_text"] is None
         assert all(set(c.keys()) == {"text"} for c in question["choices"])
+
+    def test_learner_lesson_quiz_requires_enrollment(self, learner_client, db):
+        _, lesson, _ = self._lesson_quiz(db)
+        res = learner_client.get(f"/api/quizzes/lesson/{lesson.id}")
+        assert res.status_code == 403
 
     def test_admin_endpoint_includes_answers(self, admin_client, db):
         _, lesson, _ = self._lesson_quiz(db)
@@ -131,6 +137,7 @@ class TestAnswerKeyStripping:
 
         quiz = make_quiz(db, course=course)
         make_question(db, quiz)
+        enroll(db, learner_user, course)
         res = learner_client.get(f"/api/quizzes/course/{course.id}/final")
         assert res.status_code == 200
         assert res.json()["id"] == quiz.id

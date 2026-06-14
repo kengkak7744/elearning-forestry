@@ -1,13 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Bookmark, BookmarkCheck, CheckCircle2, Clock, GraduationCap } from 'lucide-react'
+import { Bookmark, BookmarkCheck, BookOpen, CheckCircle2, Clock, GraduationCap } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { CATEGORY_BADGES } from '@/constants/labels'
 import { mediaUrl } from '@/utils/media'
 import { cn } from '@/lib/utils'
-
-const FALLBACK_COVER = '/elearning/forest_logo.png'
 
 function BookmarkToggle({ bookmarked, onToggle }) {
   if (!onToggle) return null
@@ -25,14 +23,23 @@ function BookmarkToggle({ bookmarked, onToggle }) {
       aria-label={bookmarked ? 'เอาออกจากบุ๊กมาร์ก' : 'บันทึกหลักสูตรนี้ไว้'}
       title={bookmarked ? 'เอาออกจากบุ๊กมาร์ก' : 'บันทึกหลักสูตรนี้ไว้'}
       className={cn(
-        'absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full backdrop-blur transition-colors',
+        'absolute right-2 top-2 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full backdrop-blur transition-colors',
         bookmarked
           ? 'bg-warning text-warning-foreground shadow hover:bg-warning/90'
           : 'bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground'
       )}
     >
-      <Icon className={cn('h-4 w-4', bookmarked && 'fill-current')} />
+      <Icon className={cn('h-4 w-4', bookmarked && 'fill-current')} aria-hidden="true" />
     </button>
+  )
+}
+
+function CourseCoverFallback({ title }) {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/12 via-card to-accent/12 px-4 text-center">
+      <BookOpen className="h-8 w-8 text-primary/80" aria-hidden="true" />
+      <span className="line-clamp-2 text-sm font-medium text-foreground">{title}</span>
+    </div>
   )
 }
 
@@ -50,9 +57,11 @@ export default function CourseCard({
   progress,
   bookmarked = false,
   onToggleBookmark,
+  imagePriority = false,
 }) {
   const cat = CATEGORY_BADGES[course.category]
-  const cover = course.cover_image ? mediaUrl(course.cover_image) : FALLBACK_COVER
+  const hasCover = Boolean(course.cover_image)
+  const cover = hasCover ? mediaUrl(course.cover_image) : ''
 
   if (variant === 'compact') {
     return (
@@ -62,13 +71,18 @@ export default function CourseCard({
       >
         <Card className="overflow-hidden border-border/60 transition-shadow group-hover:shadow-md">
           <div className="relative aspect-video w-full overflow-hidden bg-muted">
-            <img
-              src={cover}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-            />
+            {hasCover ? (
+              <img
+                src={cover}
+                alt=""
+                loading={imagePriority ? 'eager' : 'lazy'}
+                fetchPriority={imagePriority ? 'high' : 'auto'}
+                decoding={imagePriority ? 'sync' : 'async'}
+                className="h-full w-full object-cover transition-transform group-hover:scale-105"
+              />
+            ) : (
+              <CourseCoverFallback title={course.title} />
+            )}
             <BookmarkToggle bookmarked={bookmarked} onToggle={onToggleBookmark} />
           </div>
           <CardContent className="p-4">
@@ -82,7 +96,11 @@ export default function CourseCard({
             </h3>
             {typeof progress === 'number' && (
               <div className="mt-3 space-y-1">
-                <Progress value={progress} className="h-1.5" />
+                <Progress
+                  value={progress}
+                  className="h-1.5"
+                  aria-label={`ความคืบหน้าหลักสูตร ${course.title}`}
+                />
                 <div className="text-[11px] tabular-nums text-muted-foreground">
                   {Math.round(progress)}%
                 </div>
@@ -109,13 +127,18 @@ export default function CourseCard({
     >
       <Card className="h-full overflow-hidden border-border/60 transition-shadow group-hover:shadow-md">
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted">
-          <img
-            src={cover}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
+          {hasCover ? (
+            <img
+              src={cover}
+              alt=""
+              loading={imagePriority ? 'eager' : 'lazy'}
+              fetchPriority={imagePriority ? 'high' : 'auto'}
+              decoding={imagePriority ? 'sync' : 'async'}
+              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+            />
+          ) : (
+            <CourseCoverFallback title={course.title} />
+          )}
           <BookmarkToggle bookmarked={bookmarked} onToggle={onToggleBookmark} />
           <div className="absolute left-2 top-2 flex gap-1">
             {course.is_mandatory && (
@@ -128,7 +151,7 @@ export default function CourseCard({
             )}
             {isCompleted && (
               <Badge className="bg-success text-success-foreground hover:bg-success">
-                <CheckCircle2 className="mr-0.5 h-3 w-3" />
+                <CheckCircle2 className="mr-0.5 h-3 w-3" aria-hidden="true" />
                 เรียนจบ
               </Badge>
             )}
@@ -155,7 +178,11 @@ export default function CourseCard({
           )}
           {hasProgress && !isCompleted ? (
             <div className="space-y-1 pt-1">
-              <Progress value={progress} className="h-1.5" />
+              <Progress
+                value={progress}
+                className="h-1.5"
+                aria-label={`ความคืบหน้าหลักสูตร ${course.title}`}
+              />
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span>คืบหน้า</span>
                 <span className="font-medium tabular-nums">{Math.round(progress)}%</span>
@@ -165,13 +192,13 @@ export default function CourseCard({
             <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
               {course.estimated_hours ? (
                 <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                   {course.estimated_hours} ชั่วโมง
                 </span>
               ) : null}
               {course.modules_count !== undefined && (
                 <span className="inline-flex items-center gap-1">
-                  <GraduationCap className="h-3.5 w-3.5" />
+                  <GraduationCap className="h-3.5 w-3.5" aria-hidden="true" />
                   {course.modules_count} โมดูล
                 </span>
               )}

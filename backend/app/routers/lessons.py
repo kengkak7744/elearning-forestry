@@ -18,7 +18,7 @@ from app.schemas.lesson import (
     LessonResponse,
 )
 from app.config import settings
-from app.core.helpers import get_or_404
+from app.core.helpers import get_or_404, require_enrollment
 from app.dependencies import get_current_user, require_instructor_or_admin
 
 
@@ -32,6 +32,20 @@ PDF_DIR = Path(settings.PDF_DIR)
 # Max file sizes (bytes)
 MAX_VIDEO_SIZE = settings.MAX_VIDEO_SIZE
 MAX_PDF_SIZE = settings.MAX_PDF_SIZE
+
+
+def _require_lesson_access(db: Session, current_user: User, lesson_id: int) -> None:
+    row = (
+        db.query(Module.course_id)
+        .join(Lesson, Lesson.module_id == Module.id)
+        .filter(Lesson.id == lesson_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    if current_user.role.value in ("admin", "instructor"):
+        return
+    require_enrollment(db, current_user.id, row.course_id, "ต้องลงทะเบียนหลักสูตรก่อนเข้าถึงบทเรียน")
 
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi", ".mkv"}
 ALLOWED_PDF_EXTENSIONS = {".pdf"}
@@ -206,10 +220,11 @@ async def upload_pdf(
 def list_lesson_resources(
     lesson_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """List supplementary materials for a lesson — visible to any logged-in learner."""
     get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
+    _require_lesson_access(db, current_user, lesson_id)
     return (
         db.query(LessonResource)
         .filter(LessonResource.lesson_id == lesson_id)
@@ -260,6 +275,7 @@ def get_my_note(
     current_user: User = Depends(get_current_user),
 ):
     """My note for this lesson. Returns empty content if I've never written one."""
+    _require_lesson_access(db, current_user, lesson_id)
     note = (
         db.query(LessonNote)
         .filter(LessonNote.user_id == current_user.id, LessonNote.lesson_id == lesson_id)
@@ -278,6 +294,7 @@ def upsert_my_note(
     current_user: User = Depends(get_current_user),
 ):
     """Save my note for this lesson. Idempotent upsert — autosave-friendly."""
+    _require_lesson_access(db, current_user, lesson_id)
     get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
 
     note = (

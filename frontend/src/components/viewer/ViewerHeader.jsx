@@ -33,14 +33,14 @@ export default function ViewerHeader({
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-12 max-w-6xl items-center gap-3 px-3 sm:px-4">
-        <Button asChild variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0">
+      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-3 py-1 sm:px-4">
+        <Button asChild variant="ghost" size="icon" className="flex-shrink-0">
           <Link to={`/courses/${courseId}`} aria-label="กลับหน้าหลักสูตร">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-foreground">{course.title}</div>
+          <h1 className="truncate text-sm font-medium text-foreground">{course.title}</h1>
           <div className="mt-0.5 flex items-center gap-2">
             {positionLabel && (
               <span className="flex-shrink-0 text-[10px] font-medium text-muted-foreground">
@@ -56,7 +56,7 @@ export default function ViewerHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 flex-shrink-0"
+          className="flex-shrink-0"
           onClick={onViewScores}
           aria-label="ดูคะแนน"
         >
@@ -67,7 +67,7 @@ export default function ViewerHeader({
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 flex-shrink-0 lg:hidden"
+              className="flex-shrink-0 lg:hidden"
               aria-label="รายการบทเรียน"
             >
               <Layers className="h-4 w-4" />

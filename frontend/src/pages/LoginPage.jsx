@@ -45,7 +45,7 @@ export default function LoginPage() {
             alt=""
             width="72"
             height="72"
-            fetchpriority="high"
+            fetchPriority="high"
             className="mb-3 h-16 w-16"
           />
           <h1 className="text-2xl font-semibold text-foreground">ระบบ e-Learning</h1>
@@ -102,7 +102,7 @@ export default function LoginPage() {
           <CardFooter className="flex flex-col gap-1 border-t border-border/60 pt-4 text-center">
             <p className="text-sm text-muted-foreground">
               ยังไม่มีบัญชี?{' '}
-              <Link to="/register" className="font-medium text-primary hover:underline">
+              <Link to="/register" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
                 {BUTTONS.REGISTER}
               </Link>
             </p>

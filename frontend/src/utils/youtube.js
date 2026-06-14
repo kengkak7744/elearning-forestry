@@ -5,7 +5,11 @@ export function getYoutubeEmbed(url) {
   const match = url.match(pattern)
   if (!match) return url
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const params = new URLSearchParams({ enablejsapi: '1' })
+  const params = new URLSearchParams({
+    enablejsapi: '1',
+    cc_load_policy: '1',
+    cc_lang_pref: 'th',
+  })
   if (origin) params.set('origin', origin)
   return `https://www.youtube.com/embed/${match[1]}?${params.toString()}`
 }

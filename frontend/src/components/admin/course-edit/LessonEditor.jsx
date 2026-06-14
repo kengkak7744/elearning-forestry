@@ -171,6 +171,19 @@ export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete
             </div>
           )}
 
+          {(lesson.content_type === 'video_youtube' ||
+            lesson.content_type === 'video_file') && (
+            <div className="space-y-1">
+              <Label className="text-xs">Caption URL (.vtt)</Label>
+              <Input
+                type="url"
+                value={lesson.caption_url || ''}
+                onChange={(e) => setField('caption_url')(e.target.value || null)}
+                placeholder="/videos/caption-th.vtt หรือ https://..."
+              />
+            </div>
+          )}
+
           {lesson.content_type === 'pdf' && (
             <div className="space-y-1">
               <Label className="text-xs">
@@ -240,6 +253,16 @@ export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete
               rows={2}
               value={lesson.description || ''}
               onChange={(e) => setField('description')(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Transcript / สรุปเนื้อหา</Label>
+            <Textarea
+              rows={4}
+              value={lesson.transcript || ''}
+              onChange={(e) => setField('transcript')(e.target.value || null)}
+              placeholder="ใส่คำบรรยายถอดเสียงหรือสรุปเนื้อหาสำคัญของบทเรียน"
             />
           </div>
 

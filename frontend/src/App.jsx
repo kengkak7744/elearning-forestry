@@ -1,10 +1,10 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import ErrorBoundary from './components/ErrorBoundary'
-import { Toaster } from '@/components/ui/sonner'
+import { TOAST_EVENT } from '@/lib/toast'
 
 // LoginPage is the universal entry point — keep eager. The shells and every
 // other page are lazy so the pre-auth login screen doesn't pay for the top
@@ -59,12 +59,84 @@ function PageFallback() {
   )
 }
 
+function AdminIndexRedirect() {
+  const { user } = useAuth()
+  return <Navigate to={user?.role === 'instructor' ? '/admin/courses' : '/admin/dashboard'} replace />
+}
+
+function AdminOnly({ children }) {
+  return (
+    <AdminRoute allowedRoles={['admin']} unauthorizedTo="/admin/courses">
+      {children}
+    </AdminRoute>
+  )
+}
+
+function RouteSeo() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const baseUrl = 'https://wildfire.forest.go.th/elearning'
+    const routePath = location.pathname.startsWith('/elearning')
+      ? location.pathname.slice('/elearning'.length) || '/'
+      : location.pathname
+    const cleanPath = routePath === '/' ? '/' : routePath.replace(/\/$/, '')
+    const href = `${baseUrl}${cleanPath === '/' ? '/' : cleanPath}`
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', href)
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', href)
+  }, [location.pathname])
+
+  return null
+}
+
+function ToastHost() {
+  const [ToasterComponent, setToasterComponent] = useState(null)
+  const [queue, setQueue] = useState([])
+
+  useEffect(() => {
+    let mounted = true
+    const handleToast = (event) => {
+      if (event.detail?.message) {
+        setQueue((prev) => [...prev, event.detail])
+      }
+      import('@/components/ui/sonner').then((m) => {
+        if (mounted) setToasterComponent(() => m.Toaster)
+      })
+    }
+    window.addEventListener(TOAST_EVENT, handleToast)
+    return () => {
+      mounted = false
+      window.removeEventListener(TOAST_EVENT, handleToast)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ToasterComponent || queue.length === 0) return
+    const pending = queue
+    const timer = setTimeout(() => {
+      import('sonner').then(({ toast }) => {
+        pending.forEach(({ message, type }) => {
+          const variant = toast[type] ?? toast
+          variant(message)
+        })
+        setQueue((current) => current.slice(pending.length))
+      })
+    }, 0)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [ToasterComponent, queue])
+
+  return ToasterComponent ? <ToasterComponent /> : null
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Toaster />
+        <ToastHost />
         <BrowserRouter basename="/elearning">
+          <RouteSeo />
           <Suspense fallback={<PageFallback />}>
             <Routes>
               {/* Public */}
@@ -106,25 +178,39 @@ function App() {
               {/* Admin shell — sidebar + content */}
               <Route
                 element={
-                  <AdminRoute>
+                  <AdminRoute allowedRoles={['admin', 'instructor']}>
                     <AdminShell />
                   </AdminRoute>
                 }
               >
-                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <AdminOnly>
+                      <AdminDashboardPage />
+                    </AdminOnly>
+                  }
+                />
                 <Route path="/admin/courses" element={<CoursesListPage />} />
                 <Route path="/admin/courses/:id/edit" element={<CourseEditPage />} />
-                <Route path="/admin/users" element={<UsersListPage />} />
-                <Route path="/admin/users/new" element={<UserFormPage />} />
-                <Route path="/admin/users/:id/edit" element={<UserFormPage />} />
-                <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
-                <Route path="/admin/certificates" element={<AdminCertificatesPage />} />
-                <Route path="/admin/cert-settings" element={<AdminCertSettingsPage />} />
-                <Route path="/admin/departments" element={<AdminDepartmentsPage />} />
-                <Route path="/admin/departments/:name" element={<AdminDepartmentDetailPage />} />
+                <Route path="/admin/users" element={<AdminOnly><UsersListPage /></AdminOnly>} />
+                <Route path="/admin/users/new" element={<AdminOnly><UserFormPage /></AdminOnly>} />
+                <Route path="/admin/users/:id/edit" element={<AdminOnly><UserFormPage /></AdminOnly>} />
+                <Route path="/admin/audit-logs" element={<AdminOnly><AuditLogsPage /></AdminOnly>} />
+                <Route path="/admin/certificates" element={<AdminOnly><AdminCertificatesPage /></AdminOnly>} />
+                <Route path="/admin/cert-settings" element={<AdminOnly><AdminCertSettingsPage /></AdminOnly>} />
+                <Route path="/admin/departments" element={<AdminOnly><AdminDepartmentsPage /></AdminOnly>} />
+                <Route path="/admin/departments/:name" element={<AdminOnly><AdminDepartmentDetailPage /></AdminOnly>} />
               </Route>
 
-              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route
+                path="/admin"
+                element={
+                  <AdminRoute allowedRoles={['admin', 'instructor']}>
+                    <AdminIndexRedirect />
+                  </AdminRoute>
+                }
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

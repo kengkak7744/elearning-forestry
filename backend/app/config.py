@@ -1,3 +1,6 @@
+from typing import Any
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +13,16 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     # Set true in prod (HTTPS). Leave false for local HTTP dev so the browser keeps the cookie.
     COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"
+    CORS_ALLOWED_ORIGINS: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://localhost:3000",
+        ]
+    )
+    # Report-only first: Trusted Types can surface DOM-XSS sinks without
+    # breaking production while we verify all frontend code paths.
+    TRUSTED_TYPES_REPORT_ONLY: bool = True
     # Public-facing origin used when generating absolute URLs (e.g. the QR code
     # embedded in certificate PDFs that links to the public /verify page).
     # Empty string → QR encodes the certificate number alone, which the
@@ -34,6 +47,21 @@ class Settings(BaseSettings):
     # Public certificate-verify endpoint rate limit (per IP, per window)
     VERIFY_RATE_LIMIT: int = 30   # requests per window
     VERIFY_RATE_WINDOW: int = 60  # seconds
+
+    @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("COOKIE_SAMESITE")
+    @classmethod
+    def validate_cookie_samesite(cls, value: str) -> str:
+        normalized = value.lower()
+        if normalized not in {"lax", "strict", "none"}:
+            raise ValueError("COOKIE_SAMESITE must be one of: lax, strict, none")
+        return normalized
 
 
 settings = Settings()

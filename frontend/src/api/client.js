@@ -21,19 +21,11 @@ const apiClient = axios.create({
   withCredentials: true,
 })
 
-// Legacy fallback: if a previous session stored a JWT in localStorage, still send it via Authorization.
-// New logins use httpOnly cookies and don't write to localStorage.
-apiClient.interceptors.request.use((config) => {
-  const legacy = localStorage.getItem('access_token')
-  if (legacy) {
-    config.headers.Authorization = `Bearer ${legacy}`
-  }
-  return config
-})
-
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Migration cleanup only. The browser app must not authenticate from
+    // localStorage; httpOnly cookies are the sole session mechanism.
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token')
     }

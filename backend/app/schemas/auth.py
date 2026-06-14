@@ -14,5 +14,10 @@ class Token(BaseModel):
     user: UserResponse
 
 
+class SessionStatus(BaseModel):
+    authenticated: bool
+    user: UserResponse | None = None
+
+
 class TokenData(BaseModel):
     user_id: int | None = None

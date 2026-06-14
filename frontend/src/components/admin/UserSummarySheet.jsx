@@ -20,6 +20,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import UserAvatar from '@/components/admin/UserAvatar'
 import { toastApiError } from '@/utils/apiError'
 
 function formatDate(d) {
@@ -82,22 +83,25 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
         ) : (
           <div className="space-y-5">
             <Card className="border-border/60">
-              <CardContent className="space-y-1 p-4">
-                <div className="text-base font-semibold text-foreground">
-                  {data.user.full_name}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  <span className="font-mono">@{data.user.username}</span>
-                  {' · '}
-                  {data.user.email}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
-                  <Badge variant="secondary" className="font-normal">
-                    {ROLE_LABELS[data.user.role] ?? data.user.role}
-                  </Badge>
-                  <span>{data.user.department || '-'}</span>
-                  {data.user.position && <span>· {data.user.position}</span>}
-                  <span>· เข้าระบบเมื่อ {formatDate(data.user.created_at)}</span>
+              <CardContent className="flex items-start gap-3 p-4">
+                <UserAvatar user={data.user} className="h-12 w-12" />
+                <div className="min-w-0 space-y-1">
+                  <div className="truncate text-base font-semibold text-foreground">
+                    {data.user.full_name}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    <span className="font-mono">@{data.user.username}</span>
+                    {' · '}
+                    {data.user.email}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
+                    <Badge variant="secondary" className="font-normal">
+                      {ROLE_LABELS[data.user.role] ?? data.user.role}
+                    </Badge>
+                    <span>{data.user.department || '-'}</span>
+                    {data.user.position && <span>· {data.user.position}</span>}
+                    <span>· เข้าระบบเมื่อ {formatDate(data.user.created_at)}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

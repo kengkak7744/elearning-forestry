@@ -22,6 +22,10 @@ export default defineConfig({
     sourcemap: 'hidden',
     rollupOptions: {
       output: {
+        // Keep hidden maps useful for stack traces, but do not embed original
+        // source code inside .map files. If a map leaks from deployment, it
+        // should not expose the app source.
+        sourcemapExcludeSources: true,
         // Explicit chunk groups via Rolldown's native advancedChunks API.
         //
         // We deliberately do NOT use the Rollup-compat `manualChunks(id)` shim:
@@ -92,6 +96,26 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+      },
+      '/elearning/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/elearning/, ''),
+      },
+      '/elearning/videos': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/elearning/, ''),
+      },
+      '/elearning/pdfs': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/elearning/, ''),
+      },
+      '/elearning/images': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/elearning/, ''),
       },
     },
   },

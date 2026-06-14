@@ -53,7 +53,7 @@ export default function LessonFooter({
             variant="outline"
             onClick={onPrev}
             disabled={!prevDest}
-            className="flex-1 sm:flex-none"
+            className="min-h-11 flex-1 sm:flex-none"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
             {BUTTONS.PREVIOUS}
@@ -74,13 +74,13 @@ export default function LessonFooter({
             finalQuiz?.is_passed ? (
               <Button
                 onClick={onFinish}
-                className="flex-1 bg-warning text-warning-foreground hover:bg-warning/90 sm:flex-none"
+                className="min-h-11 flex-1 bg-warning text-warning-foreground hover:bg-warning/90 sm:flex-none"
               >
                 <Trophy className="mr-1.5 h-4 w-4" />
                 จบหลักสูตร
               </Button>
             ) : (
-              <Button variant="secondary" onClick={onPrev} className="flex-1 sm:flex-none">
+              <Button variant="secondary" onClick={onPrev} className="min-h-11 flex-1 sm:flex-none">
                 {BUTTONS.BACK}
               </Button>
             )
@@ -90,7 +90,7 @@ export default function LessonFooter({
               disabled={!timeGateMet}
               title={blocked ? 'คลิกเพื่อไปทำแบบทดสอบที่ต้องผ่าน' : undefined}
               className={cn(
-                'h-auto min-h-9 flex-1 py-1 sm:flex-none',
+                'h-auto min-h-11 flex-1 py-2 sm:flex-none',
                 blocked && 'bg-warning text-warning-foreground hover:bg-warning/90',
                 !blocked && !nextDest && 'bg-success text-success-foreground hover:bg-success/90'
               )}

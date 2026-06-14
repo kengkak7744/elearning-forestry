@@ -13,7 +13,6 @@ export default class ErrorBoundary extends Component {
     // Stay visible in dev; in production this is the place to forward
     // to an error tracker (Sentry/Bugsnag) once one is wired up.
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
       console.error('Render error:', error, info)
     }
   }

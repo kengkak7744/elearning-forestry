@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, GraduationCap, Trophy } from 'lucide-react'
+import { BookOpen, ChevronRight, GraduationCap, Trophy } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
 import { progressApi } from '@/api/progress'
 import { quizzesApi } from '@/api/quizzes'
@@ -11,8 +11,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-
-const FALLBACK_COVER = '/elearning/forest_logo.png'
 
 /**
  * Resolve the lesson to resume into, mirroring CourseViewerPage exactly:
@@ -105,7 +103,8 @@ function HeroCard({ hero }) {
     }
   }
 
-  const cover = hero.cover_image ? mediaUrl(hero.cover_image) : FALLBACK_COVER
+  const hasCover = Boolean(hero.cover_image)
+  const cover = hasCover ? mediaUrl(hero.cover_image) : ''
   const pct = Math.round(hero.progress_percent ?? 0)
   const remaining = Math.max(0, (hero.total_lessons ?? 0) - (hero.completed_lessons ?? 0))
 
@@ -113,13 +112,20 @@ function HeroCard({ hero }) {
     <Card className="overflow-hidden border-border/60">
       <div className="grid gap-0 md:grid-cols-[280px_1fr]">
         <div className="aspect-video h-full w-full overflow-hidden bg-muted md:aspect-auto">
-          <img
-            src={cover}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="eager"
-            fetchpriority="high"
-          />
+          {hasCover ? (
+            <img
+              src={cover}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="eager"
+              fetchPriority="high"
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/12 via-card to-accent/12 px-4 text-center">
+              <BookOpen className="h-10 w-10 text-primary/80" aria-hidden="true" />
+              <span className="line-clamp-2 text-sm font-medium text-foreground">{hero.title}</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col justify-between gap-4 p-5 sm:p-6">
           <div>
@@ -149,12 +155,20 @@ function HeroCard({ hero }) {
             {quizLine}
           </div>
 
-          <Button asChild size="lg" className="w-full sm:w-auto">
-            <Link to={ctaHref}>
-              {BUTTONS.CONTINUE}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <Link to={ctaHref}>
+                {BUTTONS.CONTINUE}
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="w-full gap-1.5 sm:w-auto">
+              <Link to="/courses">
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                {BUTTONS.VIEW_ALL_COURSES}
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </Card>

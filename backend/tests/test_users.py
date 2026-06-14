@@ -120,12 +120,15 @@ class TestDeleteUser:
 
 class TestLearningSummary:
     def test_summary_shape(self, admin_client, db, learner_user):
+        learner_user.profile_image = "/elearning/images/summary.png"
+        db.commit()
         course = make_course(db)
         enroll(db, learner_user, course)
         res = admin_client.get(f"/api/users/{learner_user.id}/learning-summary")
         assert res.status_code == 200
         body = res.json()
         assert body["user"]["id"] == learner_user.id
+        assert body["user"]["profile_image"] == "/elearning/images/summary.png"
         assert len(body["enrollments"]) == 1
         assert body["enrollments"][0]["course_id"] == course.id
         assert body["quiz_stats"] == {

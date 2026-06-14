@@ -1,4 +1,7 @@
 """Characterization tests for /api/admin/stats."""
+import csv
+import io
+
 import pytest
 
 from tests.conftest import make_user
@@ -8,7 +11,10 @@ from tests.factories import (
     make_course,
     make_lesson,
     make_module,
+    make_quiz,
+    pass_quiz,
 )
+from app.models.certificate import Certificate
 from app.models.user import UserRole
 
 
@@ -74,12 +80,14 @@ class TestDepartments:
         assert row["role_breakdown"] == {"learner": 1}
 
     def test_department_members(self, admin_client, db, learner_user):
+        learner_user.profile_image = "/elearning/images/learner.png"
+        db.commit()
         res = admin_client.get(
             f"/api/admin/stats/departments/{learner_user.department}/members"
         )
         assert res.status_code == 200
-        usernames = {m["username"] for m in res.json()}
-        assert learner_user.username in usernames
+        member = next(m for m in res.json() if m["username"] == learner_user.username)
+        assert member["profile_image"] == "/elearning/images/learner.png"
 
     def test_department_members_csv(self, admin_client, db):
         user = make_user(db, username="ascii_dept", department="Forest HQ")
@@ -89,6 +97,44 @@ class TestDepartments:
         assert res.status_code == 200
         assert res.headers["content-type"].startswith("text/csv")
         assert "ชื่อผู้ใช้" in res.text
+
+    def test_department_members_csv_contains_report_metrics(self, admin_client, db):
+        user = make_user(
+            db,
+            username="report_user",
+            department="Report Dept",
+            profile_image="/elearning/images/report.png",
+        )
+        course = make_course(db, is_mandatory=True)
+        module = make_module(db, course)
+        make_lesson(db, module)
+        enroll(db, user, course)
+        complete_all_lessons(db, user, course)
+        quiz = make_quiz(db, course=course)
+        pass_quiz(db, user, quiz, score=88)
+        db.add(Certificate(
+            user_id=user.id,
+            course_id=course.id,
+            certificate_number="CERT-REPORT-1",
+            final_score=88,
+        ))
+        db.commit()
+
+        res = admin_client.get("/api/admin/stats/departments/Report Dept/members.csv")
+        assert res.status_code == 200
+
+        rows = list(csv.DictReader(io.StringIO(res.content.decode("utf-8-sig"))))
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["ชื่อผู้ใช้"] == "report_user"
+        assert row["รูปโปรไฟล์"] == "/elearning/images/report.png"
+        assert row["จำนวนหลักสูตรที่ลงทะเบียน"] == "1"
+        assert row["จำนวนหลักสูตรที่เรียนจบ"] == "1"
+        assert row["หลักสูตรบังคับที่ผ่านแล้ว"] == "1"
+        assert row["ใบรับรองที่ใช้ได้"] == "1"
+        assert row["จำนวนแบบทดสอบที่ผ่าน"] == "1"
+        assert row["คะแนนแบบทดสอบเฉลี่ยจากคะแนนดีที่สุด (%)"] == "88.0"
+        assert row["สถานะการเรียนสำหรับรายงาน"] == "all_enrolled_completed"
 
     def test_department_members_csv_thai_name(self, admin_client, learner_user):
         # Thai department names used to 500 (Thai chars survived into the
@@ -112,6 +158,8 @@ class TestDepartments:
         assert row["certification_pct"] == 0
 
     def test_department_course_members(self, admin_client, db, learner_user):
+        learner_user.profile_image = "/elearning/images/course-member.png"
+        db.commit()
         course = make_course(db)
         module = make_module(db, course)
         make_lesson(db, module)
@@ -124,6 +172,7 @@ class TestDepartments:
         body = res.json()
         assert body["course"]["id"] == course.id
         member = next(m for m in body["members"] if m["id"] == learner_user.id)
+        assert member["profile_image"] == "/elearning/images/course-member.png"
         assert member["is_enrolled"] is True
         assert member["progress_percent"] == 0
 

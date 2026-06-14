@@ -39,6 +39,8 @@ class LessonBase(BaseModel):
     description: Optional[str] = None
     content_type: ContentType
     content_url: Optional[str] = None
+    caption_url: Optional[str] = Field(None, max_length=500)
+    transcript: Optional[str] = None
     duration_seconds: Optional[int] = Field(None, ge=0)
     total_pages: Optional[int] = Field(None, ge=0)
     notes_content: Optional[str] = None
@@ -55,6 +57,8 @@ class LessonUpdate(BaseModel):
     description: Optional[str] = None
     content_type: Optional[ContentType] = None
     content_url: Optional[str] = None
+    caption_url: Optional[str] = Field(None, max_length=500)
+    transcript: Optional[str] = None
     duration_seconds: Optional[int] = None
     total_pages: Optional[int] = None
     notes_content: Optional[str] = None

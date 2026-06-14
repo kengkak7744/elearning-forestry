@@ -21,6 +21,8 @@ class Lesson(Base):
     content_type = Column(Enum(ContentType), nullable=False)
     
     content_url = Column(String(500), nullable=True)
+    caption_url = Column(String(500), nullable=True)
+    transcript = Column(Text, nullable=True)
     
     # For videos
     duration_seconds = Column(Integer, nullable=True)

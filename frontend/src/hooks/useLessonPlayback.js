@@ -297,7 +297,7 @@ export default function useLessonPlayback({
       setElapsedSeconds((s) => s + 1)
     }, 1000)
     return () => clearInterval(iv)
-  }, [currentLesson?.id, viewingFinal, progressLoaded])
+  }, [currentLesson, currentLesson?.id, viewingFinal, progressLoaded])
 
   useEffect(() => {
     if (!currentLesson || currentLesson.content_type !== 'pdf' || viewingFinal) return

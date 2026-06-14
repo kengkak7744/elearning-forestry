@@ -38,10 +38,7 @@ app = FastAPI(
 #React
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +67,11 @@ CSP_VALUE = (
     "frame-ancestors 'self'"
 )
 
+TRUSTED_TYPES_REPORT_ONLY_VALUE = (
+    "require-trusted-types-for 'script'; "
+    "trusted-types default react"
+)
+
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
@@ -83,6 +85,11 @@ async def security_headers(request: Request, call_next):
         "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
     )
     response.headers.setdefault("Content-Security-Policy", CSP_VALUE)
+    if settings.TRUSTED_TYPES_REPORT_ONLY:
+        response.headers.setdefault(
+            "Content-Security-Policy-Report-Only",
+            TRUSTED_TYPES_REPORT_ONLY_VALUE,
+        )
     if settings.COOKIE_SECURE:
         response.headers.setdefault(
             "Strict-Transport-Security",

@@ -26,6 +26,29 @@ require_quiz_editor = require_roles(
 )
 
 
+def _require_course_quiz_access(db: Session, current_user: User, course_id: int) -> None:
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    if current_user.role.value in ("admin", "instructor"):
+        return
+    if not course.is_published:
+        raise HTTPException(status_code=404, detail="ไม่พบหลักสูตร")
+    require_enrollment(db, current_user.id, course_id, "ต้องลงทะเบียนหลักสูตรก่อนดูแบบทดสอบ")
+
+
+def _course_id_for_lesson(db: Session, lesson_id: int) -> int:
+    row = (
+        db.query(Module.course_id)
+        .join(Lesson, Lesson.module_id == Module.id)
+        .filter(Lesson.id == lesson_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
+    return row.course_id
+
+
 def _strip_question_answers(q):
     """Hide answer keys from learners. Returns a question dict safe to send to the client."""
     safe_choices = None
@@ -92,6 +115,7 @@ def get_lesson_quizzes(
     current_user: User = Depends(get_current_user),
 ):
     """Learner-safe: answer keys stripped."""
+    _require_course_quiz_access(db, current_user, _course_id_for_lesson(db, lesson_id))
     quizzes = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
         Quiz.lesson_id == lesson_id
     ).order_by(Quiz.order_index).all()
@@ -356,6 +380,7 @@ def get_course_quizzes_with_status(
     current_user: User = Depends(get_current_user),
 ):
     """All quizzes in a course (lesson + final) with the current user's best score and pass status."""
+    _require_course_quiz_access(db, current_user, course_id)
     lesson_quizzes = db.query(Quiz).options(joinedload(Quiz.questions)).join(
         Lesson, Quiz.lesson_id == Lesson.id
     ).join(
@@ -399,6 +424,7 @@ def get_course_final_quiz(
     ).first()
     if not quiz:
         raise HTTPException(status_code=404, detail="ยังไม่มีแบบทดสอบสุดท้าย")
+    _require_course_quiz_access(db, current_user, course_id)
     return _quiz_to_safe_dict(quiz)
 
 

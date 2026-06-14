@@ -330,6 +330,7 @@ def user_learning_summary(
             "username": user.username,
             "full_name": user.full_name,
             "email": user.email,
+            "profile_image": user.profile_image,
             "role": user.role.value,
             "department": user.department,
             "position": user.position,

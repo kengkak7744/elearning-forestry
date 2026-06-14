@@ -17,11 +17,16 @@ export default function FormField({ id, label, error, required, children, hint }
     <div className="space-y-1.5">
       <Label htmlFor={id}>
         {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
+        {required && (
+          <>
+            <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>
+            <span className="sr-only"> จำเป็น</span>
+          </>
+        )}
       </Label>
       {input}
       {error ? (
-        <p id={`${id}-error`} className="text-xs text-destructive">
+        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
           {error}
         </p>
       ) : hint ? (

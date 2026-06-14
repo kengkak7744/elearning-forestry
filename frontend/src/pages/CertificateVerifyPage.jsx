@@ -124,7 +124,6 @@ export default function CertificateVerifyPage() {
   // Auto-run when arriving via direct link / QR scan, but only once.
   useEffect(() => {
     if (paramNumber) runVerify(paramNumber)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramNumber])
 
   const handleSubmit = (e) => {

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Table,
@@ -162,8 +163,12 @@ export default function AdminCertificatesPage() {
       <Card className="mb-4 border-border/60">
         <CardContent className="flex flex-col gap-2 p-3 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Label htmlFor="admin-certificate-search" className="sr-only">
+              ค้นหาใบรับรอง
+            </Label>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="admin-certificate-search"
               value={search}
               onChange={onSearchChange}
               placeholder="ค้นหา: เลขที่ / ชื่อผู้ได้รับ / หลักสูตร / หน่วยงาน"
@@ -182,6 +187,7 @@ export default function AdminCertificatesPage() {
                 variant={statusFilter === t.v ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => onStatusChange(t.v)}
+                aria-pressed={statusFilter === t.v}
               >
                 {t.label} ({t.count})
               </Button>
@@ -247,9 +253,9 @@ export default function AdminCertificatesPage() {
                             href={certificatesApi.downloadUrl(c.id)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label="ดาวน์โหลด PDF"
+                            aria-label={`ดาวน์โหลด PDF ใบรับรอง ${c.certificate_number}`}
                           >
-                            <Download className="h-3.5 w-3.5" />
+                            <Download className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="ml-1 sm:hidden">ดาวน์โหลด</span>
                           </a>
                         </Button>
@@ -259,7 +265,7 @@ export default function AdminCertificatesPage() {
                             size="sm"
                             onClick={() => handleUnrevoke(c)}
                           >
-                            <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                            <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                             ยกเลิกการเพิกถอน
                           </Button>
                         ) : (
@@ -269,7 +275,7 @@ export default function AdminCertificatesPage() {
                             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => openRevoke(c)}
                           >
-                            <ShieldX className="mr-1 h-3.5 w-3.5" />
+                            <ShieldX className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                             เพิกถอน
                           </Button>
                         )}
@@ -311,10 +317,12 @@ export default function AdminCertificatesPage() {
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-foreground">
-                เหตุผลในการเพิกถอน <span className="text-destructive">*</span>
+              <label htmlFor="revoke-reason" className="mb-1 block text-xs font-medium text-foreground">
+                เหตุผลในการเพิกถอน <span className="text-destructive" aria-hidden="true">*</span>
+                <span className="sr-only"> จำเป็น</span>
               </label>
               <Textarea
+                id="revoke-reason"
                 value={revokeReason}
                 onChange={(e) => setRevokeReason(e.target.value.slice(0, 500))}
                 placeholder="ตัวอย่าง: ออกผิดให้ผู้รับ / ตรวจพบทุจริตในการสอบ / ฯลฯ"

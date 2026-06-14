@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BookOpen, ChevronRight, FileText, Search } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
@@ -48,6 +48,8 @@ export default function CoursesPage() {
   // happen via useMemo, otherwise every render produces a new reference and
   // useEffect below loops forever.
   const search = params.get('q') ?? ''
+  const [searchDraft, setSearchDraft] = useState(search)
+  const committedSearchRef = useRef(search)
   const catParam = params.get('cat') ?? ''
   const mandatoryOnly = params.get('m') === '1'
   const selectedCategories = useMemo(
@@ -70,7 +72,22 @@ export default function CoursesPage() {
     [setParams]
   )
 
-  const setSearch = (v) => updateParam('q', v)
+  useEffect(() => {
+    if (search === committedSearchRef.current) return
+    committedSearchRef.current = search
+    setSearchDraft(search)
+  }, [search])
+
+  useEffect(() => {
+    if (searchDraft === search) return undefined
+    const timer = setTimeout(() => {
+      const nextSearch = searchDraft.trim() ? searchDraft : ''
+      committedSearchRef.current = nextSearch
+      updateParam('q', nextSearch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchDraft, search, updateParam])
+
   const setMandatoryOnly = (v) => updateParam('m', v ? '1' : '')
   const toggleCategory = (value) => {
     const next = selectedCategories.includes(value)
@@ -79,6 +96,7 @@ export default function CoursesPage() {
     updateParam('cat', next.join(','))
   }
   const clearFilters = () => {
+    setSearchDraft('')
     setParams({}, { replace: true })
   }
 
@@ -198,12 +216,16 @@ export default function CoursesPage() {
       <div className="sticky top-16 z-20 -mx-4 mb-6 border-y border-border/60 bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border sm:px-4">
         <div className="space-y-3">
           <div className="relative">
+            <Label htmlFor="course-search" className="sr-only">
+              ค้นหาหลักสูตรหรือบทเรียน
+            </Label>
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              id="course-search"
               type="search"
               placeholder="ค้นหาหลักสูตร..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -217,7 +239,7 @@ export default function CoursesPage() {
                   type="button"
                   onClick={() => toggleCategory(c.value)}
                   className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    'min-h-11 rounded-full border px-4 py-2 text-xs font-medium transition-colors',
                     active
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-background text-foreground hover:bg-muted'
@@ -232,18 +254,23 @@ export default function CoursesPage() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                className="min-h-11 rounded-md px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
               >
                 {BUTTONS.CLEAR_FILTERS}
               </button>
             )}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex min-h-11 items-center gap-2">
               <Switch
                 id="mandatory-only"
+                aria-labelledby="mandatory-only-label"
                 checked={mandatoryOnly}
                 onCheckedChange={setMandatoryOnly}
               />
-              <Label htmlFor="mandatory-only" className="cursor-pointer text-sm">
+              <Label
+                id="mandatory-only-label"
+                htmlFor="mandatory-only"
+                className="cursor-pointer text-sm"
+              >
                 เฉพาะหลักสูตรบังคับ
               </Label>
             </div>
@@ -313,8 +340,14 @@ export default function CoursesPage() {
       )}
 
       {/* Results */}
+      <h2 id="course-results-heading" className="sr-only">
+        รายการหลักสูตร
+      </h2>
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          aria-labelledby="course-results-heading"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-64 w-full rounded-xl" />
           ))}
@@ -344,14 +377,18 @@ export default function CoursesPage() {
           <div className="mb-3 text-xs text-muted-foreground">
             พบ {visibleCourses.length} หลักสูตร
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visibleCourses.map((course) => (
+          <div
+            aria-labelledby="course-results-heading"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          >
+            {visibleCourses.map((course, index) => (
               <CourseCard
                 key={course.id}
                 course={course}
                 progress={progressMap[course.id]}
                 bookmarked={bookmarkedIds.has(course.id)}
                 onToggleBookmark={() => toggleBookmark(course.id)}
+                imagePriority={index < 2}
               />
             ))}
           </div>

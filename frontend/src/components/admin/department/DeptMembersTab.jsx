@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import RoleChip from '@/components/admin/department/RoleChip'
+import UserAvatar from '@/components/admin/UserAvatar'
 
 /** Searchable/filterable member table. Filter state lives here — it only
  * affects this tab. Clicking a name opens UserSummarySheet via onPickMember. */
@@ -42,8 +44,12 @@ export default function DeptMembersTab({ members, onPickMember }) {
       <Card className="mb-3 border-border/60">
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Label htmlFor="dept-member-search" className="sr-only">
+              ค้นหาสมาชิกในหน่วยงาน
+            </Label>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
+              id="dept-member-search"
               value={memberFilter}
               onChange={(e) => setMemberFilter(e.target.value)}
               placeholder="ค้นหาชื่อ / อีเมล / ตำแหน่ง"
@@ -63,6 +69,7 @@ export default function DeptMembersTab({ members, onPickMember }) {
                 size="sm"
                 variant={roleFilter === t.v ? 'default' : 'outline'}
                 onClick={() => setRoleFilter(t.v)}
+                aria-pressed={roleFilter === t.v}
               >
                 {t.label}
               </Button>
@@ -71,8 +78,9 @@ export default function DeptMembersTab({ members, onPickMember }) {
               size="sm"
               variant={activeOnly ? 'default' : 'outline'}
               onClick={() => setActiveOnly((v) => !v)}
+              aria-pressed={activeOnly}
             >
-              {activeOnly ? <Check className="mr-1 h-3.5 w-3.5" /> : null}
+              {activeOnly ? <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : null}
               ใช้งานอยู่
             </Button>
           </div>
@@ -89,9 +97,10 @@ export default function DeptMembersTab({ members, onPickMember }) {
               setRoleFilter('all')
               setActiveOnly(false)
             }}
+            aria-label="ล้างตัวกรองสมาชิก"
             className="ml-2 inline-flex items-center gap-0.5 text-primary hover:underline"
           >
-            <X className="h-3 w-3" /> ล้างตัวกรอง
+            <X className="h-3 w-3" aria-hidden="true" /> ล้างตัวกรอง
           </button>
         )}
       </div>
@@ -122,20 +131,24 @@ export default function DeptMembersTab({ members, onPickMember }) {
                       <button
                         type="button"
                         onClick={() => onPickMember(m.id)}
-                        className="group block text-left"
+                        aria-label={`ดูหลักสูตรที่ลงทะเบียนของ ${m.full_name}`}
+                        className="group flex items-center gap-2 text-left"
                         title="ดูหลักสูตรที่ลงทะเบียนของผู้ใช้นี้"
                       >
-                        <div className="text-sm font-medium text-foreground group-hover:text-primary group-hover:underline">
-                          {m.full_name}
-                          {!m.is_active && (
-                            <Badge variant="secondary" className="ml-1.5 font-normal">
-                              ปิด
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          @{m.username}
-                        </div>
+                        <UserAvatar user={m} className="h-8 w-8" />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-foreground group-hover:text-primary group-hover:underline">
+                            {m.full_name}
+                            {!m.is_active && (
+                              <Badge variant="secondary" className="ml-1.5 font-normal">
+                                ปิด
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            @{m.username}
+                          </span>
+                        </span>
                       </button>
                     </TableCell>
                     <TableCell>
@@ -156,7 +169,7 @@ export default function DeptMembersTab({ members, onPickMember }) {
                             href={`mailto:${m.email}`}
                             className="inline-flex items-center gap-1 text-foreground hover:text-primary"
                           >
-                            <Mail className="h-3 w-3" />
+                            <Mail className="h-3 w-3" aria-hidden="true" />
                             {m.email}
                           </a>
                         )}
@@ -165,7 +178,7 @@ export default function DeptMembersTab({ members, onPickMember }) {
                             href={`tel:${m.phone.replace(/\s+/g, '')}`}
                             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
                           >
-                            <Phone className="h-3 w-3" />
+                            <Phone className="h-3 w-3" aria-hidden="true" />
                             {m.phone}
                           </a>
                         )}
