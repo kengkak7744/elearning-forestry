@@ -65,6 +65,7 @@ export default function MidVideoQuizModal({
           <QuizTaker
             quiz={quiz}
             showToast={showToast}
+            allowRetry={false}
             onAttempted={(qid, attempt) => {
               if (attempt.is_passed) setPassed(true)
               else setFailed(true)

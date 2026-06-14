@@ -105,14 +105,11 @@ export default function useLessonPlayback({
 
   const { iframeRef: ytIframeRef, playerRef: ytPlayerRef } = useYouTubePlayer({
     lesson: currentLesson,
-    getResumePosition: () => {
-      const saved = currentLessonRef.current
-        ? progressRef.current[currentLessonRef.current.id]
-        : null
-      return saved?.current_position > 0 && !saved.is_completed
-        ? saved.current_position
-        : 0
-    },
+    // Always start YouTube videos from 0. Resuming to a saved position skipped
+    // past mid-video quizzes — they'd be treated as already seen, so seeking or
+    // re-entering a lesson could miss them. Starting at 0 guarantees every quiz
+    // is reached as the video plays. (Progress is still saved for completion.)
+    getResumePosition: () => 0,
     onQuizCheck: (tFloor) => {
       const due = midQuiz.findDueMidQuiz(tFloor)
       if (due) {

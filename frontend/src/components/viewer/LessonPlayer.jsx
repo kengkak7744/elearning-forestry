@@ -54,6 +54,10 @@ export default function LessonPlayer({
           </video>
         )}
         {lesson.content_type === 'video_youtube' && lesson.content_url && (
+          // React fully owns this iframe (its src loads the video directly, so
+          // it always renders). useYouTubePlayer drives it via postMessage only
+          // — it never calls YT.Player, so there's no DOM ownership conflict
+          // that could leave the player dead after switching lessons.
           <iframe
             ref={ytIframeRef}
             key={lesson.id}

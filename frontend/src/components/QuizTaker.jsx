@@ -39,7 +39,7 @@ function buildShuffleMaps(questions) {
   return out
 }
 
-export default function QuizTaker({ quiz, onAttempted, showToast }) {
+export default function QuizTaker({ quiz, onAttempted, showToast, allowRetry = true }) {
   const [started, setStarted] = useState(false)
   const [answers, setAnswers] = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -148,7 +148,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
           </p>
         )}
 
-        {hasQuestions && !started && !result && (
+        {hasQuestions && !started && !result && (!currentlyPassed || allowRetry) && (
           <Button onClick={start}>
             {currentlyPassed ? (
               <>
@@ -441,10 +441,12 @@ export default function QuizTaker({ quiz, onAttempted, showToast }) {
                     คะแนน: {result.score}%{' '}
                     {result.is_passed ? '· ผ่านเกณฑ์' : '· ไม่ผ่านเกณฑ์'}
                   </Badge>
-                  <Button onClick={reset}>
-                    <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                    {BUTTONS.RETRY_QUIZ}
-                  </Button>
+                  {allowRetry && (
+                    <Button onClick={reset}>
+                      <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                      {BUTTONS.RETRY_QUIZ}
+                    </Button>
+                  )}
                 </>
               )}
             </div>
