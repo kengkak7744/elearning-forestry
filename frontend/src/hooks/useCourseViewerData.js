@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { coursesApi } from '@/api/courses'
 import { progressApi } from '@/api/progress'
 import { quizzesApi } from '@/api/quizzes'
@@ -17,6 +17,7 @@ export default function useCourseViewerData(id) {
   const [progress, setProgress] = useState({})
   const [progressLoaded, setProgressLoaded] = useState(false)
   const [quizzes, setQuizzes] = useState([])
+  const [loadedLessonQuizIds, setLoadedLessonQuizIds] = useState(new Set())
 
   const loadCourse = async () => {
     setLoading(true)
@@ -25,6 +26,16 @@ export default function useCourseViewerData(id) {
     try {
       const data = await coursesApi.getById(id)
       setCourse(data)
+      const embeddedQuizzes = data.modules.flatMap((m) =>
+        m.lessons.flatMap((l) => l.quizzes || [])
+      )
+      if (embeddedQuizzes.length > 0) {
+        setQuizzes(embeddedQuizzes)
+        setLoadedLessonQuizIds(new Set(embeddedQuizzes.map((q) => q.lesson_id).filter(Boolean)))
+      } else {
+        setQuizzes([])
+        setLoadedLessonQuizIds(new Set())
+      }
       try {
         const progressList = await progressApi.getByCourse(id)
         const progressMap = {}
@@ -36,9 +47,18 @@ export default function useCourseViewerData(id) {
       setProgressLoaded(true)
       try {
         const quizList = await quizzesApi.getCourseAll(id)
-        setQuizzes(quizList)
+        setQuizzes((prev) => {
+          const byId = new Map(prev.map((quiz) => [quiz.id, quiz]))
+          quizList.forEach((quiz) => byId.set(quiz.id, quiz))
+          return Array.from(byId.values())
+        })
+        setLoadedLessonQuizIds((prev) => new Set([
+          ...prev,
+          ...quizList.map((q) => q.lesson_id).filter(Boolean),
+        ]))
       } catch {
-        setQuizzes([])
+        // Keep course-embedded lesson quizzes; they are enough for mid-video
+        // triggers even when the course-wide quiz status endpoint fails.
       }
     } catch (err) {
       setLoadError(true)
@@ -56,9 +76,37 @@ export default function useCourseViewerData(id) {
   const refreshQuizzes = async () => {
     try {
       const quizList = await quizzesApi.getCourseAll(id)
-      setQuizzes(quizList)
+      setQuizzes((prev) => {
+        const byId = new Map(prev.map((quiz) => [quiz.id, quiz]))
+        quizList.forEach((quiz) => byId.set(quiz.id, quiz))
+        return Array.from(byId.values())
+      })
+      setLoadedLessonQuizIds((prev) => new Set([
+        ...prev,
+        ...quizList.map((q) => q.lesson_id).filter(Boolean),
+      ]))
     } catch {}
   }
+
+  const loadLessonQuizzes = useCallback(async (lessonId) => {
+    if (!lessonId || loadedLessonQuizIds.has(lessonId)) return
+    try {
+      const lessonQuizList = await quizzesApi.getByLesson(lessonId)
+      setQuizzes((prev) => {
+        if (lessonQuizList.length === 0 && prev.some((q) => q.lesson_id === lessonId)) {
+          return prev
+        }
+        return [
+          ...prev.filter((q) => q.lesson_id !== lessonId),
+          ...lessonQuizList,
+        ]
+      })
+    } catch (err) {
+      toastApiError(err, 'โหลดแบบทดสอบของบทเรียนไม่สำเร็จ')
+    } finally {
+      setLoadedLessonQuizIds((prev) => new Set([...prev, lessonId]))
+    }
+  }, [loadedLessonQuizIds])
 
   const allLessons = useMemo(
     () => (course ? course.modules.flatMap((m) => m.lessons) : []),
@@ -127,6 +175,7 @@ export default function useCourseViewerData(id) {
     progressLoaded,
     quizzes,
     refreshQuizzes,
+    loadLessonQuizzes,
     allLessons,
     lessonQuizzes,
     finalQuiz,

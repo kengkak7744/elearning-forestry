@@ -91,6 +91,17 @@ export default function useLessonPlayback({
     onResume: () => playCurrentVideo(),
     onSeek: (t) => seekCurrentVideo(t),
   })
+  const midQuizRef = useRef(midQuiz)
+  useEffect(() => {
+    midQuizRef.current = midQuiz
+  }, [midQuiz])
+
+  const triggerDueMidQuiz = (currentTime) => {
+    const due = midQuiz.findDueMidQuiz(Math.floor(currentTime || 0))
+    if (!due) return false
+    midQuiz.triggerMidQuiz(due)
+    return true
+  }
 
   const { iframeRef: ytIframeRef, playerRef: ytPlayerRef } = useYouTubePlayer({
     lesson: currentLesson,
@@ -197,11 +208,7 @@ export default function useLessonPlayback({
     const currentTime = Math.floor(videoRef.current.currentTime)
     const duration = videoRef.current.duration
 
-    const due = midQuiz.findDueMidQuiz(currentTime)
-    if (due) {
-      midQuiz.triggerMidQuiz(due)
-      return
-    }
+    if (triggerDueMidQuiz(currentTime)) return
 
     if (currentTime - lastSavedRef.current >= 10) {
       lastSavedRef.current = currentTime
@@ -220,8 +227,25 @@ export default function useLessonPlayback({
     if (saved && saved.current_position > 0 && !saved.is_completed) {
       videoRef.current.currentTime = saved.current_position
     }
+    triggerDueMidQuiz(videoRef.current.currentTime)
     lastSavedRef.current = 0
   }
+
+  const nativePollLessonId = currentLesson?.id
+  const nativePollContentType = currentLesson?.content_type
+  const nativePollContentUrl = currentLesson?.content_url
+  useEffect(() => {
+    if (!nativePollLessonId || nativePollContentType !== 'video_file' || viewingFinal) return
+    const check = () => {
+      const currentTime = videoRef.current?.currentTime
+      if (currentTime == null || Number.isNaN(currentTime)) return
+      const due = midQuizRef.current.findDueMidQuiz(Math.floor(currentTime))
+      if (due) midQuizRef.current.triggerMidQuiz(due)
+    }
+    check()
+    const iv = setInterval(check, 1000)
+    return () => clearInterval(iv)
+  }, [nativePollLessonId, nativePollContentType, nativePollContentUrl, viewingFinal])
 
   // Persist the current position immediately — before a lesson switch and when
   // the tab is backgrounded — so a quick navigate/close doesn't lose up to 10s

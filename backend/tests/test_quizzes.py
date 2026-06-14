@@ -111,6 +111,23 @@ class TestAnswerKeyStripping:
         question = res.json()[0]["questions"][0]
         assert question["correct_text"] is None
         assert all(set(c.keys()) == {"text"} for c in question["choices"])
+        assert res.json()[0]["best_score"] is None
+        assert res.json()[0]["is_passed"] is False
+
+    def test_lesson_endpoint_reports_learner_status(self, learner_client, db, learner_user):
+        course, lesson, quiz = self._lesson_quiz(db)
+        enroll(db, learner_user, course)
+        q = quiz.questions[0]
+        learner_client.post(
+            f"/api/quizzes/{quiz.id}/submit",
+            json={"answers": {str(q.id): 1}, "question_ids": [q.id]},
+        )
+
+        res = learner_client.get(f"/api/quizzes/lesson/{lesson.id}")
+
+        assert res.status_code == 200
+        assert res.json()[0]["best_score"] == 100
+        assert res.json()[0]["is_passed"] is True
 
     def test_learner_lesson_quiz_requires_enrollment(self, learner_client, db):
         _, lesson, _ = self._lesson_quiz(db)
@@ -267,6 +284,27 @@ class TestCourseQuizStatus:
         row = res.json()[0]
         assert row["best_score"] == 100
         assert row["is_passed"] is True
+
+    def test_enrolled_learner_gets_mid_video_quiz_questions(self, learner_client, db, learner_user):
+        course = make_course(db)
+        module = make_module(db, course)
+        lesson = make_lesson(db, module)
+        quiz = make_quiz(
+            db,
+            lesson=lesson,
+            placement=QuizPlacement.MID_VIDEO,
+            trigger_time=20,
+        )
+        make_question(db, quiz)
+        enroll(db, learner_user, course)
+
+        res = learner_client.get(f"/api/quizzes/course/{course.id}/all")
+
+        assert res.status_code == 200
+        mid = next(q for q in res.json() if q["id"] == quiz.id)
+        assert mid["placement"] == "mid_video"
+        assert mid["trigger_time"] == 20
+        assert len(mid["questions"]) == 1
 
 
 class TestQuizStats:

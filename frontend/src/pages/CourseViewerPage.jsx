@@ -55,6 +55,7 @@ export default function CourseViewerPage() {
     progressLoaded,
     quizzes,
     refreshQuizzes,
+    loadLessonQuizzes,
     allLessons,
     lessonQuizzes,
     finalQuiz,
@@ -143,6 +144,11 @@ export default function CourseViewerPage() {
   useEffect(() => {
     setShowComplete(false)
   }, [lessonId])
+
+  useEffect(() => {
+    if (!currentLesson?.id || viewingFinal) return
+    loadLessonQuizzes(currentLesson.id)
+  }, [currentLesson?.id, viewingFinal, loadLessonQuizzes])
 
   const toggleModule = (moduleId) => {
     setExpandedModules((prev) => {
@@ -260,6 +266,9 @@ export default function CourseViewerPage() {
     nextDest?.type === 'final'
       ? finalQuiz?.title || 'แบบทดสอบสุดท้าย'
       : nextDest?.lesson?.title || ''
+  const visibleLessonQuizzes = currentLesson
+    ? (lessonQuizzes[currentLesson.id] || []).filter((quiz) => quiz.placement !== 'mid_video')
+    : []
   const emptyLessonMessage =
     totalLessons === 0 ? 'ยังไม่มีบทเรียนในหลักสูตรนี้' : 'เปิดรายการบทเรียนเพื่อเลือกบทเรียน'
 
@@ -390,9 +399,9 @@ export default function CourseViewerPage() {
                 />
 
                 {/* End-of-lesson quizzes — always visible, never tucked inside a tab */}
-                {(lessonQuizzes[currentLesson.id] || []).length > 0 && (
+                {visibleLessonQuizzes.length > 0 && (
                   <div className="mb-4 space-y-3">
-                    {lessonQuizzes[currentLesson.id].map((quiz) => (
+                    {visibleLessonQuizzes.map((quiz) => (
                       <div
                         key={quiz.id}
                         id={`quiz-${quiz.id}`}

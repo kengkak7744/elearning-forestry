@@ -39,22 +39,36 @@ export default function useMidVideoQuizzes({
   const findDueMidQuiz = (currentTime) => {
     const cl = currentLessonRef.current
     if (!cl) return null
-    const mids = (lessonQuizzesRef.current[cl.id] || []).filter(
-      (q) =>
-        q.placement === 'mid_video' &&
-        q.trigger_time != null &&
-        q.questions.length > 0
-    )
+    const t = Number(currentTime)
+    if (!Number.isFinite(t)) return null
+    const mids = (lessonQuizzesRef.current[cl.id] || [])
+      .filter((q) => {
+        const triggerAt = Number(q.trigger_time)
+        return (
+          q.placement === 'mid_video' &&
+          Number.isFinite(triggerAt) &&
+          (q.questions?.length || 0) > 0
+        )
+      })
+      .sort((a, b) => {
+        const byTime = Number(a.trigger_time) - Number(b.trigger_time)
+        if (byTime !== 0) return byTime
+        return (a.order_index || 0) - (b.order_index || 0)
+      })
     return (
       mids.find(
         (q) =>
-          currentTime >= q.trigger_time && !triggeredQuizIdsRef.current.has(q.id)
+          t >= Number(q.trigger_time) && !triggeredQuizIdsRef.current.has(q.id)
       ) || null
     )
   }
 
   const triggerMidQuiz = (quiz) => {
-    setTriggeredQuizIds((prev) => new Set([...prev, quiz.id]))
+    if (!quiz || triggeredQuizIdsRef.current.has(quiz.id)) return
+    const next = new Set(triggeredQuizIdsRef.current)
+    next.add(quiz.id)
+    triggeredQuizIdsRef.current = next
+    setTriggeredQuizIds(next)
     setActiveMidQuiz(quiz)
     onPause()
   }

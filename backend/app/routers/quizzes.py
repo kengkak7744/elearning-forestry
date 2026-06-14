@@ -119,7 +119,27 @@ def get_lesson_quizzes(
     quizzes = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
         Quiz.lesson_id == lesson_id
     ).order_by(Quiz.order_index).all()
-    return [_quiz_to_safe_dict(q) for q in quizzes]
+    quiz_ids = [q.id for q in quizzes]
+    attempts = []
+    if quiz_ids:
+        attempts = db.query(QuizAttempt).filter(
+            QuizAttempt.user_id == current_user.id,
+            QuizAttempt.quiz_id.in_(quiz_ids),
+        ).all()
+
+    best_by_quiz = {}
+    for attempt in attempts:
+        existing = best_by_quiz.get(attempt.quiz_id)
+        if not existing or attempt.score > existing["score"]:
+            best_by_quiz[attempt.quiz_id] = {
+                "score": attempt.score,
+                "is_passed": attempt.is_passed,
+            }
+
+    return [
+        _quiz_to_safe_dict(q, include_status=True, best=best_by_quiz.get(q.id))
+        for q in quizzes
+    ]
 
 
 @router.get("/admin/course/{course_id}/stats")

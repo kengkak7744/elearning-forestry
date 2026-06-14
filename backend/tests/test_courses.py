@@ -1,5 +1,6 @@
 """Characterization tests for /api/courses (catalog, enrollment, bookmarks)."""
-from tests.factories import enroll, make_course, make_lesson, make_module
+from tests.factories import enroll, make_course, make_lesson, make_module, make_question, make_quiz
+from app.models.quiz import QuizPlacement
 
 
 def course_payload(**overrides):
@@ -104,6 +105,29 @@ class TestVisibility:
         assert body["is_enrolled"] is True
         assert body["is_bookmarked"] is False
         assert len(body["modules"][0]["lessons"]) == 1
+
+    def test_detail_embeds_learner_safe_lesson_quizzes(self, learner_client, db, learner_user):
+        course = make_course(db)
+        module = make_module(db, course)
+        lesson = make_lesson(db, module)
+        quiz = make_quiz(
+            db,
+            lesson=lesson,
+            placement=QuizPlacement.MID_VIDEO,
+            trigger_time=20,
+        )
+        make_question(db, quiz)
+        enroll(db, learner_user, course)
+
+        res = learner_client.get(f"/api/courses/{course.id}")
+
+        assert res.status_code == 200
+        lesson_body = res.json()["modules"][0]["lessons"][0]
+        embedded = lesson_body["quizzes"][0]
+        assert embedded["placement"] == "mid_video"
+        assert embedded["trigger_time"] == 20
+        assert embedded["questions"][0]["correct_text"] is None
+        assert set(embedded["questions"][0]["choices"][0].keys()) == {"text"}
 
     def test_search_filter(self, learner_client, db):
         make_course(db, title="การดับไฟป่าเบื้องต้น")

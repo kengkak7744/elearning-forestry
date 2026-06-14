@@ -44,7 +44,7 @@ export default function MidVideoQuizModal({
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && canDismiss) onSkip?.() }}>
       <DialogContent
-        className="max-h-[92vh] overflow-y-auto sm:max-w-2xl"
+        className="z-[120] max-h-[92vh] overflow-y-auto sm:max-w-2xl"
         showCloseButton={canDismiss}
         onEscapeKeyDown={(e) => { if (!canDismiss) e.preventDefault() }}
         onInteractOutside={(e) => { if (!canDismiss) e.preventDefault() }}
