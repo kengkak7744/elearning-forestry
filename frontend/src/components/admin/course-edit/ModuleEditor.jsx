@@ -1,8 +1,14 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileStack, Plus, Trash2 } from 'lucide-react'
+import { lessonsApi } from '@/api/lessons'
+import { showToast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { Switch } from '@/components/ui/switch'
 import LessonEditor from '@/components/admin/course-edit/LessonEditor'
+import { toastApiError } from '@/utils/apiError'
 
 export default function ModuleEditor({
   module,
@@ -13,14 +19,44 @@ export default function ModuleEditor({
   onUpdateLesson,
   onSaveLesson,
   onDeleteLesson,
+  onLessonsAdded,
 }) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(module.title)
   const [expanded, setExpanded] = useState(true)
+  // Auto-split: when ON, picking a PDF uploads it and the server carves it into
+  // one lesson per top-level bookmark (table of contents).
+  const [autoSplit, setAutoSplit] = useState(false)
+  const [splitting, setSplitting] = useState(false)
+  const [splitProgress, setSplitProgress] = useState(0)
 
   const handleSave = () => {
     onUpdate({ title })
     setEditing(false)
+  }
+
+  const handleSplitUpload = async (e) => {
+    const file = e.target.files?.[0]
+    // Reset so re-picking the same file still fires onChange.
+    e.target.value = ''
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('รองรับเฉพาะไฟล์ PDF', 'error')
+      return
+    }
+    setSplitting(true)
+    setSplitProgress(0)
+    try {
+      const result = await lessonsApi.splitPdf(module.id, file, setSplitProgress)
+      const newLessons = result?.lessons ?? []
+      if (newLessons.length > 0) onLessonsAdded?.(newLessons)
+      showToast(`แยกเป็น ${result?.created_count ?? newLessons.length} บทเรียนสำเร็จ`, 'success')
+    } catch (err) {
+      toastApiError(err, 'แยกบทเรียนไม่สำเร็จ')
+    } finally {
+      setSplitting(false)
+      setSplitProgress(0)
+    }
   }
 
   return (
@@ -73,6 +109,52 @@ export default function ModuleEditor({
 
       {expanded && (
         <div className="divide-y divide-border">
+          {/* Auto-split-by-table-of-contents control */}
+          <div className="bg-muted/20 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label
+                htmlFor={`autosplit-${module.id}`}
+                className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-foreground"
+              >
+                <FileStack className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                แยก PDF เป็นบทเรียนอัตโนมัติตามสารบัญ
+              </Label>
+              <Switch
+                id={`autosplit-${module.id}`}
+                checked={autoSplit}
+                onCheckedChange={setAutoSplit}
+                disabled={splitting}
+              />
+            </div>
+            {autoSplit && (
+              <div className="mt-2 space-y-1.5">
+                <Input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleSplitUpload}
+                  disabled={splitting}
+                  className="text-sm"
+                  aria-label="เลือกไฟล์ PDF เพื่อแยกเป็นบทเรียน"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  อัปโหลด PDF 1 ไฟล์ที่มีสารบัญ (bookmarks) — ระบบจะแยกเป็นหลายบทเรียนให้อัตโนมัติ
+                  ทุกหัวข้อทุกระดับ (รวมหัวข้อย่อย) = 1 บทเรียน ชื่อแสดงลำดับชั้นแบบ &ldquo;บทที่ 1 › 1.1&rdquo;
+                  และต่อท้ายบทเรียนเดิมในโมดูลนี้
+                </p>
+                {splitting && (
+                  <div className="space-y-1">
+                    <Progress value={splitProgress} className="h-1.5" />
+                    <div className="text-[11px] tabular-nums text-muted-foreground">
+                      {splitProgress < 100
+                        ? `กำลังอัปโหลด ${splitProgress}%`
+                        : 'กำลังแยกบทเรียน...'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {module.lessons.length === 0 ? (
             <p className="p-4 text-center text-sm text-muted-foreground">ยังไม่มีบทเรียน</p>
           ) : (

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, Settings, User as UserIcon } from 'lucide-react'
+import { Building2, LogOut, Settings, User as UserIcon } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import {
@@ -70,6 +70,14 @@ export default function LearnerTopBar() {
                 โปรไฟล์
               </Link>
             </DropdownMenuItem>
+            {user?.role === 'manager' && (
+              <DropdownMenuItem asChild>
+                <Link to="/my-department" className="cursor-pointer">
+                  <Building2 className="mr-2 h-4 w-4" />
+                  หน่วยงานของฉัน
+                </Link>
+              </DropdownMenuItem>
+            )}
             {canManageCourses && (
               <DropdownMenuItem asChild>
                 <Link to={manageHref} className="cursor-pointer">

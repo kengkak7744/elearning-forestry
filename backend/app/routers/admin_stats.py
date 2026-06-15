@@ -11,7 +11,7 @@ from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from app.core.helpers import get_or_404
 from app.database import get_db
-from app.dependencies import require_admin
+from app.dependencies import require_admin, require_department_access
 from app.models.user import User
 from app.models.course import Course
 from app.models.enrollment import Enrollment
@@ -275,7 +275,7 @@ def department_members(
     department: str,
     response: Response,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(require_department_access),
 ):
     """All members of a department with the organizational metadata
     available in the User model.
@@ -313,7 +313,7 @@ def department_course_performance(
     department: str,
     response: Response,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(require_department_access),
 ):
     """Per-course performance for one department.
 
@@ -378,7 +378,7 @@ def department_course_members(
     course_id: int,
     response: Response,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(require_department_access),
 ):
     """Department members crossed with one specific course.
 
@@ -400,7 +400,7 @@ def department_course_members(
 def department_members_csv(
     department: str,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(require_department_access),
 ):
     """CSV download of a department's members. UTF-8 + BOM so Excel
     opens the Thai headers without garbling, matching the existing

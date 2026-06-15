@@ -211,10 +211,23 @@ def delete_user(
 def user_learning_summary(
     user_id: int,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    """Admin view of a learner's full activity: enrollments, certificates, quiz stats."""
+    """Full learning activity for one user — enrollments, certificates, quiz stats.
+
+    Admins may view anyone; a manager (หัวหน้างาน) may view only members of their
+    own department, so they can monitor their team without broader access.
+    """
     user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
+    if current_user.role != UserRole.ADMIN and not (
+        current_user.role == UserRole.MANAGER
+        and current_user.department
+        and user.department == current_user.department
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ไม่มีสิทธิ์ดูข้อมูลผู้ใช้นี้",
+        )
 
     enrollments = (
         db.query(Enrollment)

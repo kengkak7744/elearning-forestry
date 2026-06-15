@@ -132,6 +132,26 @@ def require_manager_or_above(current_user: User = Depends(get_current_user)) -> 
     return current_user
 
 
+def require_department_access(
+    department: str,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Scoped access to a department's stats/members.
+
+    Admins may view any department; a manager (หัวหน้างาน) may view ONLY their own.
+    FastAPI injects `department` from the route's {department} path segment, so
+    this works on any endpoint whose path carries that parameter.
+    """
+    if current_user.role == UserRole.ADMIN:
+        return current_user
+    if current_user.role == UserRole.MANAGER and current_user.department == department:
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="ไม่มีสิทธิ์เข้าถึงข้อมูลหน่วยงานนี้",
+    )
+
+
 def require_media_token(
     t: Optional[str] = Query(None, description="Optional JWT for non-cookie clients"),
     authorization: Optional[str] = Header(None),

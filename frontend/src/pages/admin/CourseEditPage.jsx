@@ -240,6 +240,14 @@ export default function CourseEditPage() {
     })
   }
 
+  const handleLessonsAdded = (moduleId, newLessons) => {
+    setModules((prev) =>
+      prev.map((m) =>
+        m.id === moduleId ? { ...m, lessons: [...m.lessons, ...newLessons] } : m
+      )
+    )
+  }
+
   const handleUpdateLesson = (moduleId, lessonId, updates) => {
     setModules(
       modules.map((m) =>
@@ -371,6 +379,9 @@ export default function CourseEditPage() {
                       onUpdate={(updates) => handleUpdateModule(module.id, updates)}
                       onDelete={() => handleDeleteModule(module.id)}
                       onAddLesson={() => handleAddLesson(module.id)}
+                      onLessonsAdded={(newLessons) =>
+                        handleLessonsAdded(module.id, newLessons)
+                      }
                       onUpdateLesson={(lessonId, updates) =>
                         handleUpdateLesson(module.id, lessonId, updates)
                       }

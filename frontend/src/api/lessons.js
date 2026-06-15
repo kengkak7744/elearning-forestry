@@ -39,6 +39,22 @@ export const lessonsApi = {
     })
     return response.data
   },
+  // Upload one PDF and auto-split it into multiple lessons by its table of
+  // contents (bookmarks). Appends the created lessons to the given module.
+  // Returns { created_count, lessons: [...] }.
+  splitPdf: async (moduleId, file, onProgress) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post(`/lessons/module/${moduleId}/split-pdf`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded * 100) / event.total))
+        }
+      },
+    })
+    return response.data
+  },
 
   // === Supplementary resources (downloads / external links) ===
   listResources: async (lessonId) => {

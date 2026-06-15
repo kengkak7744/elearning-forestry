@@ -44,6 +44,7 @@ const AdminCertSettingsPage = lazy(() => import('./pages/admin/AdminCertSettings
 const AdminDepartmentsPage = lazy(() => import('./pages/admin/AdminDepartmentsPage'))
 const AdminDepartmentDetailPage = lazy(() => import('./pages/admin/AdminDepartmentDetailPage'))
 const CertificateVerifyPage = lazy(() => import('./pages/CertificateVerifyPage'))
+const MyDepartmentPage = lazy(() => import('./pages/MyDepartmentPage'))
 
 function PageFallback() {
   // role=status + aria-live=polite announces the wait state to screen readers
@@ -159,6 +160,7 @@ function App() {
               >
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/my-department" element={<MyDepartmentPage />} />
                 <Route path="/courses" element={<CoursesPage />} />
                 <Route path="/courses/:id" element={<CourseDetailPage />} />
               </Route>
