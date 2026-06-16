@@ -89,6 +89,7 @@ export default function QuizTaker({ quiz, onAttempted, showToast, allowRetry = t
         quiz.id,
         answers,
         activeQuestions.map((q) => q.id),
+        quiz.question_set_token,
       )
       setResult(data)
       if (data.is_passed) {

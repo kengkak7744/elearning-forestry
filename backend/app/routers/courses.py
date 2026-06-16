@@ -1,6 +1,5 @@
 import logging
 import os
-import random
 import shutil
 import uuid
 from pathlib import Path
@@ -23,6 +22,7 @@ from app.schemas.course import (
 from app.core.helpers import get_or_404
 from app.dependencies import get_current_user, require_instructor_or_admin
 from app.services.audit import log_action
+from app.services.quiz_delivery import quiz_to_learner_dict
 from fastapi import Request
 
 
@@ -99,51 +99,6 @@ def _clone_quiz_into(source_quiz: Quiz, db: Session, *, new_course_id=None, new_
             order_index=src_q.order_index,
         ))
     return new_quiz
-
-
-def _strip_question_answers(question: Question) -> dict:
-    choices = None
-    if question.choices:
-        choices = [{"text": c.get("text", "")} for c in question.choices]
-    return {
-        "id": question.id,
-        "quiz_id": question.quiz_id,
-        "question_text": question.question_text,
-        "question_type": question.question_type.value if question.question_type else None,
-        "choices": choices,
-        "correct_text": None,
-        "points": question.points,
-        "order_index": question.order_index,
-    }
-
-
-def _serve_quiz_questions(quiz: Quiz) -> list[Question]:
-    ordered = sorted(quiz.questions, key=lambda q: q.order_index)
-    if quiz.randomize_questions and quiz.questions_per_attempt:
-        n = min(quiz.questions_per_attempt, len(ordered))
-        if n > 0:
-            return random.sample(ordered, n)
-    return ordered
-
-
-def _quiz_to_learner_dict(quiz: Quiz, best: Optional[dict] = None) -> dict:
-    return {
-        "id": quiz.id,
-        "lesson_id": quiz.lesson_id,
-        "course_id": quiz.course_id,
-        "title": quiz.title,
-        "placement": quiz.placement.value if quiz.placement else None,
-        "trigger_time": quiz.trigger_time,
-        "can_skip": quiz.can_skip,
-        "show_correct_answer": quiz.show_correct_answer,
-        "passing_score": quiz.passing_score,
-        "order_index": quiz.order_index,
-        "randomize_questions": quiz.randomize_questions,
-        "questions_per_attempt": quiz.questions_per_attempt,
-        "questions": [_strip_question_answers(q) for q in _serve_quiz_questions(quiz)],
-        "best_score": best["score"] if best else None,
-        "is_passed": best["is_passed"] if best else False,
-    }
 
 
 @router.get("", response_model=list[CourseListItem])
@@ -263,7 +218,12 @@ def get_course(
                     }
         for quiz in lesson_quizzes:
             lesson_quizzes_by_lesson.setdefault(quiz.lesson_id, []).append(
-                _quiz_to_learner_dict(quiz, best_by_quiz.get(quiz.id))
+                quiz_to_learner_dict(
+                    quiz,
+                    current_user,
+                    include_status=True,
+                    best=best_by_quiz.get(quiz.id),
+                )
             )
 
     modules_data = []

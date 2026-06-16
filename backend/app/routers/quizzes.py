@@ -1,4 +1,3 @@
-import random
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from typing import List
@@ -16,6 +15,7 @@ from app.schemas.quiz import (
     AnswerSubmit, AttemptResponse,
 )
 from app.services.quiz_grading import grade_attempt
+from app.services.quiz_delivery import quiz_to_learner_dict
 
 router = APIRouter()
 
@@ -49,63 +49,6 @@ def _course_id_for_lesson(db: Session, lesson_id: int) -> int:
     return row.course_id
 
 
-def _strip_question_answers(q):
-    """Hide answer keys from learners. Returns a question dict safe to send to the client."""
-    safe_choices = None
-    if q.choices:
-        safe_choices = [{"text": c.get("text", "")} for c in q.choices]
-    return {
-        "id": q.id,
-        "quiz_id": q.quiz_id,
-        "question_text": q.question_text,
-        "question_type": q.question_type.value if q.question_type else None,
-        "choices": safe_choices,
-        "correct_text": None,
-        "points": q.points,
-        "order_index": q.order_index,
-    }
-
-
-def _serve_questions(quiz):
-    """Return the question subset to show the learner.
-
-    Non-random: full bank, sorted by order_index (stable, authoring order).
-    Random: random.sample of size `questions_per_attempt` (capped at bank size).
-            Each fetch re-rolls — refresh during an attempt is fine because the
-            client locks the set when it submits via `question_ids`.
-    """
-    ordered = sorted(quiz.questions, key=lambda x: x.order_index)
-    if quiz.randomize_questions and quiz.questions_per_attempt:
-        n = min(quiz.questions_per_attempt, len(ordered))
-        if n > 0:
-            return random.sample(ordered, n)
-    return ordered
-
-
-def _quiz_to_safe_dict(q, include_status=False, best=None):
-    """Quiz dict with stripped question answers."""
-    served = _serve_questions(q)
-    base = {
-        "id": q.id,
-        "lesson_id": q.lesson_id,
-        "course_id": q.course_id,
-        "title": q.title,
-        "placement": q.placement.value if q.placement else None,
-        "trigger_time": q.trigger_time,
-        "can_skip": q.can_skip,
-        "show_correct_answer": q.show_correct_answer,
-        "passing_score": q.passing_score,
-        "order_index": q.order_index,
-        "randomize_questions": q.randomize_questions,
-        "questions_per_attempt": q.questions_per_attempt,
-        "questions": [_strip_question_answers(qu) for qu in served],
-    }
-    if include_status:
-        base["best_score"] = best["score"] if best else None
-        base["is_passed"] = best["is_passed"] if best else False
-    return base
-
-
 # === Quiz CRUD ===
 
 @router.get("/lesson/{lesson_id}")
@@ -137,7 +80,12 @@ def get_lesson_quizzes(
             }
 
     return [
-        _quiz_to_safe_dict(q, include_status=True, best=best_by_quiz.get(q.id))
+        quiz_to_learner_dict(
+            q,
+            current_user,
+            include_status=True,
+            best=best_by_quiz.get(q.id),
+        )
         for q in quizzes
     ]
 
@@ -428,7 +376,15 @@ def get_course_quizzes_with_status(
         if not existing or a.score > existing["score"]:
             best_by_quiz[a.quiz_id] = {"score": a.score, "is_passed": a.is_passed}
 
-    return [_quiz_to_safe_dict(q, include_status=True, best=best_by_quiz.get(q.id)) for q in all_quizzes]
+    return [
+        quiz_to_learner_dict(
+            q,
+            current_user,
+            include_status=True,
+            best=best_by_quiz.get(q.id),
+        )
+        for q in all_quizzes
+    ]
 
 
 @router.get("/course/{course_id}/final")
@@ -445,7 +401,7 @@ def get_course_final_quiz(
     if not quiz:
         raise HTTPException(status_code=404, detail="ยังไม่มีแบบทดสอบสุดท้าย")
     _require_course_quiz_access(db, current_user, course_id)
-    return _quiz_to_safe_dict(quiz)
+    return quiz_to_learner_dict(quiz, current_user)
 
 
 @router.get("/admin/course/{course_id}/final", response_model=QuizResponse)

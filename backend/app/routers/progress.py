@@ -9,7 +9,7 @@ from app.models.progress import LessonProgress
 from app.models.lesson import Lesson
 from app.models.course import Module
 from app.schemas.progress import ProgressUpdate
-from app.services.progress import upsert_lesson_progress
+from app.services.progress import current_position_for_lesson, upsert_lesson_progress
 
 router = APIRouter()
 
@@ -22,8 +22,6 @@ def update_progress(
 ):
     lesson_id = payload.lesson_id
     current_position = payload.current_position
-    is_completed = payload.is_completed
-    content_type = payload.content_type or "video"
 
     # Validate lesson exists and find which course it belongs to
     lesson_row = (
@@ -43,10 +41,8 @@ def update_progress(
     progress = upsert_lesson_progress(
         db,
         current_user,
-        lesson_id,
+        lesson,
         current_position=current_position,
-        is_completed=is_completed,
-        content_type=content_type,
     )
 
     # Return normalized shape for frontend
@@ -54,7 +50,7 @@ def update_progress(
         "id": progress.id,
         "user_id": progress.user_id,
         "lesson_id": progress.lesson_id,
-        "current_position": progress.position_seconds,
+        "current_position": current_position_for_lesson(progress, lesson),
         "is_completed": progress.completed,
         "last_accessed_at": progress.last_accessed_at,
     }
@@ -68,7 +64,7 @@ def get_course_progress(
 ):
     from app.models.course import Module
 
-    progress = db.query(LessonProgress).join(Lesson).join(Module).filter(
+    progress_rows = db.query(LessonProgress, Lesson).join(Lesson).join(Module).filter(
         LessonProgress.user_id == current_user.id,
         Module.course_id == course_id,
     ).all()
@@ -78,9 +74,9 @@ def get_course_progress(
             "id": p.id,
             "user_id": p.user_id,
             "lesson_id": p.lesson_id,
-            "current_position": p.position_seconds,
+            "current_position": current_position_for_lesson(p, lesson),
             "is_completed": p.completed,
             "last_accessed_at": p.last_accessed_at,
         }
-        for p in progress
+        for p, lesson in progress_rows
     ]

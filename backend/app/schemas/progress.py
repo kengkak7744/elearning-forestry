@@ -4,9 +4,11 @@ from datetime import datetime
 
 class ProgressUpdate(BaseModel):
     lesson_id: int
-    current_position: int = Field(0, ge=0)  # seconds for video, page for pdf
+    current_position: int = Field(0, ge=0)  # seconds watched/read metric
+    # Deprecated client hints kept for backward compatibility. The server
+    # derives completion and content type from the lesson record.
     is_completed: bool = False
-    content_type: Optional[str] = None  # "pdf" or video (hint)
+    content_type: Optional[str] = None
 
 class ProgressResponse(BaseModel):
     id: int

@@ -240,15 +240,66 @@ class TestSubmitGrading:
         )
         assert res.json()["results"][str(q1.id)]["correct_answer"] is None
 
-    def test_question_ids_subset_scoring(self, learner_client, db, learner_user):
+    def test_question_ids_subset_does_not_change_nonrandom_denominator(self, learner_client, db, learner_user):
         course, quiz, (q1, q2, q3, q4) = self._graded_quiz(db)
         enroll(db, learner_user, course)
-        # Served only q1; answered correctly → 100 despite unanswered bank.
+        # Non-random quizzes are scored against the full question bank.
         res = learner_client.post(
             f"/api/quizzes/{quiz.id}/submit",
             json={"answers": {str(q1.id): 1}, "question_ids": [q1.id]},
         )
-        assert res.json()["score"] == 100
+        assert res.json()["score"] == 33
+
+    def test_random_quiz_requires_signed_question_set_token(self, learner_client, db, learner_user):
+        course = make_course(db)
+        quiz = make_quiz(
+            db,
+            course=course,
+            randomize_questions=True,
+            questions_per_attempt=1,
+        )
+        make_question(db, quiz, order_index=0)
+        make_question(db, quiz, order_index=1)
+        enroll(db, learner_user, course)
+
+        served = learner_client.get(f"/api/quizzes/course/{course.id}/all")
+        assert served.status_code == 200
+        row = served.json()[0]
+        question_id = row["questions"][0]["id"]
+        token = row["question_set_token"]
+        assert token
+
+        ok = learner_client.post(
+            f"/api/quizzes/{quiz.id}/submit",
+            json={
+                "answers": {str(question_id): 1},
+                "question_ids": [question_id],
+                "question_set_token": token,
+            },
+        )
+        assert ok.status_code == 200
+
+        missing = learner_client.post(
+            f"/api/quizzes/{quiz.id}/submit",
+            json={"answers": {str(question_id): 1}, "question_ids": [question_id]},
+        )
+        assert missing.status_code == 400
+
+    def test_malformed_choice_answers_are_wrong_not_500(self, learner_client, db, learner_user):
+        course, quiz, (q1, q2, q3, q4) = self._graded_quiz(db)
+        enroll(db, learner_user, course)
+        res = learner_client.post(
+            f"/api/quizzes/{quiz.id}/submit",
+            json={
+                "answers": {
+                    str(q1.id): "not-an-int",
+                    str(q2.id): ["also-not-int"],
+                    str(q3.id): "wrong",
+                }
+            },
+        )
+        assert res.status_code == 200
+        assert res.json()["score"] == 0
 
     def test_unenrolled_learner_denied(self, learner_client, db):
         course, quiz, _ = self._graded_quiz(db)
@@ -277,7 +328,14 @@ class TestCourseQuizStatus:
         enroll(db, learner_user, course)
         learner_client.post(
             f"/api/quizzes/{quiz.id}/submit",
-            json={"answers": {str(q1.id): 1}, "question_ids": [q1.id]},
+            json={
+                "answers": {
+                    str(q1.id): 1,
+                    str(q2.id): [0, 2],
+                    str(q3.id): q3.correct_text,
+                    str(q4.id): "ok",
+                }
+            },
         )
         res = learner_client.get(f"/api/quizzes/course/{course.id}/all")
         assert res.status_code == 200

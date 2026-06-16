@@ -77,10 +77,10 @@ class QuizResponse(QuizBase):
 
 class AnswerSubmit(BaseModel):
     answers: dict  # {question_id: answer_value}
-    # IDs of the questions the learner was actually served. With randomization
-    # the server doesn't know which subset the client saw, so the client must
-    # tell us. If omitted, fallback = score against the full bank (back-compat).
+    # Deprecated compatibility hint. Randomized subsets are validated with the
+    # signed question_set_token issued by the learner quiz endpoint.
     question_ids: Optional[List[int]] = None
+    question_set_token: Optional[str] = None
 
 
 class AttemptResponse(BaseModel):

@@ -53,10 +53,11 @@ export const quizzesApi = {
     return response.data
   },
 
-  submit: async (quizId, answers, questionIds) => {
+  submit: async (quizId, answers, questionIds, questionSetToken) => {
     const response = await client.post(`/quizzes/${quizId}/submit`, {
       answers,
       question_ids: questionIds,
+      question_set_token: questionSetToken,
     })
     return response.data
   },

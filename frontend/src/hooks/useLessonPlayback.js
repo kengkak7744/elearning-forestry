@@ -82,6 +82,17 @@ export default function useLessonPlayback({
 
   const dismissSaveError = () => setSaveFailed(false)
 
+  // Create a server-side start timestamp for a fresh lesson. Completion is
+  // derived on the backend from elapsed server-observed time, so this keeps
+  // legitimately short lessons completable without trusting a first POST that
+  // claims the lesson is already done.
+  useEffect(() => {
+    if (!currentLesson || viewingFinal || !progressLoaded) return
+    if (progressRef.current[currentLesson.id]) return
+    saveProgress({ lesson_id: currentLesson.id, current_position: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLesson?.id, progressLoaded, viewingFinal])
+
   // === Mid-video quizzes + YouTube player (existing hooks) ===
   const midQuiz = useMidVideoQuizzes({
     currentLesson,

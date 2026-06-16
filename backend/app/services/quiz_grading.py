@@ -1,35 +1,53 @@
-"""Quiz grading — moved out of the submit route so the scoring rules are
-unit-testable and reusable."""
+"""Quiz grading rules."""
 from sqlalchemy.orm import Session
 
-from app.models.quiz import Quiz, QuizAttempt, QuestionType
+from app.models.quiz import QuestionType, Quiz, QuizAttempt
 from app.models.user import User
 from app.schemas.quiz import AnswerSubmit
+from app.services.quiz_delivery import (
+    requires_question_set_token,
+    validate_question_set_token,
+)
+
+
+def _submitted_questions(quiz: Quiz, payload: AnswerSubmit, user: User):
+    if requires_question_set_token(quiz):
+        served_ids = set(validate_question_set_token(payload.question_set_token, quiz, user))
+        return [q for q in quiz.questions if q.id in served_ids]
+    return list(quiz.questions)
+
+
+def _as_int(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_int_set(value) -> set[int]:
+    if value is None:
+        return set()
+    if isinstance(value, (str, bytes)):
+        value = [value]
+    try:
+        return {int(item) for item in value}
+    except (TypeError, ValueError):
+        return set()
 
 
 def grade_attempt(db: Session, quiz: Quiz, payload: AnswerSubmit, user: User):
     """Grade a submission, persist the attempt, and return (attempt, results).
 
     Count-based scoring: every non-opinion question weights equally (1 each).
-    Opinion questions don't count in either direction — they're feedback only.
-    `results` is per-question feedback for the UI; it is not stored.
+    Opinion questions don't count in either direction; they're feedback only.
     """
     graded_count = 0
     correct_count = 0
     results = {}
 
-    # With randomization, the learner saw a subset. Score against the IDs they
-    # were served (passed by the client), not the full bank — otherwise total
-    # points includes unseen questions and the score caps below 100%.
-    if payload.question_ids:
-        served_ids = set(payload.question_ids)
-        questions_to_score = [q for q in quiz.questions if q.id in served_ids]
-    else:
-        # Back-compat: legacy clients don't send question_ids → score full bank.
-        questions_to_score = list(quiz.questions)
+    questions_to_score = _submitted_questions(quiz, payload, user)
 
     for q in questions_to_score:
-        # Opinion: recorded in `answers` for admin review, never counted.
         if q.question_type == QuestionType.OPINION:
             results[q.id] = {"correct": True, "correct_answer": None}
             continue
@@ -43,20 +61,21 @@ def grade_attempt(db: Session, quiz: Quiz, payload: AnswerSubmit, user: User):
         correct_answer = None
 
         if q.question_type == QuestionType.SINGLE_CHOICE:
-            correct_idx = next((i for i, c in enumerate(q.choices or []) if c.get("is_correct")), None)
+            correct_idx = next(
+                (i for i, c in enumerate(q.choices or []) if c.get("is_correct")),
+                None,
+            )
             correct_answer = correct_idx
-            if user_answer is not None and int(user_answer) == correct_idx:
+            if _as_int(user_answer) == correct_idx:
                 is_correct = True
 
         elif q.question_type == QuestionType.MULTIPLE_CHOICE:
             correct_set = {i for i, c in enumerate(q.choices or []) if c.get("is_correct")}
             correct_answer = sorted(list(correct_set))
-            user_set = set(int(x) for x in (user_answer or []))
-            if user_set == correct_set:
+            if _as_int_set(user_answer) == correct_set:
                 is_correct = True
 
         elif q.question_type == QuestionType.WRITTEN:
-            # Auto-grade: exact match (case-insensitive)
             correct_answer = q.correct_text
             if q.correct_text and user_answer:
                 if str(user_answer).strip().lower() == q.correct_text.strip().lower():
@@ -68,15 +87,10 @@ def grade_attempt(db: Session, quiz: Quiz, payload: AnswerSubmit, user: User):
         results[q.id] = {
             "correct": is_correct,
             "correct_answer": correct_answer if quiz.show_correct_answer else None,
-            # Show explanation when the quiz is configured to reveal answers OR
-            # the learner got it wrong (so they always get the "why" on misses,
-            # even on stricter quizzes that hide the correct answer).
             "explanation": q.explanation if (quiz.show_correct_answer or not is_correct) else None,
         }
 
-    # Score = % of graded (non-opinion) questions answered correctly.
     score = int((correct_count / graded_count) * 100) if graded_count > 0 else 0
-    # An all-opinion quiz (e.g. course feedback survey) is "passed" automatically.
     is_passed = score >= quiz.passing_score if graded_count > 0 else True
 
     attempt = QuizAttempt(
