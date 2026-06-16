@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     MAX_IMAGE_SIZE: int = 10 * 1024 * 1024      # 10 MB
     MAX_VIDEO_SIZE: int = 2000 * 1024 * 1024    # 2 GB
     MAX_PDF_SIZE: int = 500 * 1024 * 1024       # 500 MB
+    # Auto-split (PDF → lessons/modules by table of contents) re-parses and
+    # re-writes the whole file, so it's heavier than a plain upload — capped a
+    # bit lower than MAX_PDF_SIZE.
+    MAX_SPLIT_PDF_SIZE: int = 400 * 1024 * 1024  # 400 MB
     SIGNATURE_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB — signatures are small line art
 
     # Public certificate-verify endpoint rate limit (per IP, per window)

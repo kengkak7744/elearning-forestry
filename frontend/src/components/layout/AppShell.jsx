@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -43,6 +43,27 @@ export function ViewerShell() {
 export function AdminShell() {
   const { user } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // The admin layout is a fixed-viewport shell: the sidebar is pinned and the
+  // ONLY thing that ever scrolls is <main> below. The document itself must not
+  // scroll here. Browser features that inject nodes into <html>/<body> from
+  // outside React — page translation, password managers, other extensions —
+  // can push the document past 100vh; because the body would then scroll, the
+  // whole shell (sidebar + header) slides up and exposes a blank strip below
+  // it. Lock document scroll while the admin shell is mounted, and restore the
+  // previous values on the way out (learner pages rely on normal body scroll).
+  useEffect(() => {
+    const html = document.documentElement
+    const { body } = document
+    const prevHtml = html.style.overflow
+    const prevBody = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevHtml
+      body.style.overflow = prevBody
+    }
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

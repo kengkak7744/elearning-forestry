@@ -13,8 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { mediaUrl } from '@/utils/media'
-
-const DOWNLOADABLE_CONTENT_TYPES = new Set(['pdf', 'video_file'])
+import { apiPathPrefix } from '@/api/client'
 
 /**
  * Pick a sensible file extension for the downloaded file. Prefer the actual
@@ -276,60 +275,94 @@ export default function LessonTree({
 }
 
 /**
- * Bottom-of-the-tree consolidated downloads panel. Lists every uploaded PDF
- * and uploaded video in the course as one-click downloads. YouTube lessons
- * are skipped — we don't host the bytes so we can't serve a download.
+ * Bottom-of-the-tree consolidated downloads panel.
+ *
+ * PDFs are offered as ONE merged file: the server concatenates every PDF lesson
+ * in module/lesson order (with a bookmark per lesson) so the learner gets a
+ * single document instead of many separate downloads. The link points straight
+ * at the merge endpoint so the browser sends the auth cookie itself. Uploaded
+ * videos can't be folded into a PDF, so any of those stay listed individually
+ * below. YouTube lessons are skipped — we don't host the bytes.
  *
  * Hidden when `course.allow_downloads === false` (admin override on the
  * course-editor Settings tab) or when no lesson has a downloadable file.
  */
 function CourseDownloads({ course }) {
-  const items = useMemo(() => {
-    if (!Array.isArray(course?.modules)) return []
-    const out = []
-    for (const m of course.modules) {
-      for (const lesson of m.lessons ?? []) {
-        if (
-          DOWNLOADABLE_CONTENT_TYPES.has(lesson.content_type) &&
-          lesson.content_url
-        ) {
-          out.push(lesson)
+  const { pdfLessons, videoLessons } = useMemo(() => {
+    const pdfs = []
+    const videos = []
+    if (Array.isArray(course?.modules)) {
+      for (const m of course.modules) {
+        for (const lesson of m.lessons ?? []) {
+          if (!lesson.content_url) continue
+          if (lesson.content_type === 'pdf') pdfs.push(lesson)
+          else if (lesson.content_type === 'video_file') videos.push(lesson)
         }
       }
     }
-    return out
+    return { pdfLessons: pdfs, videoLessons: videos }
   }, [course])
 
-  if (course?.allow_downloads === false || items.length === 0) return null
+  const total = pdfLessons.length + videoLessons.length
+  if (course?.allow_downloads === false || total === 0) return null
+
+  const mergedHref = `${apiPathPrefix()}/lessons/course/${course.id}/merged-pdf`
+  const mergedName = `${(course.title || 'เอกสารหลักสูตร').replace(/[\\/:*?"<>|]+/g, '').slice(0, 120)}.pdf`
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex items-center gap-2 bg-muted/30 px-3 py-2.5">
         <Download className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="text-sm font-medium text-foreground">เอกสารประกอบทั้งหมด</span>
-        <span className="ml-auto text-[11px] text-muted-foreground">{items.length} ไฟล์</span>
+        <span className="ml-auto text-[11px] text-muted-foreground">{total} ไฟล์</span>
       </div>
-      <ul className="divide-y divide-border">
-        {items.map((lesson) => {
-          const ext = fileExtForContentType(lesson.content_type, lesson.content_url)
-          const Icon = lesson.content_type === 'video_file' ? PlayCircle : FileText
-          return (
-            <li key={lesson.id}>
-              <a
-                href={mediaUrl(lesson.content_url)}
-                download={`${lesson.title || 'lesson'}.${ext}`}
-                className="flex items-center gap-2 px-3 py-2 text-sm transition hover:bg-muted/30"
-              >
-                <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-foreground">
-                  {lesson.title}
-                </span>
-                <Download className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
-              </a>
-            </li>
-          )
-        })}
-      </ul>
+
+      <div className="space-y-3 p-3">
+        {pdfLessons.length > 0 && (
+          <a
+            href={mergedHref}
+            download={mergedName}
+            className="flex items-center gap-2.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/10"
+          >
+            <FileText className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              ดาวน์โหลดเอกสารรวมเป็น PDF เดียว
+              <span className="block text-[11px] font-normal text-muted-foreground">
+                รวม {pdfLessons.length} บทเรียนเป็นไฟล์เดียว
+              </span>
+            </span>
+            <Download className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+          </a>
+        )}
+
+        {videoLessons.length > 0 && (
+          <div>
+            <div className="mb-1.5 px-0.5 text-[11px] font-medium text-muted-foreground">
+              ไฟล์วิดีโอ (ดาวน์โหลดแยก)
+            </div>
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+              {videoLessons.map((lesson) => {
+                const ext = fileExtForContentType(lesson.content_type, lesson.content_url)
+                return (
+                  <li key={lesson.id}>
+                    <a
+                      href={mediaUrl(lesson.content_url)}
+                      download={`${lesson.title || 'lesson'}.${ext}`}
+                      className="flex items-center gap-2 px-3 py-2 text-sm transition hover:bg-muted/30"
+                    >
+                      <PlayCircle className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate text-foreground">
+                        {lesson.title}
+                      </span>
+                      <Download className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

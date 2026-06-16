@@ -55,6 +55,22 @@ export const lessonsApi = {
     })
     return response.data
   },
+  // Upload one PDF and auto-split it into MODULES (top-level TOC headings) +
+  // LESSONS (their sub-headings). Appends the created modules to the course.
+  // Returns { created_modules, created_lessons, modules: [...] }.
+  splitPdfIntoModules: async (courseId, file, onProgress) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.post(`/lessons/course/${courseId}/split-pdf`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded * 100) / event.total))
+        }
+      },
+    })
+    return response.data
+  },
 
   // === Supplementary resources (downloads / external links) ===
   listResources: async (lessonId) => {

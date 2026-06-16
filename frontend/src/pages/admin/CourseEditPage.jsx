@@ -21,6 +21,7 @@ import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import CourseOverviewTab from '@/components/admin/course-edit/CourseOverviewTab'
 import CourseSettingsTab from '@/components/admin/course-edit/CourseSettingsTab'
 import ModuleEditor from '@/components/admin/course-edit/ModuleEditor'
+import CoursePdfSplitPanel from '@/components/admin/course-edit/CoursePdfSplitPanel'
 import PromptInputDialog from '@/components/admin/course-edit/PromptInputDialog'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import { toastApiError } from '@/utils/apiError'
@@ -248,6 +249,13 @@ export default function CourseEditPage() {
     )
   }
 
+  const handleModulesAdded = (newModules) => {
+    setModules((prev) => [
+      ...prev,
+      ...newModules.map((m) => ({ ...m, lessons: m.lessons || [] })),
+    ])
+  }
+
   const handleUpdateLesson = (moduleId, lessonId, updates) => {
     setModules(
       modules.map((m) =>
@@ -365,6 +373,10 @@ export default function CourseEditPage() {
               </Button>
             </CardHeader>
             <CardContent>
+              <CoursePdfSplitPanel
+                courseId={parseInt(id)}
+                onModulesAdded={handleModulesAdded}
+              />
               {modules.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   ยังไม่มีโมดูล กดปุ่ม &ldquo;เพิ่มโมดูล&rdquo; เพื่อเริ่มต้น

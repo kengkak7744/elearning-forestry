@@ -1,8 +1,12 @@
-import io
+import asyncio
 import logging
+import re
+import tempfile
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -34,6 +38,7 @@ PDF_DIR = Path(settings.PDF_DIR)
 # Max file sizes (bytes)
 MAX_VIDEO_SIZE = settings.MAX_VIDEO_SIZE
 MAX_PDF_SIZE = settings.MAX_PDF_SIZE
+MAX_SPLIT_PDF_SIZE = settings.MAX_SPLIT_PDF_SIZE
 
 
 def _require_lesson_access(db: Session, current_user: User, lesson_id: int) -> None:
@@ -257,12 +262,13 @@ def _flatten_outline(reader, items, ancestors) -> list[tuple[list[str], int]]:
     return out
 
 
-def _pdf_sections(reader) -> list[tuple[str, int]]:
+def _pdf_sections_paths(reader) -> list[tuple[list[str], int]]:
     """Read a PDF's outline ("table of contents") at ALL levels and return
-    (title, start_page_index) per section, sorted by page. Sub-headings become
-    their own sections too. Titles are breadcrumbs of ancestors joined by " › "
-    (e.g. "บทที่ 1 › 1.1 บทนำ"). When several bookmarks point at the same page
-    only one section starts there — the deepest (most specific) one wins.
+    (path, start_page_index) per section, sorted by page. `path` is the
+    breadcrumb of ancestor titles (e.g. ["บทที่ 1", "1.1"]) — keeping the list
+    (not a joined string) lets callers group by the top level for module mode.
+    Sub-headings become their own sections; when several bookmarks point at the
+    same page only one section starts there — the deepest (most specific) wins.
     """
     try:
         outline = reader.outline
@@ -280,11 +286,153 @@ def _pdf_sections(reader) -> list[tuple[str, int]]:
         if existing is None or len(path) > len(existing):
             by_page[page] = path
 
-    sections: list[tuple[str, int]] = []
-    for page in sorted(by_page):
-        title = " › ".join(p for p in by_page[page] if p)
-        sections.append((title, page))
-    return sections
+    return [(by_page[page], page) for page in sorted(by_page)]
+
+
+def _breadcrumb(path: list[str]) -> str:
+    """Join a TOC path into a display title, dropping empty ancestor titles."""
+    return " › ".join(p for p in path if p)
+
+
+class _PdfSplitError(Exception):
+    """Raised by the threaded splitter with a user-facing Thai message."""
+
+
+def _split_pdf_file(src_path: Path) -> list[dict]:
+    """Parse the PDF at `src_path`, split it by its table of contents, write one
+    PDF per section into PDF_DIR, and return [{path, content_url, total_pages}]
+    in page order (`path` is the section's TOC breadcrumb list).
+
+    Runs in a worker thread (via asyncio.to_thread) — the pypdf parse/write is
+    synchronous CPU work, and doing it on the event loop blocks gunicorn's
+    heartbeat, so the master kills the worker mid-request → the proxy returns
+    502. Reads from a file handle (not an in-memory buffer) so RAM stays flat
+    for large PDFs. On any failure, removes the partial split files it wrote.
+    """
+    from pypdf import PdfReader, PdfWriter
+
+    written: list[Path] = []
+    try:
+        with src_path.open("rb") as fh:
+            reader = PdfReader(fh)
+            if reader.is_encrypted:
+                # Try an empty owner password (common for "print-protected" PDFs).
+                try:
+                    reader.decrypt("")
+                except Exception:
+                    raise _PdfSplitError("ไฟล์ PDF ถูกเข้ารหัส ไม่สามารถแยกอัตโนมัติได้")
+
+            total_pages = len(reader.pages)
+            if total_pages == 0:
+                raise _PdfSplitError("ไฟล์ PDF ว่างเปล่า")
+
+            sections = _pdf_sections_paths(reader)
+            if not sections:
+                raise _PdfSplitError(
+                    "ไฟล์ PDF นี้ไม่มีสารบัญ (bookmarks) — ปิดสวิตช์แยกอัตโนมัติ แล้วอัปโหลดเป็นบทเรียนเดียวแทน"
+                )
+
+            # Page ranges: section i covers [start_i, start_{i+1}-1]; the last
+            # runs to the final page. Force the first section to start at page 0
+            # so a cover/preface before the first bookmark isn't dropped.
+            starts = [p for (_, p) in sections]
+            starts[0] = 0
+            ranges: list[tuple[list[str], int, int]] = []
+            for i, (path, _) in enumerate(sections):
+                start = starts[i]
+                end = (starts[i + 1] - 1) if i + 1 < len(sections) else (total_pages - 1)
+                if end < start:
+                    continue
+                ranges.append((path, start, end))
+            if not ranges:
+                raise _PdfSplitError("แยกบทเรียนจากสารบัญไม่ได้")
+
+            PDF_DIR.mkdir(parents=True, exist_ok=True)
+            meta: list[dict] = []
+            for path, start, end in ranges:
+                writer = PdfWriter()
+                for page_no in range(start, end + 1):
+                    writer.add_page(reader.pages[page_no])
+                unique_name = f"{uuid.uuid4().hex}.pdf"
+                out_path = PDF_DIR / unique_name
+                with out_path.open("wb") as out:
+                    writer.write(out)
+                written.append(out_path)
+                meta.append({
+                    "path": path,
+                    "content_url": f"/pdfs/{unique_name}",
+                    "total_pages": end - start + 1,
+                })
+            return meta
+    except _PdfSplitError:
+        for p in written:
+            try: p.unlink()
+            except OSError: pass
+        raise
+    except Exception:
+        for p in written:
+            try: p.unlink()
+            except OSError: pass
+        logger.exception("split worker failed for %s", src_path)
+        raise _PdfSplitError("อ่านไฟล์ PDF ไม่ได้ — ไฟล์อาจเสียหาย")
+
+
+async def _receive_and_split_pdf(file: UploadFile) -> list[dict]:
+    """Validate the upload, stream it to a temp file (≤ MAX_SPLIT_PDF_SIZE), then
+    run the threaded splitter. Returns section metadata. Shared by the
+    module-level and course-level split endpoints. Raises HTTPException on any
+    user-facing error.
+    """
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_PDF_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="รองรับเฉพาะไฟล์ PDF",
+        )
+
+    # Stream to a temp file (not memory) so RAM stays flat for large PDFs.
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp_path = Path(tmp.name)
+    total = 0
+    try:
+        try:
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_SPLIT_PDF_SIZE:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไฟล์ใหญ่เกิน {MAX_SPLIT_PDF_SIZE // (1024 * 1024)} MB",
+                    )
+                tmp.write(chunk)
+        finally:
+            tmp.close()
+
+        if total == 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ไฟล์ว่างเปล่า")
+
+        # Heavy parse/split runs off the event loop so gunicorn's heartbeat keeps
+        # firing — otherwise a big PDF blocks it and the worker is killed (→ 502).
+        try:
+            return await asyncio.to_thread(_split_pdf_file, tmp_path)
+        except _PdfSplitError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    finally:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+
+
+def _cleanup_split_files(sections_meta: list[dict]) -> None:
+    """Delete the split PDFs a worker wrote — used to roll back on a DB failure."""
+    for meta in sections_meta:
+        try:
+            (PDF_DIR / Path(meta["content_url"]).name).unlink()
+        except OSError:
+            pass
 
 
 @router.post("/module/{module_id}/split-pdf")
@@ -300,104 +448,22 @@ async def split_pdf_into_lessons(
     เป็น breadcrumb ของลำดับชั้น เช่น "บทที่ 1 › 1.1 บทนำ" โดยตัด PDF เป็นไฟล์ย่อย
     จริงต่อบทเรียน และต่อท้ายบทเรียนเดิมในโมดูล (order_index ต่อเนื่อง).
     """
-    from pypdf import PdfReader, PdfWriter
-
     get_or_404(db, Module, module_id, "ไม่พบโมดูล")
 
-    ext = Path(file.filename or "").suffix.lower()
-    if ext not in ALLOWED_PDF_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="รองรับเฉพาะไฟล์ PDF",
-        )
-
-    # Read the whole file into memory (bounded by MAX_PDF_SIZE) — we need random
-    # page access to split, which a streamed file doesn't give us.
-    data = bytearray()
-    while True:
-        chunk = await file.read(CHUNK_SIZE)
-        if not chunk:
-            break
-        data.extend(chunk)
-        if len(data) > MAX_PDF_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"ไฟล์ใหญ่เกิน {MAX_PDF_SIZE // (1024 * 1024)} MB",
-            )
-
-    try:
-        reader = PdfReader(io.BytesIO(bytes(data)))
-        if reader.is_encrypted:
-            # Try an empty owner password (common for "print-protected" PDFs).
-            try:
-                reader.decrypt("")
-            except Exception:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="ไฟล์ PDF ถูกเข้ารหัส ไม่สามารถแยกอัตโนมัติได้",
-                )
-        total_pages = len(reader.pages)
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="อ่านไฟล์ PDF ไม่ได้ — ไฟล์อาจเสียหาย",
-        )
-
-    if total_pages == 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ไฟล์ PDF ว่างเปล่า")
-
-    sections = _pdf_sections(reader)
-    if not sections:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="ไฟล์ PDF นี้ไม่มีสารบัญ (bookmarks) — ปิดสวิตช์แยกอัตโนมัติ แล้วอัปโหลดเป็นบทเรียนเดียวแทน",
-        )
-
-    # Build page ranges: section i covers [start_i, start_{i+1}-1]; the last runs
-    # to the final page. Force the first section to start at page 0 so a cover /
-    # preface page that precedes the first bookmark isn't dropped.
-    starts = [p for (_, p) in sections]
-    starts[0] = 0
-    ranges: list[tuple[str, int, int]] = []
-    for i, (title, _) in enumerate(sections):
-        start = starts[i]
-        end = (starts[i + 1] - 1) if i + 1 < len(sections) else (total_pages - 1)
-        if end < start:
-            continue  # defensive: skip an empty range
-        ranges.append((title, start, end))
-
-    if not ranges:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="แยกบทเรียนจากสารบัญไม่ได้",
-        )
+    sections_meta = await _receive_and_split_pdf(file)
 
     existing_count = (
         db.query(func.count(Lesson.id)).filter(Lesson.module_id == module_id).scalar() or 0
     )
-
-    PDF_DIR.mkdir(parents=True, exist_ok=True)
     created: list[Lesson] = []
-    written_paths: list[Path] = []
     try:
-        for idx, (title, start, end) in enumerate(ranges):
-            writer = PdfWriter()
-            for page_no in range(start, end + 1):
-                writer.add_page(reader.pages[page_no])
-            unique_name = f"{uuid.uuid4().hex}.pdf"
-            out_path = PDF_DIR / unique_name
-            with out_path.open("wb") as out:
-                writer.write(out)
-            written_paths.append(out_path)
-
+        for idx, meta in enumerate(sections_meta):
             lesson = Lesson(
                 module_id=module_id,
-                title=(title or f"ตอนที่ {idx + 1}")[:200],
+                title=(_breadcrumb(meta["path"]) or f"ตอนที่ {idx + 1}")[:200],
                 content_type=ContentType.PDF,
-                content_url=f"/pdfs/{unique_name}",
-                total_pages=(end - start + 1),
+                content_url=meta["content_url"],
+                total_pages=meta["total_pages"],
                 order_index=existing_count + idx,
             )
             db.add(lesson)
@@ -405,13 +471,8 @@ async def split_pdf_into_lessons(
         db.commit()
     except Exception:
         db.rollback()
-        # Clean up any split files we already wrote so they don't orphan on disk.
-        for p in written_paths:
-            try:
-                p.unlink()
-            except OSError:
-                pass
-        logger.exception("split-pdf failed for module_id=%s", module_id)
+        _cleanup_split_files(sections_meta)
+        logger.exception("split-pdf db write failed for module_id=%s", module_id)
         raise HTTPException(status_code=500, detail="สร้างบทเรียนจากการแยก PDF ไม่สำเร็จ")
 
     for lesson in created:
@@ -421,6 +482,210 @@ async def split_pdf_into_lessons(
         "created_count": len(created),
         "lessons": [LessonResponse.model_validate(lesson) for lesson in created],
     }
+
+
+@router.post("/course/{course_id}/split-pdf")
+async def split_pdf_into_modules(
+    course_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกตามสารบัญเป็น "โมดูล + บทเรียน" อัตโนมัติ.
+
+    หัวข้อระดับบนสุดของสารบัญ = โมดูล, หัวข้อย่อยที่อยู่ภายใต้ = บทเรียนในโมดูลนั้น
+    ตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และต่อท้ายโมดูลเดิมในคอร์ส (order_index ต่อเนื่อง).
+    ถ้าหัวข้อระดับบนสุดมีเนื้อหานำก่อนหัวข้อย่อยแรก เนื้อหานั้นจะกลายเป็นบทเรียนแรกของโมดูล.
+    """
+    from app.models.course import Course
+
+    get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+
+    sections_meta = await _receive_and_split_pdf(file)
+
+    existing_modules = (
+        db.query(func.count(Module.id)).filter(Module.course_id == course_id).scalar() or 0
+    )
+
+    # Group consecutive sections by their top-level TOC title → one module each.
+    # Sections arrive in page order, so a module's sections are contiguous.
+    groups: list[tuple[str, list[dict]]] = []
+    for meta in sections_meta:
+        path = meta["path"]
+        top = path[0] if path else ""
+        if not groups or groups[-1][0] != top:
+            groups.append((top, [meta]))
+        else:
+            groups[-1][1].append(meta)
+
+    created: list[tuple[Module, list[Lesson]]] = []
+    try:
+        for m_idx, (top_title, metas) in enumerate(groups):
+            module = Module(
+                course_id=course_id,
+                title=(top_title or f"โมดูล {existing_modules + m_idx + 1}")[:200],
+                order_index=existing_modules + m_idx,
+            )
+            db.add(module)
+            db.flush()  # need module.id for its lessons
+
+            lessons: list[Lesson] = []
+            for l_idx, meta in enumerate(metas):
+                path = meta["path"]
+                # Lesson title = breadcrumb BELOW the module; the module-intro
+                # section (path == [top]) falls back to the module title.
+                lesson_title = _breadcrumb(path[1:]) or top_title or f"ตอนที่ {l_idx + 1}"
+                lesson = Lesson(
+                    module_id=module.id,
+                    title=lesson_title[:200],
+                    content_type=ContentType.PDF,
+                    content_url=meta["content_url"],
+                    total_pages=meta["total_pages"],
+                    order_index=l_idx,
+                )
+                db.add(lesson)
+                lessons.append(lesson)
+            created.append((module, lessons))
+        db.commit()
+    except Exception:
+        db.rollback()
+        _cleanup_split_files(sections_meta)
+        logger.exception("split-pdf (modules) db write failed for course_id=%s", course_id)
+        raise HTTPException(status_code=500, detail="สร้างโมดูลจากการแยก PDF ไม่สำเร็จ")
+
+    total_lessons = 0
+    modules_out = []
+    for module, lessons in created:
+        db.refresh(module)
+        for lesson in lessons:
+            db.refresh(lesson)
+        total_lessons += len(lessons)
+        modules_out.append({
+            "id": module.id,
+            "course_id": module.course_id,
+            "title": module.title,
+            "description": module.description,
+            "order_index": module.order_index,
+            "lessons": [LessonResponse.model_validate(lesson) for lesson in lessons],
+        })
+
+    return {
+        "created_modules": len(created),
+        "created_lessons": total_lessons,
+        "modules": modules_out,
+    }
+
+
+# =====================================================================
+# Merge all of a course's PDF lessons into ONE downloadable PDF
+# =====================================================================
+
+def _safe_download_name(title: str) -> str:
+    """Sanitise a course title into a filesystem-safe download filename stem."""
+    base = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "", (title or "").strip())
+    return base[:120] or "course"
+
+
+def _merge_course_pdfs(pdf_paths: list[Path], titles: list[str], dest_path: Path) -> int:
+    """Concatenate the given PDF files into `dest_path`, adding one top-level
+    bookmark (the lesson title) per source so the merged file has a clean table
+    of contents. Returns the count actually merged. Best-effort: a corrupt or
+    encrypted source is skipped rather than failing the whole download.
+
+    Runs in a worker thread (via asyncio.to_thread) — pypdf's parse/write is
+    synchronous CPU/IO work, and doing it on the event loop blocks gunicorn's
+    heartbeat → the worker is killed mid-request → 502.
+    """
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    merged = 0
+    try:
+        for path, title in zip(pdf_paths, titles):
+            try:
+                writer.append(
+                    str(path),
+                    outline_item=(title.strip()[:200] or "เอกสาร"),
+                    import_outline=False,
+                )
+                merged += 1
+            except Exception:
+                logger.exception("merge: skipped unreadable pdf %s", path)
+                continue
+        if merged == 0:
+            raise _PdfSplitError("รวมไฟล์ PDF ไม่ได้ — ไฟล์อาจเสียหายหรือถูกเข้ารหัส")
+        with dest_path.open("wb") as out:
+            writer.write(out)
+    finally:
+        writer.close()
+    return merged
+
+
+@router.get("/course/{course_id}/merged-pdf")
+async def download_course_merged_pdf(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """รวมไฟล์ PDF ของทุกบทเรียนในหลักสูตรเป็น PDF ไฟล์เดียวสำหรับดาวน์โหลด.
+
+    เรียงตามลำดับโมดูล → บทเรียน และใส่ bookmark (สารบัญ) ต่อบทเรียนให้อัตโนมัติ
+    แทนการโหลดทีละไฟล์. ใช้ได้เฉพาะหลักสูตรที่เปิดให้ดาวน์โหลด (allow_downloads)
+    และผู้เรียนต้องลงทะเบียนก่อน (แอดมิน/ผู้สอนเข้าถึงได้ทุกหลักสูตร).
+    """
+    from app.models.course import Course
+
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+    if not course.allow_downloads:
+        raise HTTPException(status_code=403, detail="หลักสูตรนี้ไม่อนุญาตให้ดาวน์โหลดเอกสาร")
+    if current_user.role.value not in ("admin", "instructor"):
+        require_enrollment(
+            db, current_user.id, course_id, "ต้องลงทะเบียนหลักสูตรก่อนดาวน์โหลดเอกสาร"
+        )
+
+    modules = (
+        db.query(Module)
+        .filter(Module.course_id == course_id)
+        .order_by(Module.order_index, Module.id)
+        .all()
+    )
+    base = PDF_DIR.resolve()
+    pdf_paths: list[Path] = []
+    titles: list[str] = []
+    for module in modules:
+        for lesson in sorted(module.lessons, key=lambda l: (l.order_index or 0, l.id)):
+            if lesson.content_type != ContentType.PDF or not lesson.content_url:
+                continue
+            path = (PDF_DIR / Path(lesson.content_url).name).resolve()
+            # Guard against traversal / missing files; skip silently.
+            if base not in path.parents or not path.is_file():
+                continue
+            pdf_paths.append(path)
+            titles.append(lesson.title or "เอกสาร")
+
+    if not pdf_paths:
+        raise HTTPException(status_code=404, detail="หลักสูตรนี้ยังไม่มีไฟล์ PDF ให้ดาวน์โหลด")
+
+    # Merge off the event loop into a temp file (flat memory for big courses).
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        await asyncio.to_thread(_merge_course_pdfs, pdf_paths, titles, tmp_path)
+    except _PdfSplitError as exc:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        logger.exception("merge-pdf failed for course_id=%s", course_id)
+        raise HTTPException(status_code=500, detail="รวมไฟล์ PDF ไม่สำเร็จ")
+
+    return FileResponse(
+        tmp_path,
+        media_type="application/pdf",
+        filename=f"{_safe_download_name(course.title)}.pdf",
+        background=BackgroundTask(lambda: tmp_path.unlink(missing_ok=True)),
+    )
 
 
 # =====================================================================
