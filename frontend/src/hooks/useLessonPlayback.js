@@ -4,6 +4,8 @@ import { showToast } from '@/lib/toast'
 import useMidVideoQuizzes from './useMidVideoQuizzes'
 import useYouTubePlayer from './useYouTubePlayer'
 
+const PDF_DEFAULT_MIN_SECONDS = 5
+
 /**
  * Owns everything about playing the current lesson and persisting its progress:
  *  - mid-video quizzes (useMidVideoQuizzes) + the YouTube player (useYouTubePlayer)
@@ -264,7 +266,7 @@ export default function useLessonPlayback({
     const existing = progressRef.current[lesson.id]
 
     if (lesson.content_type === 'pdf') {
-      if (elapsedSecondsRef.current < 5) return
+      if (elapsedSecondsRef.current < PDF_DEFAULT_MIN_SECONDS) return
       saveProgress({
         lesson_id: lesson.id,
         current_position: Math.max(
@@ -333,8 +335,8 @@ export default function useLessonPlayback({
 
   useEffect(() => {
     if (!currentLesson || currentLesson.content_type !== 'pdf' || viewingFinal) return
-    if (elapsedSeconds === 0 || elapsedSeconds % 10 !== 0) return
-    const completeAt = minSeconds > 0 ? minSeconds : 30
+    if (elapsedSeconds === 0 || elapsedSeconds % PDF_DEFAULT_MIN_SECONDS !== 0) return
+    const completeAt = minSeconds > 0 ? minSeconds : PDF_DEFAULT_MIN_SECONDS
     const isCompleted = elapsedSeconds >= completeAt
     saveProgress({
       lesson_id: currentLesson.id,

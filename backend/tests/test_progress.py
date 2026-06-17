@@ -35,7 +35,9 @@ class TestUpdateProgress:
         )
         assert res.status_code == 200
         body = res.json()
-        assert body["current_position"] == 15
+        # First update is capped at FIRST_UPDATE_MAX_SECONDS, so a client can't
+        # jump straight to the claimed position on the very first save.
+        assert body["current_position"] == 10
         assert body["is_completed"] is False
 
     def test_completion_is_sticky(self, learner_client, db, learner_user):
@@ -77,6 +79,34 @@ class TestUpdateProgress:
         )
         assert res.status_code == 200
         assert res.json()["current_position"] == 5
+
+    def test_pdf_completes_after_short_read(self, learner_client, db, learner_user):
+        """A PDF should auto-complete after only a few seconds of reading."""
+        course = make_course(db)
+        module = make_module(db, course)
+        lesson = make_lesson(db, module, content_type=ContentType.PDF, total_pages=3)
+        enroll(db, learner_user, course)
+
+        # Mount: creates the row (first update never completes on its own).
+        first = learner_client.post(
+            "/api/progress/",
+            json={"lesson_id": lesson.id, "current_position": 0},
+        )
+        assert first.json()["is_completed"] is False
+
+        # Simulate ~5s of reading elapsing on the server, then save again.
+        progress = db.query(LessonProgress).filter(
+            LessonProgress.user_id == learner_user.id,
+            LessonProgress.lesson_id == lesson.id,
+        ).one()
+        progress.last_accessed_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        db.commit()
+
+        done = learner_client.post(
+            "/api/progress/",
+            json={"lesson_id": lesson.id, "current_position": 5, "is_completed": True},
+        )
+        assert done.json()["is_completed"] is True
 
     def test_unenrolled_learner_denied(self, learner_client, db):
         _, lesson = self._setup(db)
