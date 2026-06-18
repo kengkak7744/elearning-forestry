@@ -151,7 +151,7 @@ export default function CourseScoresModal({ open, quizzes, courseId, onClose }) 
                   <>
                     <span
                       className={cn(
-                        'text-5xl font-bold tabular-nums',
+                        'text-5xl font-semibold tabular-nums',
                         finalQuiz.is_passed ? 'text-success' : 'text-destructive'
                       )}
                     >

@@ -60,12 +60,13 @@
     <link rel="dns-prefetch" href="https://www.youtube-nocookie.com" />
     <link rel="dns-prefetch" href="https://www.youtube.com" />
     <link rel="dns-prefetch" href="https://i.ytimg.com" />
-    <!-- Weights 400/500/600/700 only — 300 is unused in the UI and would
-         add ~30KB of Thai + Latin glyphs we never render. display=optional
-         avoids late font swaps that can move text on slow connections. -->
+    <!-- Weights 400/500/600 only — 300 and 700 are effectively unused (700 had
+         a single occurrence, now 600), and each Thai weight is ~30KB of glyphs
+         we'd otherwise download for nothing. display=optional avoids late font
+         swaps that can move text on slow connections. -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=optional"
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600&display=optional"
     />
     <!-- Speculation Rules: prerender likely-next pages on hover so navigation
          feels instant. Chromium-only (Safari/Firefox ignore silently — pure

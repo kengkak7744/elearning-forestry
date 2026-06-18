@@ -25,7 +25,8 @@ export default function ModuleEditor({
   const [title, setTitle] = useState(module.title)
   const [expanded, setExpanded] = useState(true)
   // Auto-split: when ON, picking a PDF uploads it and the server carves it into
-  // one lesson per top-level bookmark (table of contents).
+  // one lesson per table-of-contents heading, down to 2 levels (deeper
+  // sub-headings fold into their parent lesson).
   const [autoSplit, setAutoSplit] = useState(false)
   const [splitting, setSplitting] = useState(false)
   const [splitProgress, setSplitProgress] = useState(0)
@@ -138,8 +139,8 @@ export default function ModuleEditor({
                 />
                 <p className="text-[11px] text-muted-foreground">
                   อัปโหลด PDF 1 ไฟล์ที่มีสารบัญ (bookmarks) — ระบบจะแยกเป็นหลายบทเรียนให้อัตโนมัติ
-                  ทุกหัวข้อทุกระดับ (รวมหัวข้อย่อย) = 1 บทเรียน ชื่อแสดงลำดับชั้นแบบ &ldquo;บทที่ 1 › 1.1&rdquo;
-                  และต่อท้ายบทเรียนเดิมในโมดูลนี้
+                  ตามหัวข้อในสารบัญลึก 2 ระดับ (หัวข้อย่อยที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่)
+                  ชื่อแสดงลำดับชั้นแบบ &ldquo;บทที่ 1 › 1.1&rdquo; และต่อท้ายบทเรียนเดิมในโมดูลนี้
                 </p>
                 {splitting && (
                   <div className="space-y-1">

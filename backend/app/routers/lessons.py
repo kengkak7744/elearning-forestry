@@ -220,7 +220,8 @@ async def upload_pdf(
 
 
 # =====================================================================
-# Auto-split a PDF into one lesson per table-of-contents entry
+# Auto-split a PDF into lessons by its table of contents, capped at
+# settings.SPLIT_MAX_DEPTH levels so a deep TOC doesn't over-fragment.
 # =====================================================================
 
 def _flatten_outline(reader, items, ancestors) -> list[tuple[list[str], int]]:
@@ -262,13 +263,19 @@ def _flatten_outline(reader, items, ancestors) -> list[tuple[list[str], int]]:
     return out
 
 
-def _pdf_sections_paths(reader) -> list[tuple[list[str], int]]:
-    """Read a PDF's outline ("table of contents") at ALL levels and return
-    (path, start_page_index) per section, sorted by page. `path` is the
+def _pdf_sections_paths(reader, max_depth: int) -> list[tuple[list[str], int]]:
+    """Read a PDF's outline ("table of contents") down to `max_depth` levels and
+    return (path, start_page_index) per section, sorted by page. `path` is the
     breadcrumb of ancestor titles (e.g. ["บทที่ 1", "1.1"]) — keeping the list
     (not a joined string) lets callers group by the top level for module mode.
-    Sub-headings become their own sections; when several bookmarks point at the
-    same page only one section starts there — the deepest (most specific) wins.
+
+    `max_depth` caps how deep the split goes: a bookmark deeper than max_depth
+    does NOT start its own section — its pages fold into the nearest ancestor at
+    max_depth (e.g. with max_depth=2, "1.1.1" stays inside the "1.1" lesson
+    instead of becoming its own). Without the cap a deeply nested TOC explodes
+    into dozens of tiny lessons. max_depth <= 0 means no cap (every level
+    splits). When several kept bookmarks share a start page only one section
+    starts there — the deepest (most specific) wins.
     """
     try:
         outline = reader.outline
@@ -278,6 +285,16 @@ def _pdf_sections_paths(reader) -> list[tuple[list[str], int]]:
     flat = _flatten_outline(reader, outline, [])
     if not flat:
         return []
+
+    # Cap split depth: drop bookmarks below max_depth so they don't start a new
+    # section — the surviving ancestor's page range simply spans their pages.
+    # Fall back to the uncapped set if the cap would empty everything (e.g. a
+    # malformed TOC where only deep leaves carry page destinations) — better to
+    # over-split than to reject a PDF that genuinely has a table of contents.
+    if max_depth and max_depth > 0:
+        capped = [(path, page) for (path, page) in flat if len(path) <= max_depth]
+        if capped:
+            flat = capped
 
     # One section per distinct start page; keep the deepest bookmark on a page.
     by_page: dict[int, list[str]] = {}
@@ -326,7 +343,7 @@ def _split_pdf_file(src_path: Path) -> list[dict]:
             if total_pages == 0:
                 raise _PdfSplitError("ไฟล์ PDF ว่างเปล่า")
 
-            sections = _pdf_sections_paths(reader)
+            sections = _pdf_sections_paths(reader, settings.SPLIT_MAX_DEPTH)
             if not sections:
                 raise _PdfSplitError(
                     "ไฟล์ PDF นี้ไม่มีสารบัญ (bookmarks) — ปิดสวิตช์แยกอัตโนมัติ แล้วอัปโหลดเป็นบทเรียนเดียวแทน"
@@ -444,9 +461,10 @@ async def split_pdf_into_lessons(
 ):
     """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกออกเป็นหลายบทเรียนอัตโนมัติตามสารบัญ (bookmarks).
 
-    รองรับสารบัญหลายระดับ — ทุกหัวข้อทุกชั้น (รวมหัวข้อย่อย) = 1 บทเรียน ชื่อบทเรียน
-    เป็น breadcrumb ของลำดับชั้น เช่น "บทที่ 1 › 1.1 บทนำ" โดยตัด PDF เป็นไฟล์ย่อย
-    จริงต่อบทเรียน และต่อท้ายบทเรียนเดิมในโมดูล (order_index ต่อเนื่อง).
+    แยกตามหัวข้อในสารบัญลึกถึง settings.SPLIT_MAX_DEPTH ระดับ (ค่าเริ่มต้น 2) — หัวข้อ
+    ที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่แทนการแตกเป็นบทเรียนใหม่ ชื่อบทเรียนเป็น breadcrumb
+    ของลำดับชั้น เช่น "บทที่ 1 › 1.1 บทนำ" โดยตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และ
+    ต่อท้ายบทเรียนเดิมในโมดูล (order_index ต่อเนื่อง).
     """
     get_or_404(db, Module, module_id, "ไม่พบโมดูล")
 
@@ -493,7 +511,8 @@ async def split_pdf_into_modules(
 ):
     """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกตามสารบัญเป็น "โมดูล + บทเรียน" อัตโนมัติ.
 
-    หัวข้อระดับบนสุดของสารบัญ = โมดูล, หัวข้อย่อยที่อยู่ภายใต้ = บทเรียนในโมดูลนั้น
+    หัวข้อระดับบนสุดของสารบัญ = โมดูล, หัวข้อย่อยระดับ 2 = บทเรียนในโมดูลนั้น (จำกัดความลึก
+    ที่ settings.SPLIT_MAX_DEPTH ระดับ — หัวข้อที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่ ไม่แตกเพิ่ม).
     ตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และต่อท้ายโมดูลเดิมในคอร์ส (order_index ต่อเนื่อง).
     ถ้าหัวข้อระดับบนสุดมีเนื้อหานำก่อนหัวข้อย่อยแรก เนื้อหานั้นจะกลายเป็นบทเรียนแรกของโมดูล.
     """

@@ -29,14 +29,17 @@
     --muted: 50 14% 88%;
     --muted-foreground: 152 18% 32%;
 
-    /* Forest-500 #1D9E75 — badges, highlights */
-    --accent: 160 53% 38%;
+    /* Forest green — badges, highlights. Deepened from 38%→30% L so white text
+       and the green-on-light text reach WCAG AA contrast (≥4.5:1); was 3.75:1. */
+    --accent: 160 58% 30%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 60% 35%;
+    /* Deepened from 35%→29% L for WCAG AA: white-on-success badges and small
+       text-success labels now hit ≥4.5:1 (was 4.11:1). */
+    --success: 142 64% 29%;
     --success-foreground: 0 0% 100%;
 
     --warning: 32 95% 32%;

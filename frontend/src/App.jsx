@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import PublicOnlyRoute from './components/PublicOnlyRoute'
 import AdminRoute from './components/AdminRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 import { TOAST_EVENT } from '@/lib/toast'
@@ -140,9 +141,10 @@ function App() {
           <RouteSeo />
           <Suspense fallback={<PageFallback />}>
             <Routes>
-              {/* Public */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              {/* Public — but bounce already-authenticated users to home so a
+                  signed-in user can't re-open the login/register forms. */}
+              <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+              <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
               {/* Public certificate verification — no auth, deliberately
                   outside the LearnerShell so third parties / HR staff at other
                   agencies can scan the QR on a printed cert and land here
