@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # re-writes the whole file, so it's heavier than a plain upload — capped a
     # bit lower than MAX_PDF_SIZE.
     MAX_SPLIT_PDF_SIZE: int = 400 * 1024 * 1024  # 400 MB
+    # Browser uploads for the splitter can be sent in multiple small requests
+    # to avoid reverse-proxy 413 responses on very large manuals.
+    SPLIT_PDF_UPLOAD_CHUNK_SIZE: int = 4 * 1024 * 1024  # 4 MB
     # How many table-of-contents levels the auto-split uses to cut sections.
     # Level 1 = top headings (→ modules in course-split), level 2 = their
     # sub-headings (→ lessons). A bookmark deeper than this does NOT become its
@@ -53,6 +56,13 @@ class Settings(BaseSettings):
     # Without the cap a deeply nested TOC (1.1.1, 1.1.1.1, …) explodes into
     # dozens of tiny lessons. Set 0 to disable the cap (split every level).
     SPLIT_MAX_DEPTH: int = 2
+    # Adaptive depth: if splitting at SPLIT_MAX_DEPTH yields MORE than this many
+    # sections, the splitter retries one level shallower (and so on, down to a
+    # single level) and keeps the deepest result that stays within the limit.
+    # This rescues PDFs whose author bookmarked every sub-bullet (hundreds of
+    # level-2 entries) from exploding into hundreds of tiny lessons, while
+    # leaving normally-structured PDFs at the full depth. Set 0 to disable.
+    SPLIT_MAX_SECTIONS: int = 50
     SIGNATURE_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB — signatures are small line art
 
     # Public certificate-verify endpoint rate limit (per IP, per window)

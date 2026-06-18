@@ -75,7 +75,7 @@ export default function CoursePdfSplitPanel({ courseId, onModulesAdded }) {
           />
           <p className="text-[11px] text-muted-foreground">
             อัปโหลด PDF 1 ไฟล์ที่มีสารบัญหลายระดับ — หัวข้อหลัก = โมดูล, หัวข้อย่อยระดับ 2 = บทเรียน
-            (หัวข้อที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่) ต่อท้ายโมดูลเดิมในคอร์ส (ไฟล์ไม่เกิน 400 MB)
+            (สูงสุด 2 ระดับ และลดความลึกอัตโนมัติถ้าได้เกิน 50 ตอน) ต่อท้ายโมดูลเดิมในคอร์ส (ไฟล์ไม่เกิน 400 MB)
           </p>
           {busy && (
             <div className="space-y-1">

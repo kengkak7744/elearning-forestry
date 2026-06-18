@@ -1,10 +1,13 @@
 import asyncio
+import json
 import logging
 import re
+import shutil
 import tempfile
+import time
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from sqlalchemy import func
@@ -39,6 +42,9 @@ PDF_DIR = Path(settings.PDF_DIR)
 MAX_VIDEO_SIZE = settings.MAX_VIDEO_SIZE
 MAX_PDF_SIZE = settings.MAX_PDF_SIZE
 MAX_SPLIT_PDF_SIZE = settings.MAX_SPLIT_PDF_SIZE
+SPLIT_PDF_UPLOAD_CHUNK_SIZE = settings.SPLIT_PDF_UPLOAD_CHUNK_SIZE
+SPLIT_UPLOAD_DIR = PDF_DIR / "_split_uploads"
+SPLIT_UPLOAD_TTL_SECONDS = 24 * 60 * 60
 
 
 def _require_lesson_access(db: Session, current_user: User, lesson_id: int) -> None:
@@ -60,7 +66,7 @@ ALLOWED_PDF_EXTENSIONS = {".pdf"}
 CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 
-async def _stream_upload_to_disk(file: UploadFile, dest: Path, max_size: int) -> None:
+async def _stream_upload_to_disk(file: UploadFile, dest: Path, max_size: int) -> int:
     """Stream UploadFile chunks to disk; raise 400 if max_size exceeded. Deletes partial file on failure."""
     total = 0
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +83,7 @@ async def _stream_upload_to_disk(file: UploadFile, dest: Path, max_size: int) ->
                         detail=f"ไฟล์ใหญ่เกิน {max_size // (1024*1024)} MB"
                     )
                 out.write(chunk)
+        return total
     except HTTPException:
         if dest.exists():
             try: dest.unlink()
@@ -220,8 +227,10 @@ async def upload_pdf(
 
 
 # =====================================================================
-# Auto-split a PDF into lessons by its table of contents, capped at
-# settings.SPLIT_MAX_DEPTH levels so a deep TOC doesn't over-fragment.
+# Auto-split a PDF into lessons by its table of contents. Capped at
+# settings.SPLIT_MAX_DEPTH levels, and reduced further automatically when a
+# file would produce more than settings.SPLIT_MAX_SECTIONS lessons, so a deep
+# or over-bookmarked TOC doesn't fragment into hundreds of tiny lessons.
 # =====================================================================
 
 def _flatten_outline(reader, items, ancestors) -> list[tuple[list[str], int]]:
@@ -306,6 +315,46 @@ def _pdf_sections_paths(reader, max_depth: int) -> list[tuple[list[str], int]]:
     return [(by_page[page], page) for page in sorted(by_page)]
 
 
+def _adaptive_sections(reader, max_depth: int, max_sections: int):
+    """Choose split sections adaptively. Start at `max_depth` and, if the result
+    has MORE than `max_sections` entries, retry one level shallower, repeating
+    down to a single level. Return the deepest level whose section count stays
+    within the limit; if even one level exceeds it, the one-level result (the
+    fewest sections) is used. `max_sections <= 0` disables the reduction.
+
+    This keeps a normally-structured PDF fine-grained, but stops a PDF whose TOC
+    tags hundreds of sub-headings (e.g. a bullet per page) from becoming hundreds
+    of one-page lessons — instead it falls back to chapter-level lessons.
+    """
+    # Where to start: the configured cap, or the document's own deepest level
+    # when the cap is disabled (max_depth <= 0 means "every level").
+    if max_depth and max_depth > 0:
+        start = max_depth
+    else:
+        try:
+            flat = _flatten_outline(reader, reader.outline, [])
+        except Exception:
+            flat = []
+        start = max((len(path) for path, _ in flat), default=1)
+
+    chosen_depth, chosen = None, []
+    for depth in range(start, 0, -1):
+        secs = _pdf_sections_paths(reader, depth)
+        if not secs:
+            continue
+        chosen_depth, chosen = depth, secs
+        if max_sections <= 0 or len(secs) <= max_sections:
+            break
+
+    if chosen_depth is not None and chosen_depth != start:
+        logger.info(
+            "PDF split: reduced TOC depth to %d level(s) -> %d sections "
+            "(limit %d, started at depth %d)",
+            chosen_depth, len(chosen), max_sections, start,
+        )
+    return chosen
+
+
 def _breadcrumb(path: list[str]) -> str:
     """Join a TOC path into a display title, dropping empty ancestor titles."""
     return " › ".join(p for p in path if p)
@@ -343,7 +392,9 @@ def _split_pdf_file(src_path: Path) -> list[dict]:
             if total_pages == 0:
                 raise _PdfSplitError("ไฟล์ PDF ว่างเปล่า")
 
-            sections = _pdf_sections_paths(reader, settings.SPLIT_MAX_DEPTH)
+            sections = _adaptive_sections(
+                reader, settings.SPLIT_MAX_DEPTH, settings.SPLIT_MAX_SECTIONS
+            )
             if not sections:
                 raise _PdfSplitError(
                     "ไฟล์ PDF นี้ไม่มีสารบัญ (bookmarks) — ปิดสวิตช์แยกอัตโนมัติ แล้วอัปโหลดเป็นบทเรียนเดียวแทน"
@@ -443,6 +494,136 @@ async def _receive_and_split_pdf(file: UploadFile) -> list[dict]:
             pass
 
 
+def _split_upload_dir(upload_id: str) -> Path:
+    """Return a safe per-upload directory for a client-supplied UUID."""
+    try:
+        safe_id = uuid.UUID(upload_id).hex
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="รหัสอัปโหลดไม่ถูกต้อง")
+    return SPLIT_UPLOAD_DIR / safe_id
+
+
+def _read_split_upload_meta(upload_dir: Path) -> dict:
+    meta_path = upload_dir / "metadata.json"
+    if not meta_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ไม่พบไฟล์อัปโหลด")
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ข้อมูลอัปโหลดเสียหาย")
+
+
+def _write_split_upload_meta(upload_dir: Path, meta: dict) -> None:
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    (upload_dir / "chunks").mkdir(exist_ok=True)
+    (upload_dir / "metadata.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
+def _cleanup_stale_split_uploads() -> None:
+    """Best-effort cleanup for abandoned chunked uploads."""
+    if not SPLIT_UPLOAD_DIR.exists():
+        return
+    cutoff = time.time() - SPLIT_UPLOAD_TTL_SECONDS
+    for child in SPLIT_UPLOAD_DIR.iterdir():
+        try:
+            if child.is_dir() and child.stat().st_mtime < cutoff:
+                shutil.rmtree(child, ignore_errors=True)
+        except OSError:
+            continue
+
+
+def _validate_split_upload_meta(
+    *, filename: str, total_size: int, total_chunks: int, chunk_index: int
+) -> dict:
+    ext = Path(filename or "").suffix.lower()
+    if ext not in ALLOWED_PDF_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="รองรับเฉพาะไฟล์ PDF",
+        )
+    if total_size <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ไฟล์ว่างเปล่า")
+    if total_size > MAX_SPLIT_PDF_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"ไฟล์ใหญ่เกิน {MAX_SPLIT_PDF_SIZE // (1024 * 1024)} MB",
+        )
+    if total_chunks <= 0 or total_chunks > ((MAX_SPLIT_PDF_SIZE // SPLIT_PDF_UPLOAD_CHUNK_SIZE) + 2):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="จำนวนชิ้นไฟล์ไม่ถูกต้อง")
+    if chunk_index < 0 or chunk_index >= total_chunks:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ลำดับชิ้นไฟล์ไม่ถูกต้อง")
+    return {
+        "filename": Path(filename).name,
+        "total_size": total_size,
+        "total_chunks": total_chunks,
+    }
+
+
+def _received_split_chunks(upload_dir: Path) -> int:
+    chunks_dir = upload_dir / "chunks"
+    if not chunks_dir.is_dir():
+        return 0
+    return sum(1 for p in chunks_dir.iterdir() if p.is_file() and p.suffix == ".part")
+
+
+def _assemble_split_upload(upload_id: str) -> Path:
+    """Concatenate stored chunks into a temp PDF and return its path."""
+    upload_dir = _split_upload_dir(upload_id)
+    meta = _read_split_upload_meta(upload_dir)
+    total_chunks = int(meta["total_chunks"])
+    total_size = int(meta["total_size"])
+    chunks_dir = upload_dir / "chunks"
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+
+    total = 0
+    try:
+        with tmp_path.open("wb") as out:
+            for idx in range(total_chunks):
+                part = chunks_dir / f"{idx:08d}.part"
+                if not part.is_file():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="อัปโหลดไฟล์ยังไม่ครบทุกส่วน",
+                    )
+                part_size = part.stat().st_size
+                total += part_size
+                if total > MAX_SPLIT_PDF_SIZE:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไฟล์ใหญ่เกิน {MAX_SPLIT_PDF_SIZE // (1024 * 1024)} MB",
+                    )
+                with part.open("rb") as fh:
+                    shutil.copyfileobj(fh, out)
+        if total != total_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ขนาดไฟล์ที่อัปโหลดไม่ตรงกัน กรุณาอัปโหลดใหม่",
+            )
+        return tmp_path
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+async def _finalize_chunked_split_pdf(upload_id: str) -> list[dict]:
+    """Assemble a chunked upload, split it, and remove upload temp files."""
+    upload_dir = _split_upload_dir(upload_id)
+    tmp_path: Path | None = None
+    try:
+        tmp_path = await asyncio.to_thread(_assemble_split_upload, upload_id)
+        try:
+            return await asyncio.to_thread(_split_pdf_file, tmp_path)
+        except _PdfSplitError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    finally:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        await asyncio.to_thread(shutil.rmtree, upload_dir, ignore_errors=True)
+
+
 def _cleanup_split_files(sections_meta: list[dict]) -> None:
     """Delete the split PDFs a worker wrote — used to roll back on a DB failure."""
     for meta in sections_meta:
@@ -452,24 +633,9 @@ def _cleanup_split_files(sections_meta: list[dict]) -> None:
             pass
 
 
-@router.post("/module/{module_id}/split-pdf")
-async def split_pdf_into_lessons(
-    module_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _user: User = Depends(require_instructor_or_admin),
-):
-    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกออกเป็นหลายบทเรียนอัตโนมัติตามสารบัญ (bookmarks).
-
-    แยกตามหัวข้อในสารบัญลึกถึง settings.SPLIT_MAX_DEPTH ระดับ (ค่าเริ่มต้น 2) — หัวข้อ
-    ที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่แทนการแตกเป็นบทเรียนใหม่ ชื่อบทเรียนเป็น breadcrumb
-    ของลำดับชั้น เช่น "บทที่ 1 › 1.1 บทนำ" โดยตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และ
-    ต่อท้ายบทเรียนเดิมในโมดูล (order_index ต่อเนื่อง).
-    """
-    get_or_404(db, Module, module_id, "ไม่พบโมดูล")
-
-    sections_meta = await _receive_and_split_pdf(file)
-
+def _create_lessons_from_split_sections(
+    db: Session, module_id: int, sections_meta: list[dict]
+) -> dict:
     existing_count = (
         db.query(func.count(Lesson.id)).filter(Lesson.module_id == module_id).scalar() or 0
     )
@@ -502,31 +668,14 @@ async def split_pdf_into_lessons(
     }
 
 
-@router.post("/course/{course_id}/split-pdf")
-async def split_pdf_into_modules(
-    course_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _user: User = Depends(require_instructor_or_admin),
-):
-    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกตามสารบัญเป็น "โมดูล + บทเรียน" อัตโนมัติ.
-
-    หัวข้อระดับบนสุดของสารบัญ = โมดูล, หัวข้อย่อยระดับ 2 = บทเรียนในโมดูลนั้น (จำกัดความลึก
-    ที่ settings.SPLIT_MAX_DEPTH ระดับ — หัวข้อที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่ ไม่แตกเพิ่ม).
-    ตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และต่อท้ายโมดูลเดิมในคอร์ส (order_index ต่อเนื่อง).
-    ถ้าหัวข้อระดับบนสุดมีเนื้อหานำก่อนหัวข้อย่อยแรก เนื้อหานั้นจะกลายเป็นบทเรียนแรกของโมดูล.
-    """
-    from app.models.course import Course
-
-    get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
-
-    sections_meta = await _receive_and_split_pdf(file)
-
+def _create_modules_from_split_sections(
+    db: Session, course_id: int, sections_meta: list[dict]
+) -> dict:
     existing_modules = (
         db.query(func.count(Module.id)).filter(Module.course_id == course_id).scalar() or 0
     )
 
-    # Group consecutive sections by their top-level TOC title → one module each.
+    # Group consecutive sections by their top-level TOC title -> one module each.
     # Sections arrive in page order, so a module's sections are contiguous.
     groups: list[tuple[str, list[dict]]] = []
     for meta in sections_meta:
@@ -593,6 +742,127 @@ async def split_pdf_into_modules(
         "created_lessons": total_lessons,
         "modules": modules_out,
     }
+
+
+@router.post("/split-pdf/uploads/{upload_id}/chunks")
+async def upload_split_pdf_chunk(
+    upload_id: str,
+    chunk_index: int = Form(...),
+    total_chunks: int = Form(...),
+    total_size: int = Form(...),
+    filename: str = Form(...),
+    file: UploadFile = File(...),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    """Receive one small chunk for a large PDF split upload."""
+    upload_dir = _split_upload_dir(upload_id)
+    expected_meta = _validate_split_upload_meta(
+        filename=filename,
+        total_size=total_size,
+        total_chunks=total_chunks,
+        chunk_index=chunk_index,
+    )
+    await asyncio.to_thread(_cleanup_stale_split_uploads)
+
+    meta_path = upload_dir / "metadata.json"
+    if meta_path.exists():
+        existing_meta = _read_split_upload_meta(upload_dir)
+        if existing_meta != expected_meta:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ข้อมูลชิ้นไฟล์ไม่ตรงกับการอัปโหลดเดิม",
+            )
+    else:
+        _write_split_upload_meta(upload_dir, expected_meta)
+
+    chunk_path = upload_dir / "chunks" / f"{chunk_index:08d}.part"
+    written = await _stream_upload_to_disk(file, chunk_path, SPLIT_PDF_UPLOAD_CHUNK_SIZE)
+    if written == 0:
+        chunk_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ชิ้นไฟล์ว่างเปล่า")
+
+    received_size = sum(p.stat().st_size for p in (upload_dir / "chunks").glob("*.part"))
+    if received_size > total_size:
+        chunk_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ขนาดไฟล์เกินข้อมูลที่แจ้ง")
+
+    return {
+        "upload_id": uuid.UUID(upload_id).hex,
+        "received_chunks": _received_split_chunks(upload_dir),
+        "total_chunks": total_chunks,
+    }
+
+
+@router.post("/module/{module_id}/split-pdf")
+async def split_pdf_into_lessons(
+    module_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกออกเป็นหลายบทเรียนอัตโนมัติตามสารบัญ (bookmarks).
+
+    แยกตามหัวข้อในสารบัญลึกถึง settings.SPLIT_MAX_DEPTH ระดับ (ค่าเริ่มต้น 2) — หัวข้อ
+    ที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่แทนการแตกเป็นบทเรียนใหม่ และถ้าได้บทเรียนเกิน
+    settings.SPLIT_MAX_SECTIONS (ค่าเริ่มต้น 50) ระบบจะลดความลึกลงอัตโนมัติ ชื่อบทเรียน
+    เป็น breadcrumb ของลำดับชั้น เช่น "บทที่ 1 › 1.1 บทนำ" โดยตัด PDF เป็นไฟล์ย่อยจริง
+    ต่อบทเรียน และต่อท้ายบทเรียนเดิมในโมดูล (order_index ต่อเนื่อง).
+    """
+    get_or_404(db, Module, module_id, "ไม่พบโมดูล")
+
+    sections_meta = await _receive_and_split_pdf(file)
+    return _create_lessons_from_split_sections(db, module_id, sections_meta)
+
+
+@router.post("/module/{module_id}/split-pdf/uploads/{upload_id}/complete")
+async def complete_chunked_split_pdf_into_lessons(
+    module_id: int,
+    upload_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    """Finish a chunked PDF upload and split it into lessons."""
+    get_or_404(db, Module, module_id, "ไม่พบโมดูล")
+    sections_meta = await _finalize_chunked_split_pdf(upload_id)
+    return _create_lessons_from_split_sections(db, module_id, sections_meta)
+
+
+@router.post("/course/{course_id}/split-pdf")
+async def split_pdf_into_modules(
+    course_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกตามสารบัญเป็น "โมดูล + บทเรียน" อัตโนมัติ.
+
+    หัวข้อระดับบนสุดของสารบัญ = โมดูล, หัวข้อย่อยระดับ 2 = บทเรียนในโมดูลนั้น (จำกัดความลึก
+    ที่ settings.SPLIT_MAX_DEPTH ระดับ — หัวข้อที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่ ไม่แตกเพิ่ม
+    และถ้าได้บทเรียนเกิน settings.SPLIT_MAX_SECTIONS ระบบจะลดความลึกลงอัตโนมัติ).
+    ตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และต่อท้ายโมดูลเดิมในคอร์ส (order_index ต่อเนื่อง).
+    ถ้าหัวข้อระดับบนสุดมีเนื้อหานำก่อนหัวข้อย่อยแรก เนื้อหานั้นจะกลายเป็นบทเรียนแรกของโมดูล.
+    """
+    from app.models.course import Course
+
+    get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+
+    sections_meta = await _receive_and_split_pdf(file)
+    return _create_modules_from_split_sections(db, course_id, sections_meta)
+
+
+@router.post("/course/{course_id}/split-pdf/uploads/{upload_id}/complete")
+async def complete_chunked_split_pdf_into_modules(
+    course_id: int,
+    upload_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_instructor_or_admin),
+):
+    """Finish a chunked PDF upload and split it into modules + lessons."""
+    from app.models.course import Course
+
+    get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+    sections_meta = await _finalize_chunked_split_pdf(upload_id)
+    return _create_modules_from_split_sections(db, course_id, sections_meta)
 
 
 # =====================================================================

@@ -1,8 +1,10 @@
 import io
+import uuid
 
 from pypdf import PdfReader, PdfWriter
 
-from app.routers.lessons import _pdf_sections_paths
+from app.routers import lessons as lessons_router
+from app.routers.lessons import _adaptive_sections, _pdf_sections_paths
 from tests.factories import make_course, make_lesson, make_module
 
 
@@ -62,6 +64,104 @@ class TestPdfSplitDepth:
         reader = _nested_outline_reader()
         sections = _pdf_sections_paths(reader, max_depth=0)
         assert len(sections) == 6
+
+
+class TestAdaptiveSplitDepth:
+    def test_reduces_depth_when_over_limit(self):
+        """depth-2 yields 5 sections; a cap of 3 forces a drop to depth-1 (the
+        two top-level chapters), mirroring the 182 MB manual that explodes into
+        101 level-2 lessons and is pulled back to 20 chapter lessons."""
+        reader = _nested_outline_reader()
+        secs = _adaptive_sections(reader, max_depth=2, max_sections=3)
+        assert [path for path, _ in secs] == [["บทที่ 1"], ["บทที่ 2"]]
+
+    def test_keeps_depth_when_within_limit(self):
+        reader = _nested_outline_reader()
+        secs = _adaptive_sections(reader, max_depth=2, max_sections=50)
+        assert len(secs) == 5
+
+    def test_zero_limit_disables_reduction(self):
+        reader = _nested_outline_reader()
+        secs = _adaptive_sections(reader, max_depth=2, max_sections=0)
+        assert len(secs) == 5
+
+
+class TestChunkedPdfSplitUpload:
+    def test_module_split_completes_from_uploaded_chunks(self, admin_client, db, monkeypatch):
+        course = make_course(db)
+        module = make_module(db, course)
+        upload_id = str(uuid.uuid4())
+        payload = b"%PDF-1.4 chunked upload"
+
+        def fake_split(path):
+            assert path.read_bytes() == payload
+            return [{"path": ["บทที่ 1"], "content_url": "/pdfs/chunked.pdf", "total_pages": 2}]
+
+        monkeypatch.setattr(lessons_router, "_split_pdf_file", fake_split)
+
+        chunks = [payload[:10], payload[10:]]
+        for idx, chunk in enumerate(chunks):
+            res = admin_client.post(
+                f"/api/lessons/split-pdf/uploads/{upload_id}/chunks",
+                data={
+                    "chunk_index": str(idx),
+                    "total_chunks": str(len(chunks)),
+                    "total_size": str(len(payload)),
+                    "filename": "manual.pdf",
+                },
+                files={"file": ("chunk.bin", chunk, "application/octet-stream")},
+            )
+            assert res.status_code == 200
+            assert res.json()["received_chunks"] == idx + 1
+
+        res = admin_client.post(
+            f"/api/lessons/module/{module.id}/split-pdf/uploads/{upload_id}/complete"
+        )
+
+        assert res.status_code == 200
+        body = res.json()
+        assert body["created_count"] == 1
+        assert body["lessons"][0]["title"] == "บทที่ 1"
+        assert body["lessons"][0]["content_url"] == "/pdfs/chunked.pdf"
+        assert not lessons_router._split_upload_dir(upload_id).exists()
+
+    def test_course_split_completes_from_uploaded_chunks(self, admin_client, db, monkeypatch):
+        course = make_course(db)
+        upload_id = str(uuid.uuid4())
+        payload = b"%PDF-1.4 course chunks"
+
+        def fake_split(path):
+            assert path.read_bytes() == payload
+            return [
+                {"path": ["บทที่ 1"], "content_url": "/pdfs/chapter-1.pdf", "total_pages": 1},
+                {"path": ["บทที่ 1", "1.1"], "content_url": "/pdfs/chapter-1-1.pdf", "total_pages": 3},
+                {"path": ["บทที่ 2"], "content_url": "/pdfs/chapter-2.pdf", "total_pages": 2},
+            ]
+
+        monkeypatch.setattr(lessons_router, "_split_pdf_file", fake_split)
+
+        for idx, chunk in enumerate([payload[:8], payload[8:16], payload[16:]]):
+            res = admin_client.post(
+                f"/api/lessons/split-pdf/uploads/{upload_id}/chunks",
+                data={
+                    "chunk_index": str(idx),
+                    "total_chunks": "3",
+                    "total_size": str(len(payload)),
+                    "filename": "manual.pdf",
+                },
+                files={"file": ("chunk.bin", chunk, "application/octet-stream")},
+            )
+            assert res.status_code == 200
+
+        res = admin_client.post(
+            f"/api/lessons/course/{course.id}/split-pdf/uploads/{upload_id}/complete"
+        )
+
+        assert res.status_code == 200
+        body = res.json()
+        assert body["created_modules"] == 2
+        assert body["created_lessons"] == 3
+        assert [m["title"] for m in body["modules"]] == ["บทที่ 1", "บทที่ 2"]
 
 
 class TestLessonAccessibilityFields:
