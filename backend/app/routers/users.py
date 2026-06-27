@@ -32,7 +32,7 @@ def create_user(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """สร้างผู้ใช้ใหม่ (admin only)"""
+    """Create a new user (admin only)."""
     ensure_unique_user_fields(db, username=user_data.username, email=user_data.email)
 
     new_user = User(
@@ -555,7 +555,7 @@ def reset_user_password(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """รีเซ็ตรหัสผ่านของผู้ใช้ (admin only)"""
+    """Reset a user's password (admin only)."""
     if user_id == admin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

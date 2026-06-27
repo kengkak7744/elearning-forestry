@@ -513,7 +513,7 @@ async def upload_cover_image(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    """อัปโหลดรูปภาพปกหลักสูตร"""
+    """Upload a course cover image."""
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     ext = Path(file.filename).suffix.lower()
@@ -656,7 +656,7 @@ def enroll_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """ลงทะเบียนเรียนหลักสูตร"""
+    """Enroll the current user in a course."""
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
     
     if not course.is_published and current_user.role.value in ("learner", "manager"):
@@ -692,7 +692,7 @@ def unenroll_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """ยกเลิกการลงทะเบียนเรียน"""
+    """Cancel the current user's course enrollment."""
     enrollment = db.query(Enrollment).filter(
         Enrollment.user_id == current_user.id,
         Enrollment.course_id == course_id

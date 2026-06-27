@@ -1,7 +1,7 @@
 import apiClient from './client'
 
 export const usersApi = {
-  /** รายการผู้ใช้ทั้งหมด (admin) */
+  /** List all users (admin). */
   list: async ({ skip = 0, limit = 50, search, role } = {}) => {
     const params = { skip, limit }
     if (search) params.search = search
@@ -11,37 +11,37 @@ export const usersApi = {
     return response.data
   },
 
-  /** ข้อมูลผู้ใช้ตาม id */
+  /** Get a user by id (admin). */
   getById: async (userId) => {
     const response = await apiClient.get(`/users/${userId}`)
     return response.data
   },
 
-  /** สร้างผู้ใช้ใหม่ (admin) */
+  /** Create a new user (admin). */
   create: async (userData) => {
     const response = await apiClient.post('/users', userData)
     return response.data
   },
 
-  /** แก้ไขผู้ใช้ (admin) */
+  /** Update a user (admin). */
   update: async (userId, userData) => {
     const response = await apiClient.put(`/users/${userId}`, userData)
     return response.data
   },
 
-  /** ลบบัญชีผู้ใช้ถาวร (admin) — ลบประวัติการเรียน, ใบรับรอง, การลงทะเบียนทั้งหมด */
+  /** Permanently delete a user account (admin) — removes all learning history, certificates, and enrollments. */
   delete: async (userId) => {
     const response = await apiClient.delete(`/users/${userId}`)
     return response.data
   },
 
-  /** สรุปการเรียนของผู้ใช้ (admin) — enrollments, certificates, quiz stats */
+  /** A user's learning summary (admin) — enrollments, certificates, quiz stats. */
   getLearningSummary: async (userId) => {
     const response = await apiClient.get(`/users/${userId}/learning-summary`)
     return response.data
   },
 
-  /** รีเซ็ตรหัสผ่านผู้ใช้ (admin) */
+  /** Reset a user's password (admin). */
   resetPassword: async (userId, newPassword) => {
     const response = await apiClient.post(`/users/${userId}/reset-password`, {
       new_password: newPassword,

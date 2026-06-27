@@ -115,7 +115,7 @@ function StarRating({ value, onChange, readonly = false, size = 'md' }) {
 
 function DistributionBars({ distribution, total }) {
   // distribution = [count_1star, count_2star, ..., count_5star]
-  // Render 5★ on top down to 1★ at bottom — matches how every other rating
+  // Render 5 stars on top down to 1 star at bottom — matches how every other rating
   // UI on the planet does it (Amazon, Google, etc.).
   return (
     <div className="space-y-1">

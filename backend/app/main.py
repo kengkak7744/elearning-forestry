@@ -97,7 +97,7 @@ async def security_headers(request: Request, call_next):
         )
     return response
 
-# รวม routers
+# Register routers
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(courses.router)

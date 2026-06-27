@@ -9,10 +9,10 @@ import LessonNotes from '@/components/learner/LessonNotes'
 
 /**
  * Tabbed lesson info under the player:
- *   รายละเอียด  — position, title, type/duration/pages, min-view note, description
- *   เอกสารประกอบ — resource list (hidden when the course disables downloads or the
- *                  lesson has no resources); a count badge sits on the trigger
- *   โน้ตของฉัน   — the private, autosaving notes textarea (reused unchanged)
+ *   Details (รายละเอียด)     — position, title, type/duration/pages, min-view note, description
+ *   Resources (เอกสารประกอบ) — resource list (hidden when the course disables downloads or the
+ *                              lesson has no resources); a count badge sits on the trigger
+ *   My notes (โน้ตของฉัน)    — the private, autosaving notes textarea (reused unchanged)
  *
  * End-of-lesson quizzes intentionally live OUTSIDE this component (rendered
  * below it, always visible) so a blocking quiz can never hide behind a tab.

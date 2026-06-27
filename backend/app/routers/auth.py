@@ -55,19 +55,19 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(data: UserRegister, db: Session = Depends(get_db)):
     """
-    สมัครสมาชิกสำหรับเจ้าหน้าที่กรมป่าไม้
+    Register an account for a Royal Forest Department staff member.
     
-    ต้องกรอก: username, ชื่อ-นามสกุล, อีเมล, รหัสผ่าน, หน่วยงาน, ตำแหน่ง
-    บทบาทเริ่มต้น: learner (admin สามารถเปลี่ยนได้ภายหลัง)
+    Required: username, full name, email, password, department, position.
+    Default role: learner (an admin can change it later).
     """
-    # ตรวจรหัสผ่านตรงกัน
+    # Check the two passwords match
     if data.password != data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน"
         )
     
-    # ตรวจ username / อีเมลซ้ำ
+    # Reject a duplicate username / email
     ensure_unique_user_fields(db, username=data.username, email=data.email)
 
     new_user = User(
@@ -91,7 +91,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(credentials: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    """เข้าสู่ระบบด้วย username หรือ email และรหัสผ่าน — sets httpOnly auth cookie."""
+    """Log in with a username or email plus password — sets the httpOnly auth cookie."""
     user = db.query(User).filter(or_(
         User.username == credentials.identifier,
         User.email == credentials.identifier,
@@ -158,7 +158,7 @@ async def upload_my_avatar(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """อัปโหลด/เปลี่ยนรูปโปรไฟล์ของตัวเอง (optional). ทำได้เฉพาะเจ้าของบัญชี."""
+    """Upload or change your own profile picture (optional). Account owner only."""
     ext = Path(file.filename or "").suffix.lower()
     if ext not in _ALLOWED_AVATAR_EXTENSIONS:
         raise HTTPException(
@@ -204,7 +204,7 @@ def delete_my_avatar(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """ลบรูปโปรไฟล์ กลับไปใช้รูปตัวอักษรย่อ."""
+    """Remove the profile picture and fall back to the initials avatar."""
     _delete_avatar_file(current_user.profile_image)
     current_user.profile_image = None
     db.commit()

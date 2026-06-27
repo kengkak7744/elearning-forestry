@@ -102,7 +102,7 @@ def create_lesson(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    """สร้างบทเรียนใหม่ (สำหรับ YouTube link หรือ lesson ที่จะ upload file ทีหลัง)"""
+    """Create a new lesson (for a YouTube link, or a lesson whose file is uploaded later)."""
     get_or_404(db, Module, data.module_id, "ไม่พบโมดูล")
 
     new_lesson = Lesson(**data.model_dump())
@@ -164,7 +164,7 @@ async def upload_video(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    """อัปโหลดไฟล์วิดีโอสำหรับบทเรียน"""
+    """Upload a video file for a lesson."""
     lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
 
     # Validate file extension
@@ -200,7 +200,7 @@ async def upload_pdf(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin)
 ):
-    """อัปโหลดไฟล์ PDF สำหรับบทเรียน"""
+    """Upload a PDF file for a lesson."""
     lesson = get_or_404(db, Lesson, lesson_id, "ไม่พบบทเรียน")
 
     ext = Path(file.filename).suffix.lower()
@@ -800,13 +800,14 @@ async def split_pdf_into_lessons(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกออกเป็นหลายบทเรียนอัตโนมัติตามสารบัญ (bookmarks).
+    """Upload a single PDF and split it into multiple lessons automatically by its table of contents (bookmarks).
 
-    แยกตามหัวข้อในสารบัญลึกถึง settings.SPLIT_MAX_DEPTH ระดับ (ค่าเริ่มต้น 2) — หัวข้อ
-    ที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่แทนการแตกเป็นบทเรียนใหม่ และถ้าได้บทเรียนเกิน
-    settings.SPLIT_MAX_SECTIONS (ค่าเริ่มต้น 50) ระบบจะลดความลึกลงอัตโนมัติ ชื่อบทเรียน
-    เป็น breadcrumb ของลำดับชั้น เช่น "บทที่ 1 › 1.1 บทนำ" โดยตัด PDF เป็นไฟล์ย่อยจริง
-    ต่อบทเรียน และต่อท้ายบทเรียนเดิมในโมดูล (order_index ต่อเนื่อง).
+    Sections are cut from TOC headings down to settings.SPLIT_MAX_DEPTH levels
+    (default 2) — deeper headings fold into their parent lesson instead of becoming
+    new lessons. If the split yields more than settings.SPLIT_MAX_SECTIONS lessons
+    (default 50) the depth is reduced automatically. Each lesson title is a breadcrumb
+    of its hierarchy, e.g. "บทที่ 1 › 1.1 บทนำ"; the PDF is cut into a real sub-file per
+    lesson and appended to the module's existing lessons (continuing order_index).
     """
     get_or_404(db, Module, module_id, "ไม่พบโมดูล")
 
@@ -834,13 +835,15 @@ async def split_pdf_into_modules(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    """อัปโหลด PDF หนึ่งไฟล์ แล้วแยกตามสารบัญเป็น "โมดูล + บทเรียน" อัตโนมัติ.
+    """Upload a single PDF and split it by its table of contents into "modules + lessons" automatically.
 
-    หัวข้อระดับบนสุดของสารบัญ = โมดูล, หัวข้อย่อยระดับ 2 = บทเรียนในโมดูลนั้น (จำกัดความลึก
-    ที่ settings.SPLIT_MAX_DEPTH ระดับ — หัวข้อที่ลึกกว่านั้นถูกรวมเข้าบทเรียนแม่ ไม่แตกเพิ่ม
-    และถ้าได้บทเรียนเกิน settings.SPLIT_MAX_SECTIONS ระบบจะลดความลึกลงอัตโนมัติ).
-    ตัด PDF เป็นไฟล์ย่อยจริงต่อบทเรียน และต่อท้ายโมดูลเดิมในคอร์ส (order_index ต่อเนื่อง).
-    ถ้าหัวข้อระดับบนสุดมีเนื้อหานำก่อนหัวข้อย่อยแรก เนื้อหานั้นจะกลายเป็นบทเรียนแรกของโมดูล.
+    Top-level TOC headings = modules; level-2 sub-headings = lessons within that
+    module (depth capped at settings.SPLIT_MAX_DEPTH levels — deeper headings fold
+    into their parent lesson instead of splitting further, and if the split yields
+    more than settings.SPLIT_MAX_SECTIONS lessons the depth is reduced automatically).
+    The PDF is cut into a real sub-file per lesson and appended to the course's existing
+    modules (continuing order_index). If a top-level heading has intro content before
+    its first sub-heading, that content becomes the module's first lesson.
     """
     from app.models.course import Course
 
@@ -916,11 +919,12 @@ async def download_course_merged_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """รวมไฟล์ PDF ของทุกบทเรียนในหลักสูตรเป็น PDF ไฟล์เดียวสำหรับดาวน์โหลด.
+    """Merge every lesson's PDF in a course into a single downloadable PDF.
 
-    เรียงตามลำดับโมดูล → บทเรียน และใส่ bookmark (สารบัญ) ต่อบทเรียนให้อัตโนมัติ
-    แทนการโหลดทีละไฟล์. ใช้ได้เฉพาะหลักสูตรที่เปิดให้ดาวน์โหลด (allow_downloads)
-    และผู้เรียนต้องลงทะเบียนก่อน (แอดมิน/ผู้สอนเข้าถึงได้ทุกหลักสูตร).
+    Ordered by module → lesson, with a bookmark (TOC entry) added per lesson
+    automatically, instead of downloading one file at a time. Available only for
+    courses that allow downloads (allow_downloads), and the learner must be enrolled
+    first (admins/instructors can access any course).
     """
     from app.models.course import Course
 

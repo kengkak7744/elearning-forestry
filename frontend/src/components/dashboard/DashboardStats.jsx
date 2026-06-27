@@ -19,7 +19,7 @@ function StatCell({ icon: Icon, label, value }) {
 }
 
 /**
- * Single card, three columns: กำลังเรียน / เรียนจบแล้ว / ใบรับรอง.
+ * Single card, three columns: in-progress / completed / certificates.
  * Each value is a number, or null while its source is still loading.
  */
 export default function DashboardStats({ inProgress, completed, certificates }) {

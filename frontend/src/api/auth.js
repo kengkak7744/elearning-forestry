@@ -1,7 +1,7 @@
 import apiClient from './client'
 
 export const authApi = {
-  /** เข้าสู่ระบบด้วย username หรือ email */
+  /** Log in with a username or email. */
   login: async (identifier, password) => {
     const response = await apiClient.post('/auth/login', {
       identifier,

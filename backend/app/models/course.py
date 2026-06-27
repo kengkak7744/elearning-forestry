@@ -46,10 +46,10 @@ class Module(Base):
     __tablename__ = "modules"
     
     id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)  # ⭐ เพิ่ม ForeignKey
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)  # the ForeignKey to courses
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     order_index = Column(Integer, default=0)
     
-    course = relationship("Course", back_populates="modules")  # ⭐ เอา primaryjoin ออก ให้ SQLAlchemy หาเอง
+    course = relationship("Course", back_populates="modules")  # no explicit primaryjoin — let SQLAlchemy infer it
     lessons = relationship("Lesson", back_populates="module", cascade="all, delete-orphan")

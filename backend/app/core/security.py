@@ -6,8 +6,8 @@ from app.config import settings
 
 
 def hash_password(password: str) -> str:
-    """เข้ารหัสรหัสผ่านก่อนเก็บลงฐานข้อมูล"""
-    # bcrypt รับรหัสผ่านได้ไม่เกิน 72 bytes ตัดให้พอดี
+    """Hash a password before storing it in the database."""
+    # bcrypt accepts at most 72 bytes of password — truncate to fit
     pwd_bytes = password.encode("utf-8")[:72]
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(pwd_bytes, salt)
@@ -15,14 +15,14 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """ตรวจสอบว่ารหัสผ่านถูกต้องหรือไม่"""
+    """Check whether the supplied password is correct."""
     pwd_bytes = plain_password.encode("utf-8")[:72]
     hashed_bytes = hashed_password.encode("utf-8")
     return bcrypt.checkpw(pwd_bytes, hashed_bytes)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """สร้าง JWT token สำหรับการ authenticate"""
+    """Create a JWT access token for authentication."""
     to_encode = data.copy()
     
     if expires_delta:
@@ -36,7 +36,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def decode_access_token(token: str) -> Optional[dict]:
-    """ถอดรหัส JWT token"""
+    """Decode a JWT token; return its payload or None if invalid."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload

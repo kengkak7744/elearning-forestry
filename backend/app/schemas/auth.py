@@ -3,7 +3,7 @@ from app.schemas.user import UserResponse
 
 
 class LoginRequest(BaseModel):
-    """เข้าสู่ระบบด้วย username หรือ email"""
+    """Log in with either a username or an email."""
     identifier: str
     password: str
 

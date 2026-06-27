@@ -25,7 +25,7 @@ def get_current_user(
     access_token: Optional[str] = Cookie(None),
     db: Session = Depends(get_db),
 ) -> User:
-    """check JWT (cookie preferred, header fallback) and get current user"""
+    """Resolve the current user from a JWT (cookie preferred, Authorization header fallback); raise 401 if missing or invalid."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="ไม่สามารถตรวจสอบสิทธิ์ได้",
@@ -103,7 +103,7 @@ def require_roles(*roles: UserRole, detail: str):
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """require admin"""
+    """Allow only admin users; raise 403 otherwise."""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -113,7 +113,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_instructor_or_admin(current_user: User = Depends(get_current_user)) -> User:
-    """require instructor or admin"""
+    """Allow only instructors or admins; raise 403 otherwise."""
     if current_user.role not in [UserRole.INSTRUCTOR, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -123,7 +123,7 @@ def require_instructor_or_admin(current_user: User = Depends(get_current_user)) 
 
 
 def require_manager_or_above(current_user: User = Depends(get_current_user)) -> User:
-    """require manager or above"""
+    """Allow managers and admins (anyone above learner); raise 403 otherwise."""
     if current_user.role == UserRole.LEARNER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

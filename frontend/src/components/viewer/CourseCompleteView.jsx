@@ -150,8 +150,7 @@ export default function CourseCompleteView({
               </div>
             ) : (
               // Not currently eligible. If a cert exists but expired, the learner
-              // must finish whatever's now outstanding (e.g. a re-added final
-              // exam) before they can renew — surface that explicitly.
+              // must finish whatever's now outstanding (e.g. a re-added final exam) before they can renew — surface that explicitly.
               <div className="space-y-1">
                 {elig?.is_expired && (
                   <p className="text-xs text-warning">ใบรับรองหมดอายุแล้ว</p>

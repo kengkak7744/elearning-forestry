@@ -27,9 +27,9 @@ import UserAvatar from '@/components/admin/UserAvatar'
 import { toastApiError } from '@/utils/apiError'
 
 /**
- * Drill-in for one (department, course) cell. Shows two tabs — ลงทะเบียนแล้ว
- * vs ยังไม่ลงทะเบียน — so an admin can answer "who hasn't started this
- * mandatory course yet?" without leaving the page.
+ * Drill-in for one (department, course) cell. Shows two tabs — enrolled
+ * (ลงทะเบียนแล้ว) vs not-yet-enrolled (ยังไม่ลงทะเบียน) — so an admin can answer
+ * "who hasn't started this mandatory course yet?" without leaving the page.
  *
  * Each row in the enrolled tab carries a per-user progress bar + cert status.
  * Clicking a name forwards to UserSummarySheet (handled by the parent so the

@@ -1,7 +1,7 @@
 import apiClient from './client'
 
 export const coursesApi = {
-  /** รายการหลักสูตรทั้งหมด */
+  /** List all courses. */
   list: async ({ skip = 0, limit = 50, category, is_mandatory, search } = {}) => {
     const params = { skip, limit }
     if (category) params.category = category
@@ -12,37 +12,37 @@ export const coursesApi = {
     return Array.isArray(response.data) ? response.data : []
   },
 
-  /** รายละเอียดหลักสูตร */
+  /** Get a single course's details. */
   getById: async (courseId) => {
     const response = await apiClient.get(`/courses/${courseId}`)
     return response.data
   },
 
-  /** สร้างหลักสูตรใหม่ (instructor/admin) */
+  /** Create a new course (instructor/admin). */
   create: async (courseData) => {
     const response = await apiClient.post('/courses', courseData)
     return response.data
   },
 
-  /** แก้ไขหลักสูตร */
+  /** Update a course. */
   update: async (courseId, courseData) => {
     const response = await apiClient.put(`/courses/${courseId}`, courseData)
     return response.data
   },
 
-  /** ลบหลักสูตร */
+  /** Delete a course. */
   delete: async (courseId) => {
     const response = await apiClient.delete(`/courses/${courseId}`)
     return response.data
   },
 
-  /** ทำสำเนาหลักสูตร — admin/instructor only. Returns { id, title, message }. */
+  /** Duplicate a course (admin/instructor only). Returns { id, title, message }. */
   duplicate: async (courseId) => {
     const response = await apiClient.post(`/courses/${courseId}/duplicate`)
     return response.data
   },
 
-  /** หลักสูตรของฉัน + ความคืบหน้า */
+  /** My enrolled courses with progress. */
   myEnrollments: async () => {
     const response = await apiClient.get('/courses/me/enrollments')
     // Always hand callers an array. A proxy returning HTML, a stale cached
@@ -51,7 +51,7 @@ export const coursesApi = {
     return Array.isArray(response.data) ? response.data : []
   },
 
-  /** อัปโหลดรูปภาพปกหลักสูตร */
+  /** Upload a course cover image. */
   uploadCoverImage: async (courseId, file, onProgress) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -66,13 +66,13 @@ export const coursesApi = {
     return response.data
   },
 
-  // การลงทะเบียนเรียนหลักสูตร
+  // Enroll in a course
   enroll: async (courseId) => {
     const response = await apiClient.post(`/courses/${courseId}/enroll`)
     return response.data
   },
 
-  // การยกเลิกการลงทะเบียนเรียนหลักสูตร
+  // Cancel a course enrollment
   unenroll: async (courseId) => {
     const response = await apiClient.delete(`/courses/${courseId}/enroll`)
     return response.data

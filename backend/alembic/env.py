@@ -28,11 +28,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv()
 
 from app.database import Base
-from app.models import *  # import models ทั้งหมด
+from app.models import *  # import all models
 
 target_metadata = Base.metadata
 
-# อ่าน DATABASE_URL จาก .env
+# Read DATABASE_URL from .env
 config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
 
 # other values from the config, defined by the needs of env.py,

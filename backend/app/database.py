@@ -18,7 +18,7 @@ Base = declarative_base()
 
 
 def get_db():
-    """Dependency สำหรับใช้ใน FastAPI endpoint"""
+    """Dependency that yields a database session for FastAPI endpoints."""
     db = SessionLocal()
     try:
         yield db
