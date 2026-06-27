@@ -23,11 +23,9 @@ class Settings(BaseSettings):
     # Report-only first: Trusted Types can surface DOM-XSS sinks without
     # breaking production while we verify all frontend code paths.
     TRUSTED_TYPES_REPORT_ONLY: bool = True
-    # Public-facing origin used when generating absolute URLs (e.g. the QR code
-    # embedded in certificate PDFs that links to the public /verify page).
-    # Empty string → QR encodes the certificate number alone, which the
-    # recipient types into the verify page manually. Set this in .env once a
-    # production domain is in place, e.g. "https://forestry.example.go.th".
+    # Public origin for absolute URLs (e.g. the QR code in certificate PDFs that
+    # links to /verify). Empty → QR encodes the certificate number alone. Set in
+    # .env in production, e.g. "https://forestry.example.go.th".
     PUBLIC_BASE_URL: str = ""
 
     # Media storage. Defaults match the docker-compose volume mounts; override
@@ -49,19 +47,15 @@ class Settings(BaseSettings):
     # Browser uploads for the splitter can be sent in multiple small requests
     # to avoid reverse-proxy 413 responses on very large manuals.
     SPLIT_PDF_UPLOAD_CHUNK_SIZE: int = 4 * 1024 * 1024  # 4 MB
-    # How many table-of-contents levels the auto-split uses to cut sections.
-    # Level 1 = top headings (→ modules in course-split), level 2 = their
-    # sub-headings (→ lessons). A bookmark deeper than this does NOT become its
-    # own lesson — its pages fold into the nearest ancestor at this depth.
-    # Without the cap a deeply nested TOC (1.1.1, 1.1.1.1, …) explodes into
-    # dozens of tiny lessons. Set 0 to disable the cap (split every level).
+    # TOC depth the auto-split cuts at: level 1 = top headings (→ modules),
+    # level 2 = sub-headings (→ lessons). Deeper bookmarks fold into the nearest
+    # ancestor; the cap stops a deeply nested TOC exploding into tiny lessons.
+    # Set 0 to disable.
     SPLIT_MAX_DEPTH: int = 2
-    # Adaptive depth: if splitting at SPLIT_MAX_DEPTH yields MORE than this many
-    # sections, the splitter retries one level shallower (and so on, down to a
-    # single level) and keeps the deepest result that stays within the limit.
-    # This rescues PDFs whose author bookmarked every sub-bullet (hundreds of
-    # level-2 entries) from exploding into hundreds of tiny lessons, while
-    # leaving normally-structured PDFs at the full depth. Set 0 to disable.
+    # Adaptive depth: if SPLIT_MAX_DEPTH yields more than this many sections, the
+    # splitter retries one level shallower (down to one) and keeps the deepest
+    # result within the limit — rescues PDFs that bookmark every sub-bullet from
+    # exploding into hundreds of tiny lessons. Set 0 to disable.
     SPLIT_MAX_SECTIONS: int = 50
     SIGNATURE_MAX_BYTES: int = 2 * 1024 * 1024  # 2 MB — signatures are small line art
 

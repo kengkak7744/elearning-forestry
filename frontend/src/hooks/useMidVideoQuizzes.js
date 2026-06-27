@@ -79,12 +79,9 @@ export default function useMidVideoQuizzes({
   }
 
   /**
-   * Failed-mid-quiz rewind: when a learner fails a mid-video quiz, the
-   * "ย้อนไปดูใหม่" button in the modal calls this. We seek the video
-   * back to the previous mid-video quiz's trigger_time (or 0 if this is
-   * the first one) so they can re-watch the section that led up to the
-   * question. The failed quiz is removed from triggeredQuizIds so it
-   * re-triggers when the playhead reaches its trigger_time again.
+   * Failed-mid-quiz rewind (the "ย้อนไปดูใหม่" button): seek back to the previous
+   * mid-video quiz's trigger_time (or 0) so the learner can re-watch, and drop
+   * the failed quiz from triggeredQuizIds so it re-fires at that point again.
    */
   const rewindMidQuiz = (quiz) => {
     const cl = currentLessonRef.current
@@ -147,7 +144,7 @@ export default function useMidVideoQuizzes({
   return {
     activeMidQuiz,
     // Plain setter for the "blocking quiz" path in goNext — shows the modal
-    // without marking it triggered or pausing (matches the original behavior).
+    // without marking it triggered or pausing.
     showMidQuiz: setActiveMidQuiz,
     findDueMidQuiz,
     triggerMidQuiz,

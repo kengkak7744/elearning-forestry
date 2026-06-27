@@ -14,21 +14,9 @@ import { toastApiError } from '@/utils/apiError'
 const MAX_COMMENT = 2000
 
 /**
- * Interactive 5-star input. Hovering previews the rating (mouseenter), the
- * committed value sticks on click. Keyboard: arrow keys + Enter via radio
- * group semantics (each button is role=radio so screen readers announce it).
- */
-/**
- * Star rating with WAI-ARIA APG-compliant radiogroup behaviour:
- *   - Tab moves focus INTO the group (lands on the selected star, or the
- *     first one if nothing selected yet) and back OUT — single tab stop.
- *   - Arrow Left/Right (and Up/Down) move focus between stars and
- *     immediately update the value. This matches how every native radio
- *     group behaves and is what a screen-reader user expects.
- *   - Home/End jump to 1 and 5.
- *
- * Implementation uses the roving-tabindex pattern: exactly one button has
- * tabIndex=0, the rest have tabIndex=-1.
+ * Interactive 5-star input. Hover previews; click commits. Implements the
+ * WAI-ARIA radiogroup pattern with roving tabindex: one tab stop, arrow keys
+ * move focus and set the value, Home/End jump to 1 and 5.
  */
 function StarRating({ value, onChange, readonly = false, size = 'md' }) {
   const [hover, setHover] = useState(0)
@@ -114,9 +102,7 @@ function StarRating({ value, onChange, readonly = false, size = 'md' }) {
 }
 
 function DistributionBars({ distribution, total }) {
-  // distribution = [count_1star, count_2star, ..., count_5star]
-  // Render 5 stars on top down to 1 star at bottom — matches how every other rating
-  // UI on the planet does it (Amazon, Google, etc.).
+  // distribution = [count_1star, ..., count_5star]; rendered 5 stars (top) down to 1.
   return (
     <div className="space-y-1">
       {[5, 4, 3, 2, 1].map((stars) => {
@@ -162,9 +148,8 @@ export default function CourseFeedbackCard({ courseId, isEnrolled }) {
         setComment(m.comment || '')
       }
     } catch (err) {
-      // Don't crash the page over a feedback block. In dev surface the error
-      // so we notice; in prod stay silent so Lighthouse's "no console errors"
-      // check stays clean and we don't leak request internals.
+      // Don't crash the page over feedback. Surface in dev; stay silent in prod
+      // (keeps the console clean and avoids leaking request internals).
       if (import.meta.env.DEV) {
         console.error('feedback load failed', err)
       }
@@ -291,9 +276,8 @@ export default function CourseFeedbackCard({ courseId, isEnrolled }) {
           </div>
         )}
 
-        {/* If they already submitted but the form is hidden (shouldn't happen since
-            can_submit is sticky once they complete, but guard anyway) — show their
-            previous rating in read-only form. */}
+        {/* Already submitted but form hidden (shouldn't happen — can_submit is
+            sticky once completed — but guard anyway): show their rating read-only. */}
         {!showSubmissionForm && hasFeedback && (
           <div className="space-y-2 border-t border-border/60 pt-4">
             <div className="text-sm font-medium text-foreground">ความคิดเห็นของคุณ</div>

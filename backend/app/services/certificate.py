@@ -100,18 +100,13 @@ def format_thai_date(d: datetime) -> str:
 
 
 def build_certificate_html(cert, user, course, db=None) -> str:
-    """Return the cert PDF as an HTML string. Split from
-    `render_certificate_pdf` so the preview endpoint can render to bytes
-    without writing to disk. Accepts duck-typed cert/user/course (real
-    ORM rows OR stub objects with the same attributes) — used to keep
-    the preview path free of DB insertion.
+    """Return the cert as an HTML string (split from `render_certificate_pdf` so
+    the preview endpoint can render bytes without a DB write). Accepts duck-typed
+    cert/user/course — real ORM rows or stubs with the same attributes.
 
-    Layout intentionally mirrors the official Royal Forest Department
-    paper certificate: gold layered border, organisation header, recipient
-    name centred and oversized, course title, Thai-numeral Buddhist Era
-    date, and two signature blocks at the bottom whose names and titles
-    come from `cert_settings` (admin-editable). QR code sits in the
-    bottom-right corner for public verification."""
+    Layout mirrors the department's official paper certificate: signer names/titles
+    come from `cert_settings` (admin-editable); a QR in the corner links to verify.
+    """
     from app.models.cert_settings import CertSettings
 
     issued = cert.issued_at or datetime.utcnow()

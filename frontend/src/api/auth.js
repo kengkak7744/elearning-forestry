@@ -30,11 +30,9 @@ export const authApi = {
     return response.data
   },
 
-  // Upload/replace my profile picture. The apiClient defaults to
-  // Content-Type: application/json, and axios will JSON-serialise a FormData
-  // body under that header (sending {"file":{}} → backend 422). Setting
-  // 'multipart/form-data' here makes axios pass the FormData through; the
-  // browser then fills in the real boundary. Returns the updated user.
+  // Upload/replace my profile picture. Must set multipart/form-data explicitly —
+  // the apiClient defaults to application/json, under which axios would
+  // JSON-serialise the FormData (→ backend 422). Returns the updated user.
   uploadAvatar: async (file) => {
     const form = new FormData()
     form.append('file', file)

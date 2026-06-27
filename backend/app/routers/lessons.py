@@ -800,14 +800,11 @@ async def split_pdf_into_lessons(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    """Upload a single PDF and split it into multiple lessons automatically by its table of contents (bookmarks).
+    """Upload a PDF and auto-split it into lessons by its table of contents (bookmarks).
 
-    Sections are cut from TOC headings down to settings.SPLIT_MAX_DEPTH levels
-    (default 2) — deeper headings fold into their parent lesson instead of becoming
-    new lessons. If the split yields more than settings.SPLIT_MAX_SECTIONS lessons
-    (default 50) the depth is reduced automatically. Each lesson title is a breadcrumb
-    of its hierarchy, e.g. "บทที่ 1 › 1.1 บทนำ"; the PDF is cut into a real sub-file per
-    lesson and appended to the module's existing lessons (continuing order_index).
+    Each section becomes a real sub-PDF appended to the module (continuing
+    order_index), titled by its TOC breadcrumb, e.g. "บทที่ 1 › 1.1 บทนำ". Depth and
+    section count follow SPLIT_MAX_DEPTH / SPLIT_MAX_SECTIONS (see config).
     """
     get_or_404(db, Module, module_id, "ไม่พบโมดูล")
 
@@ -835,15 +832,12 @@ async def split_pdf_into_modules(
     db: Session = Depends(get_db),
     _user: User = Depends(require_instructor_or_admin),
 ):
-    """Upload a single PDF and split it by its table of contents into "modules + lessons" automatically.
+    """Upload a PDF and auto-split it into modules + lessons by its table of contents.
 
-    Top-level TOC headings = modules; level-2 sub-headings = lessons within that
-    module (depth capped at settings.SPLIT_MAX_DEPTH levels — deeper headings fold
-    into their parent lesson instead of splitting further, and if the split yields
-    more than settings.SPLIT_MAX_SECTIONS lessons the depth is reduced automatically).
-    The PDF is cut into a real sub-file per lesson and appended to the course's existing
-    modules (continuing order_index). If a top-level heading has intro content before
-    its first sub-heading, that content becomes the module's first lesson.
+    Top-level TOC headings become modules, their sub-headings become lessons (each
+    a real sub-PDF), appended to the course's existing modules. Intro content before
+    a heading's first sub-heading becomes that module's first lesson. Depth / section
+    count follow SPLIT_MAX_DEPTH / SPLIT_MAX_SECTIONS (see config).
     """
     from app.models.course import Course
 
@@ -919,12 +913,10 @@ async def download_course_merged_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Merge every lesson's PDF in a course into a single downloadable PDF.
+    """Merge all of a course's lesson PDFs into one downloadable file.
 
-    Ordered by module → lesson, with a bookmark (TOC entry) added per lesson
-    automatically, instead of downloading one file at a time. Available only for
-    courses that allow downloads (allow_downloads), and the learner must be enrolled
-    first (admins/instructors can access any course).
+    Ordered module → lesson, with a per-lesson bookmark. Requires the course to
+    allow downloads and the learner to be enrolled (admins/instructors exempt).
     """
     from app.models.course import Course
 

@@ -2,8 +2,7 @@ import { useMemo } from 'react'
 
 /**
  * Computes the current lesson's position within the course and the prev/next
- * destinations (lesson → lesson → final quiz). Pure derivation from the course
- * shape — moved verbatim from CourseViewerPage.
+ * destinations (lesson → lesson → final quiz). Pure derivation from the course shape.
  */
 export default function useLessonNavigation({ course, currentLesson, viewingFinal, finalQuiz }) {
   const currentPos = useMemo(() => {
