@@ -19,7 +19,8 @@ import { coursesApi } from '@/api/courses'
 import { quizzesApi } from '@/api/quizzes'
 import { certificatesApi } from '@/api/certificates'
 import { useAuth } from '@/contexts/AuthContext'
-import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
+import { BUTTONS } from '@/constants/labels'
+import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
@@ -100,6 +101,7 @@ export default function CourseDetailPage() {
 
   // Drive the tab/bookmark title from the loaded course title once it's known.
   useDocumentTitle(course?.title)
+  const categories = useCategories()
   const [unenrollOpen, setUnenrollOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [scoresOpen, setScoresOpen] = useState(false)
@@ -246,7 +248,7 @@ export default function CourseDetailPage() {
     )
   }
 
-  const cat = CATEGORY_BADGES[course.category]
+  const catLabel = categoryLabel(categories, course.category)
   const hasCover = Boolean(course.cover_image)
   const cover = hasCover ? mediaUrl(course.cover_image) : ''
   const enrolled = !!course.is_enrolled
@@ -319,9 +321,9 @@ export default function CourseDetailPage() {
               </div>
             )}
             <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-              {cat && (
+              {catLabel && (
                 <Badge variant="secondary" className="bg-background/90">
-                  {cat.label}
+                  {catLabel}
                 </Badge>
               )}
               {course.is_mandatory && (

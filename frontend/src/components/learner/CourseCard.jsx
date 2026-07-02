@@ -3,7 +3,7 @@ import { Bookmark, BookmarkCheck, BookOpen, CheckCircle2, Clock, GraduationCap }
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { CATEGORY_BADGES } from '@/constants/labels'
+import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { mediaUrl } from '@/utils/media'
 import { cn } from '@/lib/utils'
 
@@ -59,7 +59,8 @@ export default function CourseCard({
   onToggleBookmark,
   imagePriority = false,
 }) {
-  const cat = CATEGORY_BADGES[course.category]
+  const categories = useCategories()
+  const catLabel = categoryLabel(categories, course.category)
   const hasCover = Boolean(course.cover_image)
   const cover = hasCover ? mediaUrl(course.cover_image) : ''
 
@@ -86,9 +87,9 @@ export default function CourseCard({
             <BookmarkToggle bookmarked={bookmarked} onToggle={onToggleBookmark} />
           </div>
           <CardContent className="p-4">
-            {cat && (
+            {catLabel && (
               <Badge variant="secondary" className="mb-2 font-normal">
-                {cat.label}
+                {catLabel}
               </Badge>
             )}
             <h3 className="line-clamp-2 text-sm font-semibold text-foreground">
@@ -163,9 +164,9 @@ export default function CourseCard({
           </div>
         </div>
         <CardContent className="space-y-2 p-4">
-          {cat && (
+          {catLabel && (
             <Badge variant="secondary" className={cn('font-normal')}>
-              {cat.label}
+              {catLabel}
             </Badge>
           )}
           <h3 className="line-clamp-2 text-base font-semibold text-foreground">

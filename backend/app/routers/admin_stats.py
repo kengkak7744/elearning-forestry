@@ -72,7 +72,7 @@ def top_courses(
         {
             "id": r.id,
             "title": r.title,
-            "category": r.category.value if r.category else None,
+            "category": r.category,
             "cover_image": r.cover_image,
             "enrolled_count": int(r.enrolled_count or 0),
         }
@@ -141,7 +141,7 @@ def recent_enrollments(
             "course": {
                 "id": c.id,
                 "title": c.title,
-                "category": c.category.value if c.category else None,
+                "category": c.category,
             },
         }
         for e, u, c in rows
@@ -187,7 +187,7 @@ def course_feedback_stats(
         courses.append({
             "id": r.id,
             "title": r.title,
-            "category": r.category.value if r.category else None,
+            "category": r.category,
             "is_published": r.is_published,
             "count": count,
             "average": round(avg, 2) if avg is not None else None,
@@ -360,7 +360,7 @@ def department_course_performance(
         out.append({
             "id": c.id,
             "title": c.title,
-            "category": c.category.value if c.category else None,
+            "category": c.category,
             "is_mandatory": c.is_mandatory,
             "enrolled_count": enrolled_n,
             "certified_count": cert_n,

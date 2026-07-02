@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from app.routers import auth, users, courses, modules, lessons, progress, quizzes, files, admin_stats, certificates, search, audit, feedback, cert_settings
+from app.routers import auth, users, courses, categories, modules, lessons, progress, quizzes, files, admin_stats, certificates, search, audit, feedback, cert_settings
 from app.config import settings
 import os
 
@@ -101,6 +101,7 @@ async def security_headers(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(courses.router)
+app.include_router(categories.router)
 app.include_router(modules.router)
 app.include_router(lessons.router)
 app.include_router(progress.router, prefix="/api/progress", tags=["progress"])

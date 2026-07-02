@@ -8,7 +8,8 @@ import {
   Trophy,
 } from 'lucide-react'
 import { usersApi } from '@/api/users'
-import { CATEGORY_BADGES, ROLE_LABELS } from '@/constants/labels'
+import { ROLE_LABELS } from '@/constants/labels'
+import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -48,6 +49,7 @@ function StatTile({ icon: Icon, label, value, hint }) {
 }
 
 export default function UserSummarySheet({ userId, open, onOpenChange }) {
+  const categories = useCategories()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -147,7 +149,7 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
               ) : (
                 <ul className="space-y-2">
                   {data.enrollments.map((e) => {
-                    const cat = CATEGORY_BADGES[e.category]
+                    const catLabel = categoryLabel(categories, e.category)
                     const done = e.progress_percent >= 100
                     return (
                       <li key={e.course_id}>
@@ -159,9 +161,9 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
                                   {e.title}
                                 </div>
                                 <div className="mt-0.5 flex flex-wrap gap-1 text-[11px] text-muted-foreground">
-                                  {cat && (
+                                  {catLabel && (
                                     <Badge variant="secondary" className="font-normal">
-                                      {cat.label}
+                                      {catLabel}
                                     </Badge>
                                   )}
                                   {e.is_mandatory && (

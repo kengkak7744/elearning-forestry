@@ -1,4 +1,4 @@
-import { CATEGORY_BADGES } from '@/constants/labels'
+import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -14,6 +14,7 @@ import {
 /** Per-course certification table, worst-first. Clicking a row drills into
  * the (department, course) member sheet via onPickCourse. */
 export default function DeptCoursesTab({ courses, onPickCourse }) {
+  const categories = useCategories()
   if (courses.length === 0) {
     return (
       <Card className="border-dashed border-border/60">
@@ -42,7 +43,7 @@ export default function DeptCoursesTab({ courses, onPickCourse }) {
           </TableHeader>
           <TableBody>
             {courses.map((c) => {
-              const cat = CATEGORY_BADGES[c.category]
+              const catLabel = categoryLabel(categories, c.category)
               const pct = c.certification_pct
               const tone =
                 pct >= 80 ? 'success' : pct >= 50 ? 'warning' : 'destructive'
@@ -70,9 +71,9 @@ export default function DeptCoursesTab({ courses, onPickCourse }) {
                         {c.title}
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-1">
-                        {cat && (
+                        {catLabel && (
                           <Badge variant="secondary" className="font-normal">
-                            {cat.label}
+                            {catLabel}
                           </Badge>
                         )}
                         {c.is_mandatory && (

@@ -286,7 +286,7 @@ def user_learning_summary(
         enrollments_out.append({
             "course_id": c.id,
             "title": c.title,
-            "category": c.category.value if c.category else None,
+            "category": c.category,
             "cover_image": c.cover_image,
             "is_mandatory": c.is_mandatory,
             "enrolled_at": e.enrolled_at.isoformat() if e.enrolled_at else None,

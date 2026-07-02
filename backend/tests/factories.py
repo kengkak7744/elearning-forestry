@@ -1,7 +1,7 @@
 """Row factories used by the characterization tests. All commit immediately."""
 from datetime import datetime, timezone
 
-from app.models.course import Course, CourseCategory, Module
+from app.models.course import Course, Module
 from app.models.lesson import Lesson, ContentType
 from app.models.enrollment import Enrollment
 from app.models.progress import LessonProgress
@@ -12,7 +12,7 @@ def make_course(db, *, title="หลักสูตรทดสอบ", publishe
     course = Course(
         title=title,
         description=overrides.pop("description", "คำอธิบายหลักสูตร"),
-        category=overrides.pop("category", CourseCategory.TECHNICAL),
+        category=overrides.pop("category", "technical"),
         is_published=published,
         **overrides,
     )

@@ -1,13 +1,26 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
-from app.models.course import CourseCategory
+
+
+class CategoryCreate(BaseModel):
+    label: str = Field(..., min_length=1, max_length=100)
+
+
+class CategoryResponse(BaseModel):
+    id: int
+    value: str
+    label: str
+    course_count: int = 0
+
+    class Config:
+        from_attributes = True
 
 
 class CourseBase(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
     description: Optional[str] = None
-    category: CourseCategory
+    category: str = Field(..., min_length=1, max_length=100)
     is_mandatory: bool = False
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = Field(None, ge=0)
@@ -26,7 +39,7 @@ class CourseCreate(CourseBase):
 class CourseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=3, max_length=200)
     description: Optional[str] = None
-    category: Optional[CourseCategory] = None
+    category: Optional[str] = Field(None, min_length=1, max_length=100)
     is_mandatory: Optional[bool] = None
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = Field(None, ge=0)
@@ -55,7 +68,7 @@ class CourseListItem(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
-    category: CourseCategory
+    category: str
     is_mandatory: bool
     cover_image: Optional[str] = None
     estimated_hours: Optional[int] = None

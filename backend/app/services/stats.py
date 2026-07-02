@@ -453,7 +453,7 @@ def department_course_members_data(db: Session, department: str, course: Course)
             "id": course.id,
             "title": course.title,
             "is_mandatory": course.is_mandatory,
-            "category": course.category.value if course.category else None,
+            "category": course.category,
             "total_lessons": total_lessons,
         },
         "members": members,

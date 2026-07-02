@@ -1,24 +1,34 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import enum
 from app.database import Base
 
 
-class CourseCategory(str, enum.Enum):
-    COMPLIANCE = "compliance"
-    TECHNICAL = "technical"
-    SAFETY = "safety"
-    SKILL = "skill"
+class CourseCategory(Base):
+    """Admin/instructor-managed course category.
+
+    `value` is the string stored in courses.category; `label` is the Thai
+    display name. The four legacy rows keep their English slugs
+    (compliance/technical/safety/skill) so existing courses keep working;
+    categories created in the UI store the Thai name in both fields.
+    """
+    __tablename__ = "course_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    value = Column(String(100), unique=True, index=True, nullable=False)
+    label = Column(String(100), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Course(Base):
     __tablename__ = "courses"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    category = Column(Enum(CourseCategory), nullable=False)
+    # Plain string matching CourseCategory.value — not a FK, so deleting a
+    # category can be validated (blocked while in use) instead of cascading.
+    category = Column(String(100), nullable=False)
     is_mandatory = Column(Boolean, default=False)
     cover_image = Column(String(500), nullable=True)
     estimated_hours = Column(Integer, nullable=True)

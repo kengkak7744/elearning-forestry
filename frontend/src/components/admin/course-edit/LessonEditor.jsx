@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, Save, Trash2, Video } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, ChevronRight, FileText, Loader2, Save, Trash2, Video } from 'lucide-react'
 import { lessonsApi } from '@/api/lessons'
 import { CONTENT_TYPE_OPTIONS } from '@/constants/labels'
+import { extractYoutubeId, fetchYoutubeDuration } from '@/utils/youtube'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,13 +21,83 @@ import QuizManager from '@/components/QuizManager'
 import LessonResourcesEditor from '@/components/admin/course-edit/LessonResourcesEditor'
 import { toastApiError } from '@/utils/apiError'
 
+// ช่องเวลาในฟอร์มกรอกเป็น "นาที" (ทศนิยมได้) แต่ backend เก็บเป็นวินาที —
+// แปลงไปกลับที่ขอบฟอร์มเท่านั้น
+function secondsToMinutesText(seconds) {
+  if (seconds == null || seconds === '') return ''
+  return String(Math.round((seconds / 60) * 100) / 100)
+}
+
+function minutesTextToSeconds(text) {
+  if (text == null || String(text).trim() === '') return null
+  const minutes = parseFloat(text)
+  if (!Number.isFinite(minutes) || minutes < 0) return null
+  return Math.round(minutes * 60)
+}
+
+// อ่านความยาวจากไฟล์วิดีโอในเครื่องก่อนอัปโหลด (โหลดเฉพาะ metadata)
+function readVideoFileDuration(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url)
+      resolve(
+        Number.isFinite(video.duration) && video.duration > 0
+          ? Math.round(video.duration)
+          : null
+      )
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(null)
+    }
+    video.src = url
+  })
+}
+
 export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete }) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [expanded, setExpanded] = useState(false)
+  const [durationMinutes, setDurationMinutes] = useState(() =>
+    secondsToMinutesText(lesson.duration_seconds)
+  )
+  const [minViewMinutes, setMinViewMinutes] = useState(() =>
+    secondsToMinutesText(lesson.min_view_seconds)
+  )
+  const [fetchingDuration, setFetchingDuration] = useState(false)
+  // URL ล่าสุดที่ดึงความยาวแล้ว — เริ่มด้วย URL เดิมของบทเรียน เพื่อไม่ให้
+  // blur เฉย ๆ ไปทับความยาวที่ผู้ใช้แก้เองไว้
+  const lastFetchedUrlRef = useRef(lesson.content_url || null)
 
   const setField = (key) => (val) => {
     onUpdate({ [key]: val })
+  }
+
+  // ค่าวินาทีเปลี่ยนจากภายนอก (ดึงอัตโนมัติ / อัปโหลด) → อัปเดตช่องนาทีตาม
+  // ระหว่างพิมพ์ไม่โดนทับเพราะ onChange ส่งค่าที่แปลงแล้วขึ้น parent ทันที
+  useEffect(() => {
+    if (minutesTextToSeconds(durationMinutes) !== (lesson.duration_seconds ?? null)) {
+      setDurationMinutes(secondsToMinutesText(lesson.duration_seconds))
+    }
+  }, [durationMinutes, lesson.duration_seconds])
+
+  useEffect(() => {
+    if (minutesTextToSeconds(minViewMinutes) !== (lesson.min_view_seconds ?? null)) {
+      setMinViewMinutes(secondsToMinutesText(lesson.min_view_seconds))
+    }
+  }, [minViewMinutes, lesson.min_view_seconds])
+
+  const handleDurationMinutesChange = (e) => {
+    setDurationMinutes(e.target.value)
+    onUpdate({ duration_seconds: minutesTextToSeconds(e.target.value) })
+  }
+
+  const handleMinViewMinutesChange = (e) => {
+    setMinViewMinutes(e.target.value)
+    onUpdate({ min_view_seconds: minutesTextToSeconds(e.target.value) })
   }
 
   const handleVideoUpload = async (e) => {
@@ -35,14 +106,51 @@ export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete
     setUploading(true)
     setUploadProgress(0)
     try {
-      const updated = await lessonsApi.uploadVideo(lesson.id, file, setUploadProgress)
+      const detected = await readVideoFileDuration(file)
+      let updated = await lessonsApi.uploadVideo(lesson.id, file, setUploadProgress)
+      if (detected) {
+        // อัปโหลดบันทึก content_url ลงฐานข้อมูลไปแล้ว — บันทึกความยาวตามไปด้วย
+        // เพื่อไม่ให้หายถ้าผู้ใช้ไม่ได้กด "บันทึกบทเรียน" ต่อ
+        try {
+          updated = await lessonsApi.update(lesson.id, { duration_seconds: detected })
+        } catch {
+          updated = { ...updated, duration_seconds: detected }
+        }
+      }
       onUpdate(updated)
-      showToast('อัปโหลดวิดีโอสำเร็จ', 'success')
+      showToast(
+        detected
+          ? `อัปโหลดวิดีโอสำเร็จ — ความยาว ${secondsToMinutesText(detected)} นาที`
+          : 'อัปโหลดวิดีโอสำเร็จ',
+        'success'
+      )
     } catch (err) {
       toastApiError(err, 'อัปโหลดไม่สำเร็จ')
     } finally {
       setUploading(false)
       setUploadProgress(0)
+    }
+  }
+
+  const handleYoutubeUrlBlur = async () => {
+    const url = (lesson.content_url || '').trim()
+    if (!url || !extractYoutubeId(url) || url === lastFetchedUrlRef.current) return
+    lastFetchedUrlRef.current = url
+    setFetchingDuration(true)
+    try {
+      const seconds = await fetchYoutubeDuration(url)
+      if (seconds) {
+        onUpdate({ duration_seconds: seconds })
+        showToast(
+          `ดึงความยาววิดีโอสำเร็จ — ${secondsToMinutesText(seconds)} นาที`,
+          'success'
+        )
+      } else {
+        lastFetchedUrlRef.current = null // เปิดทางให้ลองใหม่
+        showToast('ดึงความยาววิดีโออัตโนมัติไม่สำเร็จ กรอกเองได้ที่ช่อง "ความยาว (นาที)"', 'error')
+      }
+    } finally {
+      setFetchingDuration(false)
     }
   }
 
@@ -135,8 +243,19 @@ export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete
                 type="url"
                 value={lesson.content_url || ''}
                 onChange={(e) => setField('content_url')(e.target.value)}
+                onBlur={handleYoutubeUrlBlur}
                 placeholder="https://www.youtube.com/watch?v=..."
               />
+              {fetchingDuration ? (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                  กำลังดึงความยาววิดีโอ...
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  วางลิงก์แล้วระบบจะดึงความยาววิดีโอให้อัตโนมัติ (แก้ไขเองได้)
+                </p>
+              )}
             </div>
           )}
 
@@ -219,17 +338,23 @@ export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete
             {(lesson.content_type === 'video_youtube' ||
               lesson.content_type === 'video_file') && (
               <div className="space-y-1">
-                <Label className="text-xs">ความยาว (วินาที)</Label>
+                <Label className="text-xs">
+                  ความยาว (นาที){' '}
+                  <span className="text-muted-foreground">— ดึงให้อัตโนมัติ แก้ไขได้</span>
+                </Label>
                 <Input
                   type="number"
                   min={0}
-                  value={lesson.duration_seconds || ''}
-                  onChange={(e) =>
-                    setField('duration_seconds')(
-                      e.target.value ? parseInt(e.target.value) : null
-                    )
-                  }
+                  step="any"
+                  value={durationMinutes}
+                  onChange={handleDurationMinutesChange}
+                  placeholder="เช่น 12.5"
                 />
+                {lesson.duration_seconds != null && (
+                  <p className="text-xs text-muted-foreground">
+                    = {lesson.duration_seconds} วินาที
+                  </p>
+                )}
               </div>
             )}
             {lesson.content_type === 'pdf' && (
@@ -268,20 +393,22 @@ export default function LessonEditor({ lesson, index, onUpdate, onSave, onDelete
 
           <div className="space-y-1">
             <Label className="text-xs">
-              เวลาขั้นต่ำที่ต้องอยู่บนหน้า (วินาที){' '}
+              เวลาขั้นต่ำที่ต้องอยู่บนหน้า (นาที){' '}
               <span className="text-muted-foreground">— 0 หรือเว้นว่าง = ปิด</span>
             </Label>
             <Input
               type="number"
               min={0}
-              value={lesson.min_view_seconds || ''}
-              onChange={(e) =>
-                setField('min_view_seconds')(
-                  e.target.value ? parseInt(e.target.value) : null
-                )
-              }
-              placeholder="เช่น 120 = 2 นาที"
+              step="any"
+              value={minViewMinutes}
+              onChange={handleMinViewMinutesChange}
+              placeholder="เช่น 2 = 2 นาที"
             />
+            {lesson.min_view_seconds != null && lesson.min_view_seconds > 0 && (
+              <p className="text-xs text-muted-foreground">
+                = {lesson.min_view_seconds} วินาที
+              </p>
+            )}
           </div>
 
           <Button size="sm" onClick={onSave}>

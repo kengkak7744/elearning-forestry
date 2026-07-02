@@ -36,6 +36,7 @@ from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.database import Base, get_db
 from app.core.security import create_access_token
+from app.models.course import CourseCategory
 from app.models.user import User, UserRole
 
 engine = create_engine(
@@ -68,6 +69,15 @@ def db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
+    # Same rows the migration seeds — course create/update validates against
+    # this table, so an empty one would 400 every course-write test.
+    session.add_all([
+        CourseCategory(value="compliance", label="บังคับตามกฎหมาย"),
+        CourseCategory(value="technical", label="วิชาชีพ"),
+        CourseCategory(value="safety", label="ความปลอดภัย"),
+        CourseCategory(value="skill", label="ทักษะทั่วไป"),
+    ])
+    session.commit()
     yield session
     session.close()
 

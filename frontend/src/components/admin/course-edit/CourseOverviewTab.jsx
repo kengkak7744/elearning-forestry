@@ -1,6 +1,8 @@
-import { ImageIcon } from 'lucide-react'
-import { CATEGORY_OPTIONS } from '@/constants/labels'
+import { useState } from 'react'
+import { ImageIcon, Settings2 } from 'lucide-react'
+import { useCategories } from '@/hooks/useCategories'
 import { mediaUrl } from '@/utils/media'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import ManageCategoriesDialog from '@/components/admin/ManageCategoriesDialog'
 
 export default function CourseOverviewTab({
   isNew,
@@ -24,6 +27,9 @@ export default function CourseOverviewTab({
   onCoverUpload,
   onSubmit,
 }) {
+  const categories = useCategories()
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
+
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-3">
@@ -96,9 +102,21 @@ export default function CourseOverviewTab({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="ce-cat">
-                หมวดหมู่ <span className="text-destructive">*</span>
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="ce-cat">
+                  หมวดหมู่ <span className="text-destructive">*</span>
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-muted-foreground"
+                  onClick={() => setCategoriesOpen(true)}
+                >
+                  <Settings2 className="mr-1 h-3 w-3" aria-hidden="true" />
+                  จัดการหมวดหมู่
+                </Button>
+              </div>
               <Select
                 value={courseData.category}
                 onValueChange={updateField('category')}
@@ -107,7 +125,7 @@ export default function CourseOverviewTab({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORY_OPTIONS.map((opt) => (
+                  {categories.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -128,6 +146,8 @@ export default function CourseOverviewTab({
           </div>
         </form>
       </CardContent>
+
+      <ManageCategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
     </Card>
   )
 }

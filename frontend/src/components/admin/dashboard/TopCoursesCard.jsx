@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { CATEGORY_BADGES } from '@/constants/labels'
+import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function TopCoursesCard({ courses }) {
+  const categories = useCategories()
   if (courses === null) return <Skeleton className="h-72 w-full rounded-xl" />
 
   const list = Array.isArray(courses) ? courses : []
@@ -22,7 +23,7 @@ export default function TopCoursesCard({ courses }) {
         ) : (
           <div className="space-y-4">
             {list.map((c) => {
-              const cat = CATEGORY_BADGES[c.category]
+              const catLabel = categoryLabel(categories, c.category)
               const pct = (c.enrolled_count / max) * 100
               return (
                 <div key={c.id}>
@@ -38,10 +39,10 @@ export default function TopCoursesCard({ courses }) {
                     </span>
                   </div>
                   <Progress value={pct} className="h-2" />
-                  {cat && (
+                  {catLabel && (
                     <div className="mt-1.5">
                       <Badge variant="secondary" className="font-normal">
-                        {cat.label}
+                        {catLabel}
                       </Badge>
                     </div>
                   )}

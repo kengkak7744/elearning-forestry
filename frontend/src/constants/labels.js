@@ -17,16 +17,16 @@ export const ROLE_BADGES = {
   admin: { label: 'ผู้ดูแลระบบ' },
 }
 
+// Thai labels for the four built-in category slugs. Categories are dynamic
+// now (see hooks/useCategories) — this map is only the offline fallback for
+// the legacy values, whose stored value is an English slug rather than the
+// Thai name itself. Don't add new categories here; add them in the UI.
 export const CATEGORY_BADGES = {
   compliance: { label: 'บังคับตามกฎหมาย' },
   technical: { label: 'วิชาชีพ' },
   safety: { label: 'ความปลอดภัย' },
   skill: { label: 'ทักษะทั่วไป' },
 }
-
-export const CATEGORY_OPTIONS = Object.entries(CATEGORY_BADGES).map(
-  ([value, { label }]) => ({ value, label })
-)
 
 export const CONTENT_TYPE_OPTIONS = [
   { value: 'video_file', label: 'วิดีโอ (อัปโหลดไฟล์)' },

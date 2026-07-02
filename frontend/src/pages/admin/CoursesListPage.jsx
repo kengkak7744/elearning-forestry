@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Copy, ImageIcon, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Copy, ImageIcon, Pencil, Plus, Search, Tags, Trash2 } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
-import { CATEGORY_BADGES } from '@/constants/labels'
+import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { mediaUrl } from '@/utils/media'
 import { showToast } from '@/lib/toast'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import ManageCategoriesDialog from '@/components/admin/ManageCategoriesDialog'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import AdminEmptyState from '@/components/admin/AdminEmptyState'
 import SkeletonRows from '@/components/admin/SkeletonRows'
@@ -29,11 +30,6 @@ import { cn } from '@/lib/utils'
 import { toastApiError } from '@/utils/apiError'
 
 const PAGE_SIZE = 50
-
-const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
-  value,
-  label: meta.label,
-}))
 
 function CoverThumb({ src, alt }) {
   return (
@@ -58,6 +54,8 @@ export default function CoursesListPage() {
   useDocumentTitle('จัดการหลักสูตร')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
+  const categories = useCategories()
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [duplicatingId, setDuplicatingId] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -148,12 +146,22 @@ export default function CoursesListPage() {
         title="จัดการหลักสูตร"
         subtitle="รายการหลักสูตรทั้งหมด"
         actions={
-          <Button asChild className="w-full sm:w-auto">
-            <Link to="/admin/courses/new/edit">
-              <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-              สร้างหลักสูตรใหม่
-            </Link>
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setCategoriesOpen(true)}
+            >
+              <Tags className="mr-1 h-4 w-4" aria-hidden="true" />
+              จัดการหมวดหมู่
+            </Button>
+            <Button asChild className="w-full sm:w-auto">
+              <Link to="/admin/courses/new/edit">
+                <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+                สร้างหลักสูตรใหม่
+              </Link>
+            </Button>
+          </div>
         }
       />
 
@@ -232,7 +240,7 @@ export default function CoursesListPage() {
               </TableHeader>
               <TableBody>
                 {courses.map((c) => {
-                  const cat = CATEGORY_BADGES[c.category]
+                  const catLabel = categoryLabel(categories, c.category)
                   return (
                     <TableRow key={c.id}>
                       <TableCell>
@@ -255,9 +263,9 @@ export default function CoursesListPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {cat && (
+                        {catLabel && (
                           <Badge variant="secondary" className="font-normal">
-                            {cat.label}
+                            {catLabel}
                           </Badge>
                         )}
                       </TableCell>
@@ -318,7 +326,7 @@ export default function CoursesListPage() {
           {/* Mobile stacked cards */}
           <div className="space-y-3 md:hidden">
             {courses.map((c) => {
-              const cat = CATEGORY_BADGES[c.category]
+              const catLabel = categoryLabel(categories, c.category)
               return (
                 <Card key={c.id} className="border-border/60">
                   <CardContent className="flex items-start gap-3 p-3">
@@ -334,9 +342,9 @@ export default function CoursesListPage() {
                         {c.title}
                       </Link>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {cat && (
+                        {catLabel && (
                           <Badge variant="secondary" className="font-normal">
-                            {cat.label}
+                            {catLabel}
                           </Badge>
                         )}
                         {c.is_mandatory && <Badge variant="destructive">บังคับ</Badge>}
@@ -403,6 +411,8 @@ export default function CoursesListPage() {
         destructive
         onConfirm={handleDelete}
       />
+
+      <ManageCategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
     </div>
   )
 }

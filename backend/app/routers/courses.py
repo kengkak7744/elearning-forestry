@@ -106,7 +106,7 @@ def list_courses(
     response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    category: Optional[CourseCategory] = None,
+    category: Optional[str] = None,
     is_mandatory: Optional[bool] = None,
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -273,7 +273,7 @@ def get_course(
         "id": course.id,
         "title": course.title,
         "description": course.description,
-        "category": course.category.value if course.category else None,
+        "category": course.category,
         "is_mandatory": course.is_mandatory,
         "cover_image": course.cover_image,
         "estimated_hours": course.estimated_hours,
@@ -291,6 +291,16 @@ def get_course(
     }
 
 
+def _validate_category(db: Session, value: str) -> None:
+    """Reject course writes whose category isn't in course_categories —
+    a plain string column means the DB no longer enforces this itself."""
+    if not db.query(CourseCategory).filter(CourseCategory.value == value).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ไม่พบหมวดหมู่นี้ กรุณาเลือกจากรายการหมวดหมู่",
+        )
+
+
 @router.post("", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 def create_course(
     course_data: CourseCreate,
@@ -298,6 +308,7 @@ def create_course(
     db: Session = Depends(get_db),
     user: User = Depends(require_instructor_or_admin)
 ):
+    _validate_category(db, course_data.category)
     new_course = Course(**course_data.model_dump())
     db.add(new_course)
     db.flush()
@@ -329,6 +340,8 @@ def update_course(
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
     update_data = course_data.model_dump(exclude_unset=True)
+    if "category" in update_data:
+        _validate_category(db, update_data["category"])
 
     # Snapshot the bits regulators care about — publish state + mandatory flag.
     before = {k: getattr(course, k) for k in update_data}
@@ -636,7 +649,7 @@ def my_enrollments(
         result.append({
             "course_id": c.id,
             "title": c.title,
-            "category": c.category.value if c.category else None,
+            "category": c.category,
             "cover_image": c.cover_image,
             "is_mandatory": c.is_mandatory,
             "instructor_name": c.instructor_name,

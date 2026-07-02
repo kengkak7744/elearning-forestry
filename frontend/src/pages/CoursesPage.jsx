@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { BookOpen, ChevronRight, FileText, Search } from 'lucide-react'
 import { coursesApi } from '@/api/courses'
 import { searchApi } from '@/api/search'
-import { BUTTONS, CATEGORY_BADGES } from '@/constants/labels'
+import { BUTTONS } from '@/constants/labels'
+import { useCategories } from '@/hooks/useCategories'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -35,13 +36,9 @@ function highlightMatch(text, term) {
   )
 }
 
-const categories = Object.entries(CATEGORY_BADGES).map(([value, meta]) => ({
-  value,
-  label: meta.label,
-}))
-
 export default function CoursesPage() {
   useDocumentTitle('หลักสูตรทั้งหมด')
+  const categories = useCategories()
   const [params, setParams] = useSearchParams()
 
   // Read filters from URL as stable primitives. Parsing into arrays must
