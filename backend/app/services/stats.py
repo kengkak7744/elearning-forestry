@@ -12,11 +12,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.certificate import Certificate
-from app.models.course import Course, Module
+from app.models.course import Course, CourseCategory, Module
 from app.models.enrollment import Enrollment
 from app.models.lesson import Lesson
 from app.models.progress import LessonProgress
-from app.models.quiz import QuizAttempt
+from app.models.quiz import Quiz, QuizAttempt, QuizPlacement
 from app.models.user import User
 
 
@@ -347,6 +347,249 @@ def department_member_report_rows(db: Session, department: str) -> list[dict]:
     return rows
 
 
+def department_progress_report_rows(db: Session, department: str) -> list[dict]:
+    """Per (member × course) rows for the department progress CSV — the
+    "ใครเรียนอะไรถึงไหนแล้ว" detail a department head attaches when reporting
+    upward. Three kinds of rows keep the roster audit-complete:
+
+    - one row per enrollment (course, status, progress, quiz result, cert)
+    - follow-up rows for published mandatory courses an active member has NOT
+      enrolled in (the "ต้องติดตาม" list)
+    - a placeholder row for members with no learning activity at all, so
+      nobody silently disappears from the report
+    """
+    users = (
+        db.query(User)
+        .filter(User.department == department)
+        .order_by(User.is_active.desc(), User.full_name)
+        .all()
+    )
+    if not users:
+        return []
+    user_ids = [u.id for u in users]
+    now = datetime.now(timezone.utc)
+
+    courses = db.query(Course).all()
+    course_map = {c.id: c for c in courses}
+    category_labels = dict(db.query(CourseCategory.value, CourseCategory.label).all())
+    mandatory_published = sorted(
+        (c for c in courses if c.is_published and c.is_mandatory),
+        key=lambda c: c.title,
+    )
+
+    lesson_counts = dict(
+        db.query(Module.course_id, func.count(Lesson.id))
+        .join(Lesson, Lesson.module_id == Module.id)
+        .group_by(Module.course_id)
+        .all()
+    )
+
+    enrollments_by_user: dict[int, list[Enrollment]] = defaultdict(list)
+    for enrollment in db.query(Enrollment).filter(Enrollment.user_id.in_(user_ids)).all():
+        enrollments_by_user[enrollment.user_id].append(enrollment)
+
+    completed_lessons = {
+        (user_id, course_id): int(n or 0)
+        for user_id, course_id, n in (
+            db.query(
+                LessonProgress.user_id,
+                Module.course_id,
+                func.count(LessonProgress.id),
+            )
+            .join(Lesson, Lesson.id == LessonProgress.lesson_id)
+            .join(Module, Module.id == Lesson.module_id)
+            .filter(
+                LessonProgress.user_id.in_(user_ids),
+                LessonProgress.completed == True,
+            )
+            .group_by(LessonProgress.user_id, Module.course_id)
+            .all()
+        )
+    }
+
+    # Any LessonProgress row means the member has opened the course — presence
+    # in this map doubles as the started/not-started signal.
+    last_access = {
+        (user_id, course_id): ts
+        for user_id, course_id, ts in (
+            db.query(
+                LessonProgress.user_id,
+                Module.course_id,
+                func.max(LessonProgress.last_accessed_at),
+            )
+            .join(Lesson, Lesson.id == LessonProgress.lesson_id)
+            .join(Module, Module.id == Lesson.module_id)
+            .filter(LessonProgress.user_id.in_(user_ids))
+            .group_by(LessonProgress.user_id, Module.course_id)
+            .all()
+        )
+    }
+
+    quiz_course = dict(
+        db.query(Quiz.id, Quiz.course_id)
+        .filter(Quiz.placement == QuizPlacement.FINAL, Quiz.course_id.isnot(None))
+        .all()
+    )
+    courses_with_final = set(quiz_course.values())
+
+    # (user_id, course_id) -> (best final-quiz score, ever passed)
+    best_final: dict[tuple[int, int], tuple[int, bool]] = {}
+    if quiz_course:
+        for attempt in (
+            db.query(QuizAttempt)
+            .filter(
+                QuizAttempt.user_id.in_(user_ids),
+                QuizAttempt.quiz_id.in_(list(quiz_course)),
+            )
+            .all()
+        ):
+            key = (attempt.user_id, quiz_course[attempt.quiz_id])
+            score = int(attempt.score or 0)
+            prev_score, prev_passed = best_final.get(key, (-1, False))
+            best_final[key] = (max(score, prev_score), prev_passed or bool(attempt.is_passed))
+
+    # (user_id, course_id) -> cert to report: a valid one wins over an
+    # expired/revoked one; within the same validity the latest issued wins
+    # (rows are ordered ascending so later iterations overwrite).
+    certs_by_pair: dict[tuple[int, int], Certificate] = {}
+    for cert in (
+        db.query(Certificate)
+        .filter(Certificate.user_id.in_(user_ids))
+        .order_by(Certificate.issued_at)
+        .all()
+    ):
+        key = (cert.user_id, cert.course_id)
+        current = certs_by_pair.get(key)
+        if current is not None and _is_valid_certificate(current, now) and not _is_valid_certificate(cert, now):
+            continue
+        certs_by_pair[key] = cert
+
+    def cert_fields(user_id: int, course_id: int, enrolled: bool) -> dict:
+        cert = certs_by_pair.get((user_id, course_id))
+        if not cert:
+            return {
+                "certificate_number": "",
+                "certificate_issued_at": "",
+                "certificate_expires_at": "",
+                "certificate_status": "ยังไม่ได้รับ" if enrolled else "",
+            }
+        if cert.is_revoked:
+            status = "ถูกเพิกถอน"
+        elif _is_valid_certificate(cert, now):
+            status = "ใช้งานได้"
+        else:
+            status = "หมดอายุ"
+        return {
+            "certificate_number": cert.certificate_number,
+            "certificate_issued_at": _format_date(cert.issued_at),
+            "certificate_expires_at": _format_date(cert.expires_at) if cert.expires_at else "ไม่มีกำหนด",
+            "certificate_status": status,
+        }
+
+    rows: list[dict] = []
+    for user in users:
+        base = {
+            "full_name": user.full_name,
+            "position": user.position or "",
+            "department": user.department or "",
+            "user_active": "ใช้งานอยู่" if user.is_active else "ปิดใช้งาน",
+        }
+        user_rows: list[dict] = []
+        enrolled_course_ids: set[int] = set()
+
+        # Mandatory courses first, then by title — the order a reader scans a
+        # compliance report in.
+        enrollments = sorted(
+            enrollments_by_user.get(user.id, []),
+            key=lambda e: (
+                not (course_map.get(e.course_id) is not None and course_map[e.course_id].is_mandatory),
+                course_map[e.course_id].title if course_map.get(e.course_id) else "",
+            ),
+        )
+        for enrollment in enrollments:
+            course = course_map.get(enrollment.course_id)
+            if course is None:
+                continue
+            enrolled_course_ids.add(course.id)
+            total = int(lesson_counts.get(course.id, 0) or 0)
+            done = int(completed_lessons.get((user.id, course.id), 0))
+            progress = int(round((done / total) * 100)) if total else 0
+            if total and done >= total:
+                status = "เรียนจบ"
+            elif (user.id, course.id) in last_access:
+                status = "กำลังเรียน"
+            else:
+                status = "ลงทะเบียนแล้ว - ยังไม่เริ่มเรียน"
+
+            best = best_final.get((user.id, course.id))
+            if course.id not in courses_with_final:
+                quiz_score, quiz_result = "", "ไม่มีแบบทดสอบ"
+            elif best is None:
+                quiz_score, quiz_result = "", "ยังไม่ได้ทำ"
+            else:
+                quiz_score, quiz_result = best[0], "ผ่าน" if best[1] else "ยังไม่ผ่าน"
+
+            user_rows.append({
+                **base,
+                "course_title": course.title,
+                "course_category": category_labels.get(course.category, course.category),
+                "course_type": "บังคับ" if course.is_mandatory else "เลือกเรียน",
+                "learning_status": status,
+                "progress_percent": progress,
+                "lessons_completed": done,
+                "lessons_total": total,
+                "enrolled_at": _format_date(enrollment.enrolled_at),
+                "last_accessed_at": _format_datetime(last_access.get((user.id, course.id))),
+                "final_quiz_score": quiz_score,
+                "final_quiz_result": quiz_result,
+                **cert_fields(user.id, course.id, enrolled=True),
+            })
+
+        if user.is_active:
+            for course in mandatory_published:
+                if course.id in enrolled_course_ids:
+                    continue
+                user_rows.append({
+                    **base,
+                    "course_title": course.title,
+                    "course_category": category_labels.get(course.category, course.category),
+                    "course_type": "บังคับ",
+                    "learning_status": "ยังไม่ลงทะเบียน",
+                    "progress_percent": 0,
+                    "lessons_completed": 0,
+                    "lessons_total": int(lesson_counts.get(course.id, 0) or 0),
+                    "enrolled_at": "",
+                    "last_accessed_at": "",
+                    "final_quiz_score": "",
+                    "final_quiz_result": "",
+                    **cert_fields(user.id, course.id, enrolled=False),
+                })
+
+        if not user_rows:
+            user_rows.append({
+                **base,
+                "course_title": "-",
+                "course_category": "-",
+                "course_type": "-",
+                "learning_status": "ยังไม่ลงทะเบียนหลักสูตรใด",
+                "progress_percent": 0,
+                "lessons_completed": 0,
+                "lessons_total": 0,
+                "enrolled_at": "",
+                "last_accessed_at": "",
+                "final_quiz_score": "",
+                "final_quiz_result": "",
+                "certificate_number": "",
+                "certificate_issued_at": "",
+                "certificate_expires_at": "",
+                "certificate_status": "",
+            })
+
+        rows.extend(user_rows)
+
+    return rows
+
+
 def department_course_members_data(db: Session, department: str, course: Course) -> dict:
     """Department members crossed with one specific course: enrollment state,
     progress %, and current-cert status per member."""
@@ -582,6 +825,39 @@ def build_department_members_csv(rows: list[dict]) -> str:
             row.get(key, "")
             for key, _ in columns
         ])
+    return buf.getvalue()
+
+
+def build_department_progress_csv(rows: list[dict]) -> str:
+    """CSV body for the per-member-per-course progress report. ลำดับ column
+    because Thai official report tables lead with a running number."""
+    buf = io.StringIO()
+    buf.write("﻿")  # BOM for Excel
+    writer = csv.writer(buf)
+    columns = [
+        ("full_name", "ชื่อ-สกุล"),
+        ("position", "ตำแหน่ง"),
+        ("department", "หน่วยงาน"),
+        ("user_active", "สถานะผู้ใช้"),
+        ("course_title", "หลักสูตร"),
+        ("course_category", "หมวดหมู่"),
+        ("course_type", "ประเภทหลักสูตร"),
+        ("learning_status", "สถานะการเรียน"),
+        ("progress_percent", "ความคืบหน้า (%)"),
+        ("lessons_completed", "บทเรียนที่เรียนจบ"),
+        ("lessons_total", "บทเรียนทั้งหมด"),
+        ("enrolled_at", "วันที่ลงทะเบียน"),
+        ("last_accessed_at", "เข้าเรียนล่าสุด"),
+        ("final_quiz_score", "คะแนนแบบทดสอบสุดท้าย (%)"),
+        ("final_quiz_result", "ผลแบบทดสอบสุดท้าย"),
+        ("certificate_number", "เลขที่ใบรับรอง"),
+        ("certificate_issued_at", "วันที่ออกใบรับรอง"),
+        ("certificate_expires_at", "ใบรับรองหมดอายุ"),
+        ("certificate_status", "สถานะใบรับรอง"),
+    ]
+    writer.writerow(["ลำดับ"] + [label for _, label in columns])
+    for index, row in enumerate(rows, start=1):
+        writer.writerow([index] + [row.get(key, "") for key, _ in columns])
     return buf.getvalue()
 
 

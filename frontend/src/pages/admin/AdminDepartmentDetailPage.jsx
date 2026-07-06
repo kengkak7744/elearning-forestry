@@ -70,7 +70,8 @@ export default function AdminDepartmentDetailPage() {
     [courses]
   )
 
-  const csvHref = adminStatsApi.departmentMembersCsvUrl(department)
+  const membersCsvHref = adminStatsApi.departmentMembersCsvUrl(department)
+  const progressCsvHref = adminStatsApi.departmentProgressCsvUrl(department)
 
   if (!department) {
     return (
@@ -89,12 +90,20 @@ export default function AdminDepartmentDetailPage() {
         backTo="/admin/departments"
         backLabel="หน่วยงานทั้งหมด"
         actions={
-          <Button asChild variant="outline" size="sm">
-            <a href={csvHref} target="_blank" rel="noopener noreferrer">
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              ดาวน์โหลด CSV สมาชิก
-            </a>
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button asChild size="sm">
+              <a href={progressCsvHref} target="_blank" rel="noopener noreferrer">
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                CSV รายงานความคืบหน้า (รายหลักสูตร)
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={membersCsvHref} target="_blank" rel="noopener noreferrer">
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                CSV สรุปรายคน
+              </a>
+            </Button>
+          </div>
         }
       />
 

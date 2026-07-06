@@ -51,6 +51,7 @@ class UserResponse(UserBase):
     is_active: bool
     created_at: datetime
     profile_image: Optional[str] = None
+    email: str
 
     class Config:
         from_attributes = True

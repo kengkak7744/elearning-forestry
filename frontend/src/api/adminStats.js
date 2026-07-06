@@ -27,6 +27,9 @@ export const adminStatsApi = {
   // auth cookie rides along automatically.
   departmentMembersCsvUrl: (name) =>
     `${apiPathPrefix()}/admin/stats/departments/${encodeURIComponent(name)}/members.csv`,
+  // Per-member-per-course progress report (ใครเรียนอะไรถึงไหนแล้ว).
+  departmentProgressCsvUrl: (name) =>
+    `${apiPathPrefix()}/admin/stats/departments/${encodeURIComponent(name)}/progress.csv`,
   // Built like certificatesApi.downloadUrl — same path the API client uses,
   // so the browser navigates directly and the auth cookie rides along.
   departmentComplianceCsvUrl: () =>

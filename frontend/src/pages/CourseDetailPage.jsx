@@ -545,7 +545,9 @@ export default function CourseDetailPage() {
               disabled={enrollLoading}
               className="flex-shrink-0"
             >
-              {BUTTONS.CANCEL}
+              {/* Full "ยกเลิกการลงทะเบียน" — a bare "ยกเลิก" next to the primary
+                  CTA reads as a generic cancel, not unenroll */}
+              {BUTTONS.UNENROLL}
             </Button>
           )}
           <div className="flex-1">

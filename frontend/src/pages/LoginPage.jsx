@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import PasswordInput from '@/components/shared/PasswordInput'
 import { toastApiError } from '@/utils/apiError'
 
 export default function LoginPage() {
@@ -76,10 +77,9 @@ export default function LoginPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="login-password">รหัสผ่าน</Label>
-                <Input
+                <PasswordInput
                   id="login-password"
                   name="password"
-                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required

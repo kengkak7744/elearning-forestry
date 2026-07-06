@@ -3,8 +3,8 @@ import { authApi } from '@/api/auth'
 import { showToast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import PasswordInput from '@/components/shared/PasswordInput'
 import { toastApiError } from '@/utils/apiError'
 
 export default function SecurityTab() {
@@ -51,9 +51,8 @@ export default function SecurityTab() {
         <form onSubmit={handleSubmit} className="max-w-md space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="cur-pw">รหัสผ่านปัจจุบัน</Label>
-            <Input
+            <PasswordInput
               id="cur-pw"
-              type="password"
               required
               autoComplete="current-password"
               value={data.current_password}
@@ -62,9 +61,8 @@ export default function SecurityTab() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-pw">รหัสผ่านใหม่</Label>
-            <Input
+            <PasswordInput
               id="new-pw"
-              type="password"
               required
               minLength={6}
               autoComplete="new-password"
@@ -75,9 +73,8 @@ export default function SecurityTab() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="confirm-pw">ยืนยันรหัสผ่านใหม่</Label>
-            <Input
+            <PasswordInput
               id="confirm-pw"
-              type="password"
               required
               minLength={6}
               autoComplete="new-password"

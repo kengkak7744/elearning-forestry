@@ -24,7 +24,9 @@ export default function PromptInputDialog({ open, title, label, placeholder, onC
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="sm:max-w-md">
+      {/* aria-describedby={undefined}: the labelled input is the whole body —
+          there is no description element, so opt out of Radix's warning. */}
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

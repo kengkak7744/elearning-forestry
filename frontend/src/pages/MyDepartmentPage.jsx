@@ -74,7 +74,8 @@ export default function MyDepartmentPage() {
     [courses]
   )
 
-  const csvHref = adminStatsApi.departmentMembersCsvUrl(department)
+  const membersCsvHref = adminStatsApi.departmentMembersCsvUrl(department)
+  const progressCsvHref = adminStatsApi.departmentProgressCsvUrl(department)
 
   // Role guard — a regular learner who lands here directly shouldn't see a page
   // that just errors out behind the scenes.
@@ -109,12 +110,22 @@ export default function MyDepartmentPage() {
         title={department}
         subtitle="สมาชิกและสถิติของหน่วยงานคุณ — ความคืบหน้าหลักสูตรและการได้รับใบรับรอง"
         actions={
-          <Button asChild variant="outline" size="sm">
-            <a href={csvHref} target="_blank" rel="noopener noreferrer">
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              ดาวน์โหลด CSV สมาชิก
-            </a>
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {/* รายหลักสูตร = the row-per-course report a head attaches when
+                reporting upward; สมาชิก = the one-row-per-person summary */}
+            <Button asChild size="sm">
+              <a href={progressCsvHref} target="_blank" rel="noopener noreferrer">
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                CSV รายงานความคืบหน้า (รายหลักสูตร)
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={membersCsvHref} target="_blank" rel="noopener noreferrer">
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                CSV สรุปรายคน
+              </a>
+            </Button>
+          </div>
         }
       />
 

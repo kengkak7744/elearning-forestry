@@ -1,6 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Building2, LogOut, Settings, User as UserIcon } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -27,20 +28,47 @@ export default function LearnerTopBar() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link to="/" className="flex min-h-11 min-w-0 items-center gap-2.5">
-          <img
-            src="/elearning/forest_logo.png"
-            alt=""
-            width="36"
-            height="36"
-            fetchPriority="high"
-            className="h-9 w-9 flex-shrink-0"
-          />
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold text-foreground">e-Learning</div>
-            <div className="hidden text-xs text-muted-foreground sm:block">กรมป่าไม้</div>
-          </div>
-        </Link>
+        <div className="flex min-w-0 items-center gap-2">
+          <Link to="/" className="flex min-h-11 min-w-0 items-center gap-2.5">
+            <img
+              src="/elearning/forest_logo.png"
+              alt=""
+              width="36"
+              height="36"
+              fetchPriority="high"
+              className="h-9 w-9 flex-shrink-0"
+            />
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-sm font-semibold text-foreground">e-Learning</div>
+              <div className="hidden text-xs text-muted-foreground sm:block">กรมป่าไม้</div>
+            </div>
+          </Link>
+
+          {/* Desktop nav — mirrors MobileBottomNav (which is md:hidden) so
+              every viewport has a persistent way to reach the course catalog. */}
+          <nav aria-label="เมนูหลัก" className="ml-4 hidden items-center gap-1 md:flex">
+            {[
+              { to: '/', label: 'หน้าหลัก', end: true },
+              { to: '/courses', label: 'หลักสูตร' },
+            ].map(({ to, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  cn(
+                    'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

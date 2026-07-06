@@ -5,14 +5,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#085041" />
-    <link rel="icon" type="image/png" href="/elearning/forest_logo.png" />
+    <!-- Root path without the /elearning/ prefix — Vite rebases root-relative
+         URLs in index.html with `base` itself (dev and build), so hardcoding
+         the prefix produced /elearning/elearning/... -->
+    <link rel="icon" type="image/png" href="/forest_logo.png" />
     <!-- LCP image preload for the unauthenticated entry pages (Login,
          Register, Verify). fetchpriority works in Chrome/Edge but Safari
          ignores it; this preload covers all browsers. -->
     <link
       rel="preload"
       as="image"
-      href="/elearning/forest_logo.png"
+      href="/forest_logo.png"
       fetchpriority="high"
     />
 

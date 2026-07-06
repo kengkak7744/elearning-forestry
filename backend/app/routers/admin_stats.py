@@ -19,10 +19,12 @@ from app.models.course_feedback import CourseFeedback
 from app.services.stats import (
     build_department_compliance_csv,
     build_department_members_csv,
+    build_department_progress_csv,
     department_compliance_data,
     department_course_members_data,
     department_member_report_rows,
     department_members_rows,
+    department_progress_report_rows,
     overview_stats,
 )
 
@@ -415,6 +417,33 @@ def department_members_csv(
         c if (c.isascii() and c.isalnum()) else "_" for c in department
     )[:60]
     filename = f"department-{safe_name}-{stamp}.csv"
+    return StreamingResponse(
+        iter([body]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/departments/{department}/progress.csv")
+def department_progress_csv(
+    department: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_department_access),
+):
+    """Per-member-per-course progress CSV — the "ใครเรียนอะไรถึงไหนแล้ว"
+    detail a department head attaches when reporting upward. One row per
+    enrollment plus follow-up rows for un-enrolled mandatory courses; same
+    UTF-8 BOM + ASCII-safe filename treatment as members.csv."""
+    rows = department_progress_report_rows(db, department)
+    body = build_department_progress_csv(rows)
+    stamp = datetime.now().strftime("%Y%m%d")
+    safe_name = "".join(
+        c if (c.isascii() and c.isalnum()) else "_" for c in department
+    )[:60]
+    filename = f"department-progress-{safe_name}-{stamp}.csv"
     return StreamingResponse(
         iter([body]),
         media_type="text/csv; charset=utf-8",

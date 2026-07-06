@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import FormField from '@/components/auth/FormField'
+import PasswordInput from '@/components/shared/PasswordInput'
 
 export function AccountStep({ form, errors, update }) {
   return (
@@ -39,9 +40,8 @@ export function AccountStep({ form, errors, update }) {
           error={errors.password}
           hint="อย่างน้อย 6 ตัวอักษร"
         >
-          <Input
+          <PasswordInput
             id="reg-password"
-            type="password"
             value={form.password}
             onChange={update('password')}
             placeholder="••••••"
@@ -54,9 +54,8 @@ export function AccountStep({ form, errors, update }) {
           required
           error={errors.confirm_password}
         >
-          <Input
+          <PasswordInput
             id="reg-confirm"
-            type="password"
             value={form.confirm_password}
             onChange={update('confirm_password')}
             placeholder="พิมพ์รหัสผ่านอีกครั้ง"

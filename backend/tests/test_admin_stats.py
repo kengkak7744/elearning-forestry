@@ -7,6 +7,7 @@ import pytest
 from tests.conftest import make_user
 from tests.factories import (
     complete_all_lessons,
+    complete_lesson,
     enroll,
     make_course,
     make_lesson,
@@ -144,6 +145,76 @@ class TestDepartments:
         )
         assert res.status_code == 200
         assert "ชื่อผู้ใช้" in res.text
+
+    def test_department_progress_csv_row_per_course(self, admin_client, db):
+        user = make_user(
+            db,
+            username="prog_user",
+            department="Progress Dept",
+            full_name="สมชาย ทดสอบ",
+        )
+        course = make_course(db, title="หลักสูตรบังคับทดสอบ", is_mandatory=True)
+        module = make_module(db, course)
+        lesson = make_lesson(db, module)
+        make_lesson(db, module, title="บทเรียนที่ 2", order_index=1)
+        enroll(db, user, course)
+        complete_lesson(db, user, lesson)
+        quiz = make_quiz(db, course=course)
+        pass_quiz(db, user, quiz, score=85)
+
+        res = admin_client.get(
+            "/api/admin/stats/departments/Progress Dept/progress.csv"
+        )
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("text/csv")
+
+        rows = list(csv.DictReader(io.StringIO(res.content.decode("utf-8-sig"))))
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["ลำดับ"] == "1"
+        assert row["ชื่อ-สกุล"] == "สมชาย ทดสอบ"
+        assert row["หลักสูตร"] == "หลักสูตรบังคับทดสอบ"
+        assert row["หมวดหมู่"] == "วิชาชีพ"  # technical → seeded Thai label
+        assert row["ประเภทหลักสูตร"] == "บังคับ"
+        assert row["สถานะการเรียน"] == "กำลังเรียน"
+        assert row["ความคืบหน้า (%)"] == "50"
+        assert row["บทเรียนที่เรียนจบ"] == "1"
+        assert row["บทเรียนทั้งหมด"] == "2"
+        assert row["คะแนนแบบทดสอบสุดท้าย (%)"] == "85"
+        assert row["ผลแบบทดสอบสุดท้าย"] == "ผ่าน"
+        assert row["สถานะใบรับรอง"] == "ยังไม่ได้รับ"
+
+    def test_department_progress_csv_flags_unenrolled_mandatory(
+        self, admin_client, db
+    ):
+        make_user(
+            db,
+            username="gap_user",
+            department="Gap Dept",
+            full_name="สมหญิง ยังไม่เรียน",
+        )
+        make_course(db, title="หลักสูตรบังคับกลาง", is_mandatory=True)
+
+        res = admin_client.get("/api/admin/stats/departments/Gap Dept/progress.csv")
+        assert res.status_code == 200
+        rows = list(csv.DictReader(io.StringIO(res.content.decode("utf-8-sig"))))
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["หลักสูตร"] == "หลักสูตรบังคับกลาง"
+        assert row["ประเภทหลักสูตร"] == "บังคับ"
+        assert row["สถานะการเรียน"] == "ยังไม่ลงทะเบียน"
+
+    def test_department_progress_csv_placeholder_for_idle_member(
+        self, admin_client, db
+    ):
+        make_user(db, username="idle_user", department="Idle Dept")
+        make_course(db, title="หลักสูตรทั่วไป")  # not mandatory — no follow-up row
+
+        res = admin_client.get("/api/admin/stats/departments/Idle Dept/progress.csv")
+        assert res.status_code == 200
+        rows = list(csv.DictReader(io.StringIO(res.content.decode("utf-8-sig"))))
+        assert len(rows) == 1
+        assert rows[0]["สถานะการเรียน"] == "ยังไม่ลงทะเบียนหลักสูตรใด"
 
     def test_department_course_performance(self, admin_client, db, learner_user):
         course = make_course(db, is_mandatory=True)

@@ -36,17 +36,15 @@ export default function DashboardPage() {
   const [enrollments, setEnrollments] = useState(null)
   const [certs, setCerts] = useState(null)
   const [mandatory, setMandatory] = useState(null)
-  const [allCourses, setAllCourses] = useState(null)
   const [bookmarks, setBookmarks] = useState(null)
 
-  // Five parallel list fetches, each isolated: one failure degrades only its
+  // Four parallel list fetches, each isolated: one failure degrades only its
   // own section. Hero adds at most three more, scoped to one course. Nothing
   // here scales with the number of enrollments.
   useEffect(() => {
     coursesApi.myEnrollments().then(setEnrollments).catch(() => setEnrollments([]))
     certificatesApi.mine().then(setCerts).catch(() => setCerts([]))
     coursesApi.list({ is_mandatory: true }).then(setMandatory).catch(() => setMandatory([]))
-    coursesApi.list({ limit: 20 }).then(setAllCourses).catch(() => setAllCourses([]))
     coursesApi.myBookmarks().then(setBookmarks).catch(() => setBookmarks([]))
   }, [])
 
@@ -77,13 +75,11 @@ export default function DashboardPage() {
   }
 
   // My courses — in-progress first, then completed, minus the hero (it has the
-  // top card). Explore — published courses not yet enrolled in. Both capped at 8.
+  // top card). Capped at 8. (No "explore other courses" rail here — the home
+  // page stays focused on the user's own learning; the catalog lives at
+  // /courses via the nav.)
   const myCourses = [...inProgress, ...completed]
     .filter((e) => e.course_id !== hero?.course_id)
-    .slice(0, 8)
-  const enrolledIds = new Set(enrollmentList.map((e) => e.course_id))
-  const exploreCourses = (Array.isArray(allCourses) ? allCourses : [])
-    .filter((c) => c.is_published !== false && !enrolledIds.has(c.id))
     .slice(0, 8)
 
   const certCount = certs === null ? null : certList.filter((c) => !c.is_revoked).length
@@ -125,24 +121,6 @@ export default function DashboardPage() {
               }}
               variant="compact"
               progress={progressOf(e)}
-            />
-          ))}
-        </CourseRail>
-      )}
-
-      {exploreCourses.length > 0 && (
-        <CourseRail
-          title="หลักสูตรอื่น ๆ"
-          viewAllTo="/courses"
-          viewAllLabel={BUTTONS.VIEW_ALL_COURSES}
-        >
-          {exploreCourses.map((c) => (
-            <CourseCard
-              key={c.id}
-              course={c}
-              variant="compact"
-              bookmarked={bookmarkedIds.has(c.id)}
-              onToggleBookmark={() => toggleBookmark(c)}
             />
           ))}
         </CourseRail>

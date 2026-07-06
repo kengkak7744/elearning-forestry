@@ -41,7 +41,9 @@ export default function ProfilePage() {
       </Card>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="mb-6 w-full justify-start overflow-x-auto sm:w-auto">
+        {/* flex-wrap on mobile: 5 tabs overflow 390px, and a scrollable row
+            hides the last tab (ใบรับรอง) with no affordance — wrap instead */}
+        <TabsList className="mb-6 h-auto w-full flex-wrap justify-start gap-1 sm:w-auto sm:flex-nowrap">
           <TabsTrigger value="profile">โปรไฟล์</TabsTrigger>
           <TabsTrigger value="security">ความปลอดภัย</TabsTrigger>
           <TabsTrigger value="courses">หลักสูตรของฉัน</TabsTrigger>

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import PasswordInput from '@/components/shared/PasswordInput'
 import { toastApiError } from '@/utils/apiError'
 
 const emptyForm = {
@@ -168,9 +169,8 @@ export default function UserFormSheet({ open, onOpenChange, userId, onSaved }) {
                 <Label htmlFor="u-password">
                   รหัสผ่าน <span className="text-destructive">*</span>
                 </Label>
-                <Input
+                <PasswordInput
                   id="u-password"
-                  type="password"
                   required
                   minLength={6}
                   value={form.password}

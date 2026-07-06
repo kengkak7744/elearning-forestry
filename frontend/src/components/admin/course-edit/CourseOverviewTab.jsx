@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ImageIcon, Settings2 } from 'lucide-react'
+import { ImageIcon, Tags } from 'lucide-react'
 import { useCategories } from '@/hooks/useCategories'
 import { mediaUrl } from '@/utils/media'
 import { Button } from '@/components/ui/button'
@@ -113,7 +113,8 @@ export default function CourseOverviewTab({
                   className="h-6 px-2 text-xs text-muted-foreground"
                   onClick={() => setCategoriesOpen(true)}
                 >
-                  <Settings2 className="mr-1 h-3 w-3" aria-hidden="true" />
+                  {/* Tags — same icon as the courses-list button for this action */}
+                  <Tags className="mr-1 h-3 w-3" aria-hidden="true" />
                   จัดการหมวดหมู่
                 </Button>
               </div>
