@@ -24,3 +24,4 @@ WEB_QUALITY_AUDIT_REPORT.md
 scripts/build_slides.py
 WEBSITE_MANUAL_TH.md
 docs/
+backend/loadtest/

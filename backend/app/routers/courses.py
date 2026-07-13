@@ -5,11 +5,12 @@ import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import Optional
 from app.config import settings
 from app.database import get_db
 from app.models.bookmark import Bookmark
+from app.models.certificate import Certificate
 from app.models.course import Course, Module, CourseCategory
 from app.models.lesson import Lesson, LessonResource, ContentType
 from app.models.lesson_note import LessonNote
@@ -36,6 +37,7 @@ ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 # Duplicate-course media copy uses the same dirs as the upload paths in lessons.py.
 _VIDEO_DIR = Path(settings.VIDEO_DIR)
 _PDF_DIR = Path(settings.PDF_DIR)
+_CERT_DIR = Path(settings.CERT_DIR)
 
 
 def _copy_media_file(content_url: Optional[str]) -> Optional[str]:
@@ -68,6 +70,101 @@ def _copy_media_file(content_url: Optional[str]) -> Optional[str]:
         logger.exception("clone: failed to copy %s", src_path)
         return content_url
     return f"{url_prefix}/{new_name}"
+
+
+def _local_media_path(url: Optional[str]) -> Optional[Path]:
+    """Map an internal media URL to a direct child of its configured root."""
+    if not url:
+        return None
+    locations = (
+        (("/videos/", "/elearning/videos/"), _VIDEO_DIR),
+        (("/pdfs/", "/elearning/pdfs/"), _PDF_DIR),
+        (("/images/", "/elearning/images/"), IMAGE_DIR),
+    )
+    for prefixes, base_dir in locations:
+        for prefix in prefixes:
+            if not url.startswith(prefix):
+                continue
+            filename = url[len(prefix):]
+            if not filename or Path(filename).name != filename:
+                return None
+            base = base_dir.resolve()
+            candidate = (base / filename).resolve()
+            return candidate if candidate.parent == base else None
+    return None
+
+
+def _media_url_variants(path: Path) -> set[str]:
+    """Return both routed URL forms that can reference one stored file."""
+    locations = (
+        (_VIDEO_DIR, "videos"),
+        (_PDF_DIR, "pdfs"),
+        (IMAGE_DIR, "images"),
+    )
+    for base_dir, prefix in locations:
+        if path.parent == base_dir.resolve():
+            return {f"/{prefix}/{path.name}", f"/elearning/{prefix}/{path.name}"}
+    return set()
+
+
+def _media_file_is_referenced(db: Session, path: Path) -> bool:
+    """Protect media shared by cloned courses or referenced elsewhere."""
+    urls = _media_url_variants(path)
+    if not urls:
+        return True
+    if db.query(Lesson.id).filter(
+        or_(Lesson.content_url.in_(urls), Lesson.caption_url.in_(urls))
+    ).first():
+        return True
+    if db.query(LessonResource.id).filter(LessonResource.url.in_(urls)).first():
+        return True
+    if db.query(Course.id).filter(Course.cover_image.in_(urls)).first():
+        return True
+    return db.query(User.id).filter(User.profile_image.in_(urls)).first() is not None
+
+
+def _certificate_file_path(stored_path: str) -> Optional[Path]:
+    """Resolve a generated certificate path without allowing root escape."""
+    base = _CERT_DIR.resolve()
+    candidate = Path(stored_path)
+    if not candidate.is_absolute():
+        candidate = base / candidate
+    candidate = candidate.resolve()
+    return candidate if candidate.parent == base else None
+
+
+def _cleanup_course_files(
+    db: Session,
+    media_urls: set[str],
+    certificate_paths: set[str],
+) -> None:
+    """Best-effort cleanup after the course deletion has committed."""
+    media_paths = {path for url in media_urls if (path := _local_media_path(url))}
+    for path in media_paths:
+        try:
+            if not _media_file_is_referenced(db, path):
+                path.unlink(missing_ok=True)
+        except Exception:
+            logger.exception("course delete: failed to remove media file %s", path)
+
+    try:
+        remaining_certificate_paths = {
+            path
+            for stored_path, in db.query(Certificate.pdf_path)
+            .filter(Certificate.pdf_path.is_not(None))
+            .all()
+            if (path := _certificate_file_path(stored_path))
+        }
+        certificate_files = {
+            path
+            for stored_path in certificate_paths
+            if (path := _certificate_file_path(stored_path))
+        }
+        for path in certificate_files:
+            if path not in remaining_certificate_paths:
+                path.unlink(missing_ok=True)
+    except Exception:
+        logger.exception("course delete: failed to clean up certificate files")
 
 
 def _clone_quiz_into(source_quiz: Quiz, db: Session, *, new_course_id=None, new_lesson_id=None) -> Quiz:
@@ -381,6 +478,27 @@ def delete_course(
 ):
     course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
 
+    lesson_media = (
+        db.query(Lesson.content_url, Lesson.caption_url)
+        .join(Module, Module.id == Lesson.module_id)
+        .filter(Module.course_id == course_id)
+        .all()
+    )
+    media_urls = {
+        url
+        for row in lesson_media
+        for url in row
+        if url
+    }
+    if course.cover_image:
+        media_urls.add(course.cover_image)
+    certificate_paths = {
+        path
+        for path, in db.query(Certificate.pdf_path)
+        .filter(Certificate.course_id == course_id, Certificate.pdf_path.is_not(None))
+        .all()
+    }
+
     title = course.title
     log_action(
         db, user, "course.delete",
@@ -390,6 +508,7 @@ def delete_course(
     )
     db.delete(course)
     db.commit()
+    _cleanup_course_files(db, media_urls, certificate_paths)
 
     return {"message": f"ลบหลักสูตร '{title}' เรียบร้อย"}
 

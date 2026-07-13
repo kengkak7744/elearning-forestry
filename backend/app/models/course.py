@@ -48,7 +48,7 @@ class Course(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     modules = relationship("Module", back_populates="course", cascade="all, delete-orphan")
-    certificates = relationship("Certificate", back_populates="course")
+    certificates = relationship("Certificate", back_populates="course", cascade="all, delete-orphan")
     enrollments = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
 
 

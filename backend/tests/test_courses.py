@@ -1,6 +1,13 @@
 """Characterization tests for /api/courses (catalog, enrollment, bookmarks)."""
+import pytest
+from sqlalchemy.orm import Session as SQLAlchemySession
+
 from tests.factories import enroll, make_course, make_lesson, make_module, make_question, make_quiz
+from app.models.certificate import Certificate
+from app.models.course import Course
+from app.models.lesson import ContentType, LessonResource
 from app.models.quiz import QuizPlacement
+from app.routers import courses as courses_router
 
 
 def course_payload(**overrides):
@@ -51,6 +58,149 @@ class TestCreateUpdateDelete:
         res = admin_client.delete(f"/api/courses/{course.id}")
         assert res.status_code == 200
         assert res.json()["message"] == f"ลบหลักสูตร '{course.title}' เรียบร้อย"
+
+    def test_delete_course_with_certificate(self, admin_client, db, learner_user):
+        course = make_course(db)
+        certificate = Certificate(
+            user_id=learner_user.id,
+            course_id=course.id,
+            certificate_number='CERT-DELETE-000001',
+        )
+        db.add(certificate)
+        db.commit()
+        course_id = course.id
+        certificate_id = certificate.id
+
+        res = admin_client.delete(f'/api/courses/{course_id}')
+
+        assert res.status_code == 200
+        db.expire_all()
+        assert db.get(Course, course_id) is None
+        assert db.get(Certificate, certificate_id) is None
+
+    def test_delete_course_removes_owned_local_files(
+        self, admin_client, db, learner_user, tmp_path, monkeypatch
+    ):
+        video_dir = tmp_path / "videos"
+        pdf_dir = tmp_path / "pdfs"
+        image_dir = tmp_path / "images"
+        cert_dir = tmp_path / "certificates"
+        for directory in (video_dir, pdf_dir, image_dir, cert_dir):
+            directory.mkdir()
+
+        monkeypatch.setattr(courses_router, "_VIDEO_DIR", video_dir)
+        monkeypatch.setattr(courses_router, "_PDF_DIR", pdf_dir)
+        monkeypatch.setattr(courses_router, "IMAGE_DIR", image_dir)
+        monkeypatch.setattr(courses_router, "_CERT_DIR", cert_dir)
+
+        course = make_course(db, cover_image="/elearning/images/cover.png")
+        module = make_module(db, course)
+        make_lesson(
+            db,
+            module,
+            content_url="/videos/lesson.mp4",
+            caption_url="/elearning/videos/lesson.vtt",
+        )
+        make_lesson(
+            db,
+            module,
+            content_type=ContentType.PDF,
+            content_url="/elearning/pdfs/handbook.pdf",
+            order_index=1,
+        )
+        certificate_path = cert_dir / "CERT-FILES.pdf"
+        db.add(Certificate(
+            user_id=learner_user.id,
+            course_id=course.id,
+            certificate_number="CERT-FILES-000001",
+            pdf_path=str(certificate_path),
+        ))
+        db.commit()
+
+        owned_paths = [
+            video_dir / "lesson.mp4",
+            video_dir / "lesson.vtt",
+            pdf_dir / "handbook.pdf",
+            image_dir / "cover.png",
+            certificate_path,
+        ]
+        for path in owned_paths:
+            path.write_bytes(b"owned")
+        sentinels = [
+            video_dir / "keep.mp4",
+            pdf_dir / "keep.pdf",
+            image_dir / "keep.png",
+            cert_dir / "keep.pdf",
+        ]
+        for path in sentinels:
+            path.write_bytes(b"keep")
+
+        res = admin_client.delete(f"/api/courses/{course.id}")
+
+        assert res.status_code == 200
+        assert all(not path.exists() for path in owned_paths)
+        assert all(path.exists() for path in sentinels)
+
+    def test_delete_course_preserves_shared_files(
+        self, admin_client, db, tmp_path, monkeypatch
+    ):
+        video_dir = tmp_path / "videos"
+        image_dir = tmp_path / "images"
+        video_dir.mkdir()
+        image_dir.mkdir()
+        monkeypatch.setattr(courses_router, "_VIDEO_DIR", video_dir)
+        monkeypatch.setattr(courses_router, "IMAGE_DIR", image_dir)
+
+        shared_video = video_dir / "shared.mp4"
+        shared_cover = image_dir / "shared.png"
+        shared_video.write_bytes(b"video")
+        shared_cover.write_bytes(b"cover")
+
+        doomed = make_course(db, cover_image="/images/shared.png")
+        doomed_module = make_module(db, doomed)
+        make_lesson(db, doomed_module, content_url="/videos/shared.mp4")
+
+        keeper = make_course(db, title="keeper", cover_image="/elearning/images/shared.png")
+        keeper_module = make_module(db, keeper)
+        keeper_lesson = make_lesson(
+            db, keeper_module, content_url="https://example.com/video"
+        )
+        db.add(LessonResource(
+            lesson_id=keeper_lesson.id,
+            title="shared video",
+            url="/elearning/videos/shared.mp4",
+        ))
+        db.commit()
+
+        res = admin_client.delete(f"/api/courses/{doomed.id}")
+
+        assert res.status_code == 200
+        assert shared_video.exists()
+        assert shared_cover.exists()
+
+    def test_delete_course_keeps_files_when_commit_fails(
+        self, admin_client, db, tmp_path, monkeypatch
+    ):
+        video_dir = tmp_path / "videos"
+        video_dir.mkdir()
+        monkeypatch.setattr(courses_router, "_VIDEO_DIR", video_dir)
+        course = make_course(db)
+        module = make_module(db, course)
+        make_lesson(db, module, content_url="/videos/lesson.mp4")
+        video_path = video_dir / "lesson.mp4"
+        video_path.write_bytes(b"video")
+
+        def fail_commit(_session):
+            raise RuntimeError("commit failed")
+
+        monkeypatch.setattr(SQLAlchemySession, "commit", fail_commit)
+
+        with pytest.raises(RuntimeError, match="commit failed"):
+            admin_client.delete(f"/api/courses/{course.id}")
+
+        assert video_path.exists()
+        db.expire_all()
+        assert db.get(Course, course.id) is not None
 
     def test_duplicate_course(self, admin_client, db):
         course = make_course(db, title="ต้นฉบับ")
