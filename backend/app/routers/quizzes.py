@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 
@@ -11,7 +12,7 @@ from app.models.lesson import Lesson
 from app.models.course import Course, Module
 from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse,
-    QuestionCreate, QuestionUpdate, QuestionResponse,
+    QuestionBulkCreate, QuestionCreate, QuestionUpdate, QuestionResponse,
     AnswerSubmit, AttemptResponse,
 )
 from app.services.quiz_grading import grade_attempt
@@ -475,6 +476,33 @@ def create_question(
     db.commit()
     db.refresh(question)
     return question
+
+
+@router.post("/{quiz_id}/questions/bulk", response_model=list[QuestionResponse])
+def create_questions_bulk(
+    quiz_id: int,
+    payload: QuestionBulkCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_quiz_editor),
+):
+    get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
+    last_order = (
+        db.query(func.max(Question.order_index))
+        .filter(Question.quiz_id == quiz_id)
+        .scalar()
+    )
+    start_order = (last_order if last_order is not None else -1) + 1
+    questions = []
+    for offset, item in enumerate(payload.questions):
+        data = item.model_dump()
+        data["order_index"] = start_order + offset
+        questions.append(Question(quiz_id=quiz_id, **data))
+
+    db.add_all(questions)
+    db.commit()
+    for question in questions:
+        db.refresh(question)
+    return questions
 
 
 @router.patch("/questions/{question_id}", response_model=QuestionResponse)

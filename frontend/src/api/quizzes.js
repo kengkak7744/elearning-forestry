@@ -68,6 +68,13 @@ export const quizzesApi = {
     return response.data
   },
 
+  addQuestionsBulk: async (quizId, questions) => {
+    const response = await client.post(`/quizzes/${quizId}/questions/bulk`, {
+      questions,
+    })
+    return response.data
+  },
+
   updateQuestion: async (questionId, data) => {
     const response = await client.patch(`/quizzes/questions/${questionId}`, data)
     return response.data

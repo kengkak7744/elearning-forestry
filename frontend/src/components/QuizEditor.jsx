@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  ClipboardPaste,
   LineChart,
   Plus,
   Save,
@@ -24,6 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import BulkQuestionImportDialog from './BulkQuestionImportDialog'
 import QuestionEditor from './QuestionEditor'
 import QuizStatsModal from './QuizStatsModal'
 import { toastApiError } from '@/utils/apiError'
@@ -38,6 +40,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [confirmDeleteQ, setConfirmDeleteQ] = useState(null)
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [draft, setDraft] = useState({
     title: quiz.title,
@@ -97,6 +100,10 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
         q.id === questionId ? { ...q, ...updates } : q
       ),
     })
+  }
+
+  const handleBulkQuestionsImported = (questions) => {
+    onUpdate({ questions: [...quiz.questions, ...questions] })
   }
 
   const handleDeleteQuestion = async () => {
@@ -357,6 +364,15 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
               <Button
                 size="sm"
                 variant="outline"
+                onClick={() => setBulkImportOpen(true)}
+                className="border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
+              >
+                <ClipboardPaste className="mr-1 h-3.5 w-3.5" />
+                วางคำถามหลายข้อ
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleAddQuestion('single_choice')}
               >
                 <Plus className="mr-1 h-3 w-3" />
@@ -391,6 +407,14 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
           </div>
         </div>
       )}
+
+      <BulkQuestionImportDialog
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
+        quizId={quiz.id}
+        onImported={handleBulkQuestionsImported}
+        showToast={showToast}
+      />
 
       <AlertDialog
         open={!!confirmDeleteQ}

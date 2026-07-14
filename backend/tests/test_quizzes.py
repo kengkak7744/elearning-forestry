@@ -93,6 +93,58 @@ class TestQuizCrud:
         )
         assert res.status_code == 403
 
+    def test_bulk_create_questions_appends_in_order(self, admin_client, db):
+        quiz = make_quiz(db, course=make_course(db))
+        make_question(db, quiz, order_index=4)
+        res = admin_client.post(
+            f"/api/quizzes/{quiz.id}/questions/bulk",
+            json={
+                "questions": [
+                    {
+                        "question_text": "ข้อใดเป็นผลเสียของการจัดการเชื้อเพลิงที่ไม่เหมาะสม",
+                        "question_type": "single_choice",
+                        "choices": [
+                            {"text": "เพิ่มความปลอดภัย", "is_correct": False},
+                            {"text": "เกิดไฟหลุดจากพื้นที่ควบคุม", "is_correct": True},
+                        ],
+                    },
+                    {
+                        "question_text": "เครื่องมือใดนิยมใช้เปิดแนวกันไฟ",
+                        "question_type": "single_choice",
+                        "choices": [
+                            {"text": "คราดและจอบ", "is_correct": True},
+                            {"text": "กล้องส่องทางไกล", "is_correct": False},
+                        ],
+                    },
+                ]
+            },
+        )
+
+        assert res.status_code == 200
+        rows = res.json()
+        assert [row["order_index"] for row in rows] == [5, 6]
+        assert rows[0]["choices"][1]["is_correct"] is True
+        assert rows[1]["question_text"] == "เครื่องมือใดนิยมใช้เปิดแนวกันไฟ"
+
+    def test_bulk_create_questions_rejects_empty_list(self, admin_client, db):
+        quiz = make_quiz(db, course=make_course(db))
+        res = admin_client.post(
+            f"/api/quizzes/{quiz.id}/questions/bulk", json={"questions": []}
+        )
+        assert res.status_code == 422
+
+    def test_bulk_create_questions_learner_denied(self, learner_client, db):
+        quiz = make_quiz(db, course=make_course(db))
+        res = learner_client.post(
+            f"/api/quizzes/{quiz.id}/questions/bulk",
+            json={
+                "questions": [
+                    {"question_text": "x", "question_type": "opinion"}
+                ]
+            },
+        )
+        assert res.status_code == 403
+
 
 class TestAnswerKeyStripping:
     def _lesson_quiz(self, db):

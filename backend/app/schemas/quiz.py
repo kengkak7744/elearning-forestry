@@ -19,6 +19,10 @@ class QuestionCreate(QuestionBase):
     pass
 
 
+class QuestionBulkCreate(BaseModel):
+    questions: List[QuestionCreate] = Field(min_length=1, max_length=500)
+
+
 class QuestionUpdate(BaseModel):
     question_text: Optional[str] = None
     question_type: Optional[QuestionType] = None
