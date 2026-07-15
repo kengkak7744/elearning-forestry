@@ -28,6 +28,11 @@ export const quizzesApi = {
     return response.data
   },
 
+  getQuestionPool: async (quizId) => {
+    const response = await client.get(`/quizzes/admin/${quizId}/question-pool`)
+    return response.data
+  },
+
   getStats: async (quizId) => {
     const response = await client.get(`/quizzes/admin/${quizId}/stats`)
     return response.data

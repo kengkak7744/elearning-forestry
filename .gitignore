@@ -5,7 +5,7 @@ __pycache__/
 .vscode/
 *.log
 public/
-backend/alembic/versions/
+backend/alembic/versions
 .claude
 .agents
 skills-lock.json

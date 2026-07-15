@@ -1,9 +1,38 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime, JSON, Enum as SQLEnum
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum as SQLEnum,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Table,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
 
 from app.database import Base
+
+
+final_quiz_question_sources = Table(
+    'final_quiz_question_sources',
+    Base.metadata,
+    Column(
+        'quiz_id',
+        Integer,
+        ForeignKey('quizzes.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column(
+        'question_id',
+        Integer,
+        ForeignKey('questions.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+)
 
 
 class QuizPlacement(str, enum.Enum):
@@ -40,12 +69,26 @@ class Quiz(Base):
     # How many to serve when randomize_questions is True. If null or ≥ bank size,
     # the whole bank is served (in random order).
     questions_per_attempt = Column(Integer, nullable=True)
+    # Where a course-level final exam gets its bank. The own mode preserves
+    # legacy behaviour; sourced modes reuse gradable lesson-quiz questions.
+    question_pool_mode = Column(
+        String(24), default='own', server_default='own', nullable=False
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     lesson = relationship("Lesson", back_populates="quizzes")
     course = relationship("Course")
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan", order_by="Question.order_index")
+    source_questions = relationship(
+        "Question",
+        secondary=final_quiz_question_sources,
+        order_by="Question.id",
+    )
     attempts = relationship("QuizAttempt", back_populates="quiz", cascade="all, delete-orphan")
+
+    @property
+    def selected_question_ids(self):
+        return [question.id for question in self.source_questions]
 
 
 class Question(Base):
@@ -75,6 +118,8 @@ class QuizAttempt(Base):
     quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
     score = Column(Integer, default=0)  # percentage 0-100
     answers = Column(JSON, nullable=True)  # {question_id: answer_value}
+    # Snapshot of the exact bank/subset served for stable attempt history.
+    question_ids = Column(JSON, nullable=True)
     is_passed = Column(Boolean, default=False)
     attempted_at = Column(DateTime(timezone=True), server_default=func.now())
 

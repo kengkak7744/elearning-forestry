@@ -1,7 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any
 from datetime import datetime
+from enum import Enum
 from app.models.quiz import QuizPlacement, QuestionType
+
+
+class QuestionPoolMode(str, Enum):
+    OWN = 'own'
+    ALL_LESSONS = 'all_lessons'
+    SELECTED = 'selected'
 
 
 class QuestionBase(BaseModel):
@@ -51,11 +58,13 @@ class QuizBase(BaseModel):
     order_index: int = 0
     randomize_questions: bool = False
     questions_per_attempt: Optional[int] = None
+    question_pool_mode: QuestionPoolMode = QuestionPoolMode.OWN
 
 
 class QuizCreate(QuizBase):
     lesson_id: Optional[int] = None
     course_id: Optional[int] = None
+    selected_question_ids: Optional[List[int]] = None
 
 
 class QuizUpdate(BaseModel):
@@ -67,13 +76,16 @@ class QuizUpdate(BaseModel):
     order_index: Optional[int] = None
     randomize_questions: Optional[bool] = None
     questions_per_attempt: Optional[int] = None
+    question_pool_mode: Optional[QuestionPoolMode] = None
+    selected_question_ids: Optional[List[int]] = None
 
 
 class QuizResponse(QuizBase):
     id: int
     lesson_id: Optional[int]
     course_id: Optional[int]
-    questions: List[QuestionResponse] = []
+    questions: List[QuestionResponse] = Field(default_factory=list)
+    selected_question_ids: List[int] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -93,6 +105,7 @@ class AttemptResponse(BaseModel):
     quiz_id: int
     score: int
     answers: dict
+    question_ids: Optional[List[int]] = None
     is_passed: bool
     attempted_at: datetime
     # For UI display: which questions were right/wrong

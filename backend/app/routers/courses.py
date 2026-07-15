@@ -70,8 +70,17 @@ def _copy_media_file(content_url: Optional[str]) -> Optional[str]:
     return f"{url_prefix}/{new_name}"
 
 
-def _clone_quiz_into(source_quiz: Quiz, db: Session, *, new_course_id=None, new_lesson_id=None) -> Quiz:
+def _clone_quiz_into(
+    source_quiz: Quiz,
+    db: Session,
+    *,
+    new_course_id=None,
+    new_lesson_id=None,
+    question_map=None,
+) -> Quiz:
     """Deep-copy a quiz including all its questions."""
+    if question_map is None:
+        question_map = {}
     new_quiz = Quiz(
         course_id=new_course_id,
         lesson_id=new_lesson_id,
@@ -84,11 +93,12 @@ def _clone_quiz_into(source_quiz: Quiz, db: Session, *, new_course_id=None, new_
         order_index=source_quiz.order_index,
         randomize_questions=source_quiz.randomize_questions,
         questions_per_attempt=source_quiz.questions_per_attempt,
+        question_pool_mode=source_quiz.question_pool_mode,
     )
     db.add(new_quiz)
     db.flush()  # need new_quiz.id for child Questions
     for src_q in source_quiz.questions:
-        db.add(Question(
+        new_question = Question(
             quiz_id=new_quiz.id,
             question_text=src_q.question_text,
             question_type=src_q.question_type,
@@ -97,7 +107,9 @@ def _clone_quiz_into(source_quiz: Quiz, db: Session, *, new_course_id=None, new_
             explanation=src_q.explanation,
             points=src_q.points,
             order_index=src_q.order_index,
-        ))
+        )
+        db.add(new_question)
+        question_map[src_q.id] = new_question
     return new_quiz
 
 
@@ -446,6 +458,12 @@ def duplicate_course(
     db.add(new_course)
     db.flush()
 
+    # Source-question selections on a final quiz point at lesson-quiz
+    # questions. Record every cloned question first, then reconnect those
+    # selections once all lesson quizzes have been copied.
+    question_map = {}
+    quiz_pairs = []
+
     # Course-level (final) quizzes attach via course_id, not via any lesson.
     course_level_quizzes = (
         db.query(Quiz)
@@ -454,7 +472,13 @@ def duplicate_course(
         .all()
     )
     for q in course_level_quizzes:
-        _clone_quiz_into(q, db, new_course_id=new_course.id)
+        new_quiz = _clone_quiz_into(
+            q,
+            db,
+            new_course_id=new_course.id,
+            question_map=question_map,
+        )
+        quiz_pairs.append((q, new_quiz))
 
     for source_module in sorted(source.modules, key=lambda m: m.order_index or 0):
         new_module = Module(
@@ -500,7 +524,20 @@ def duplicate_course(
                 ))
 
             for src_quiz in source_lesson.quizzes:
-                _clone_quiz_into(src_quiz, db, new_lesson_id=new_lesson.id)
+                new_quiz = _clone_quiz_into(
+                    src_quiz,
+                    db,
+                    new_lesson_id=new_lesson.id,
+                    question_map=question_map,
+                )
+                quiz_pairs.append((src_quiz, new_quiz))
+
+    for source_quiz, new_quiz in quiz_pairs:
+        new_quiz.source_questions = [
+            question_map[source_question.id]
+            for source_question in source_quiz.source_questions
+            if source_question.id in question_map
+        ]
 
     log_action(
         db, user, "course.duplicate",

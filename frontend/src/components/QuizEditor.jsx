@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -26,14 +26,31 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import BulkQuestionImportDialog from './BulkQuestionImportDialog'
+import FinalQuestionPoolSettings from './FinalQuestionPoolSettings'
 import QuestionEditor from './QuestionEditor'
 import QuizStatsModal from './QuizStatsModal'
-import { toastApiError } from '@/utils/apiError'
+import { getApiErrorMessage, toastApiError } from '@/utils/apiError'
 
 const placementLabels = {
   mid_video: 'กลางวิดีโอ',
   end_of_lesson: 'ท้ายบทเรียน',
   final: 'แบบทดสอบสุดท้าย',
+}
+
+function createSettingsDraft(quiz) {
+  return {
+    title: quiz.title,
+    trigger_time: quiz.trigger_time || 0,
+    can_skip: quiz.can_skip,
+    show_correct_answer: quiz.show_correct_answer,
+    passing_score: quiz.passing_score,
+    randomize_questions: quiz.randomize_questions || false,
+    questions_per_attempt: quiz.questions_per_attempt || '',
+    question_pool_mode: quiz.question_pool_mode || 'own',
+    selected_question_ids: Array.isArray(quiz.selected_question_ids)
+      ? quiz.selected_question_ids.map(Number)
+      : [],
+  }
 }
 
 export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
@@ -42,33 +59,144 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
   const [confirmDeleteQ, setConfirmDeleteQ] = useState(null)
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
-  const [draft, setDraft] = useState({
-    title: quiz.title,
-    trigger_time: quiz.trigger_time || 0,
-    can_skip: quiz.can_skip,
-    show_correct_answer: quiz.show_correct_answer,
-    passing_score: quiz.passing_score,
-    randomize_questions: quiz.randomize_questions || false,
-    questions_per_attempt: quiz.questions_per_attempt || '',
-  })
+  const [draft, setDraft] = useState(() => createSettingsDraft(quiz))
+  const [questionPool, setQuestionPool] = useState(null)
+  const [questionPoolLoading, setQuestionPoolLoading] = useState(false)
+  const [questionPoolError, setQuestionPoolError] = useState('')
+  const [questionPoolReloadKey, setQuestionPoolReloadKey] = useState(0)
+
+  useEffect(() => {
+    if (!expanded || quiz.placement !== 'final') return undefined
+
+    let ignore = false
+    const loadQuestionPool = async () => {
+      setQuestionPoolLoading(true)
+      setQuestionPoolError('')
+      try {
+        const data = await quizzesApi.getQuestionPool(quiz.id)
+        if (ignore) return
+        setQuestionPool(data)
+        if (!quiz.question_pool_mode && data.question_pool_mode) {
+          setDraft((current) => ({
+            ...current,
+            question_pool_mode: data.question_pool_mode,
+            selected_question_ids: Array.isArray(data.selected_question_ids)
+              ? data.selected_question_ids.map(Number)
+              : [],
+            randomize_questions:
+              data.question_pool_mode === 'own' ? current.randomize_questions : true,
+          }))
+        }
+      } catch (err) {
+        if (!ignore) {
+          setQuestionPoolError(getApiErrorMessage(err, 'ไม่สามารถโหลดคลังคำถามได้'))
+        }
+      } finally {
+        if (!ignore) setQuestionPoolLoading(false)
+      }
+    }
+
+    loadQuestionPool()
+    return () => {
+      ignore = true
+    }
+  }, [expanded, questionPoolReloadKey, quiz.id, quiz.placement, quiz.question_pool_mode])
+
+  const poolMode = draft.question_pool_mode || 'own'
+  const availableQuestions = Array.isArray(questionPool?.available_questions)
+    ? questionPool.available_questions
+    : []
+  const availableQuestionIds = new Set(availableQuestions.map((question) => Number(question.id)))
+  const validSelectedQuestionIds = (draft.selected_question_ids || [])
+    .map(Number)
+    .filter((id) => availableQuestionIds.has(id))
+  const effectivePoolSize =
+    poolMode === 'own'
+      ? quiz.questions.length
+      : poolMode === 'all_lessons'
+        ? availableQuestions.length
+        : new Set(validSelectedQuestionIds).size
+  const sourcedPoolReady =
+    !!questionPool && !questionPoolLoading && !questionPoolError
+  const amountText = String(draft.questions_per_attempt ?? '').trim()
+  const parsedAmount = amountText === '' ? null : Number(amountText)
+  const usesQuestionAmount = poolMode !== 'own' || draft.randomize_questions
+  const amountError =
+    usesQuestionAmount &&
+    parsedAmount !== null &&
+    (!Number.isInteger(parsedAmount) || parsedAmount < 1)
+      ? 'จำนวนข้อต่อครั้งต้องเป็นเลขจำนวนเต็มตั้งแต่ 1 ขึ้นไป'
+      : usesQuestionAmount &&
+          parsedAmount !== null &&
+          (poolMode === 'own' || sourcedPoolReady) &&
+          effectivePoolSize > 0 &&
+          parsedAmount > effectivePoolSize
+        ? `จำนวนข้อต่อครั้งต้องไม่เกิน ${effectivePoolSize} ข้อ`
+        : ''
+  const sourceError =
+    quiz.placement === 'final' && poolMode !== 'own' && sourcedPoolReady
+      ? effectivePoolSize === 0
+        ? poolMode === 'selected'
+          ? 'กรุณาเลือกคำถามอย่างน้อย 1 ข้อ'
+          : 'ยังไม่มีคำถามจากบทเรียนให้ใช้ในแบบทดสอบสุดท้าย'
+        : ''
+      : ''
+  const settingsError = amountError || sourceError
+  const settingsBlocked =
+    !!settingsError ||
+    (quiz.placement === 'final' &&
+      poolMode !== 'own' &&
+      (questionPoolLoading || !!questionPoolError || !questionPool))
+  const savedPoolMode = quiz.question_pool_mode || 'own'
+  const savedSelectedQuestionCount = Array.isArray(quiz.selected_question_ids)
+    ? new Set(quiz.selected_question_ids.map(Number)).size
+    : null
+  const displayedQuestionCount =
+    savedPoolMode === 'own'
+      ? quiz.questions.length
+      : savedPoolMode === 'selected'
+        ? (quiz.question_pool_size ??
+          savedSelectedQuestionCount ??
+          questionPool?.question_pool_size ??
+          questionPool?.effective_count ??
+          '—')
+        : (quiz.question_pool_size ??
+          questionPool?.question_pool_size ??
+          questionPool?.effective_count ??
+          '—')
 
   const handleSaveSettings = async () => {
+    if (settingsBlocked) return
     try {
       const payload = { ...draft }
       if (quiz.placement !== 'mid_video') delete payload.trigger_time
+      if (quiz.placement === 'final') {
+        payload.question_pool_mode = poolMode
+        payload.selected_question_ids =
+          poolMode === 'selected' ? Array.from(new Set(validSelectedQuestionIds)) : []
+        if (poolMode !== 'own') payload.randomize_questions = true
+      } else {
+        delete payload.question_pool_mode
+        delete payload.selected_question_ids
+      }
       if (!payload.randomize_questions) {
         payload.questions_per_attempt = null
       } else {
-        const n = parseInt(payload.questions_per_attempt, 10)
-        payload.questions_per_attempt = Number.isFinite(n) && n > 0 ? n : null
+        payload.questions_per_attempt = parsedAmount
       }
       const updated = await quizzesApi.update(quiz.id, payload)
       onUpdate(updated)
+      setDraft(createSettingsDraft({ ...quiz, ...payload, ...updated }))
       setEditing(false)
       showToast('บันทึกการตั้งค่าสำเร็จ', 'success')
     } catch (err) {
       toastApiError(err, 'บันทึกไม่สำเร็จ')
     }
+  }
+
+  const handleCancelSettings = () => {
+    setDraft(createSettingsDraft(quiz))
+    setEditing(false)
   }
 
   const handleAddQuestion = async (type) => {
@@ -153,7 +281,9 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
           {quiz.title}
         </span>
         <span className="flex-shrink-0 text-xs text-muted-foreground">
-          {quiz.questions.length} คำถาม
+          {displayedQuestionCount === '—'
+            ? 'คลังคำถาม'
+            : `${displayedQuestionCount} คำถาม`}
         </span>
         <Button
           variant="ghost"
@@ -229,32 +359,68 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                 />
               </div>
 
+              {quiz.placement === 'final' && (
+                <FinalQuestionPoolSettings
+                  mode={poolMode}
+                  onModeChange={(mode) =>
+                    setDraft((current) => ({
+                      ...current,
+                      question_pool_mode: mode,
+                      randomize_questions:
+                        mode === 'own' ? current.randomize_questions : true,
+                    }))
+                  }
+                  selectedQuestionIds={draft.selected_question_ids}
+                  onSelectedQuestionIdsChange={(selectedQuestionIds) =>
+                    setDraft((current) => ({
+                      ...current,
+                      selected_question_ids: selectedQuestionIds,
+                    }))
+                  }
+                  availableQuestions={availableQuestions}
+                  ownQuestionCount={quiz.questions.length}
+                  loading={
+                    questionPoolLoading || (!questionPool && !questionPoolError)
+                  }
+                  error={questionPoolError}
+                  onRetry={() => setQuestionPoolReloadKey((key) => key + 1)}
+                />
+              )}
+
               <div className="space-y-2 border-t border-border pt-3">
-                <div className="flex items-center justify-between gap-3">
-                  <Label
-                    htmlFor={`qe-random-${quiz.id}`}
-                    className="cursor-pointer text-sm font-normal"
-                  >
-                    สุ่มคำถาม
-                  </Label>
-                  <Switch
-                    id={`qe-random-${quiz.id}`}
-                    checked={draft.randomize_questions}
-                    onCheckedChange={(v) =>
-                      setDraft({ ...draft, randomize_questions: v })
-                    }
-                  />
-                </div>
-                {draft.randomize_questions && (
+                {poolMode === 'own' ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <Label
+                      htmlFor={`qe-random-${quiz.id}`}
+                      className="cursor-pointer text-sm font-normal"
+                    >
+                      สุ่มคำถาม
+                    </Label>
+                    <Switch
+                      id={`qe-random-${quiz.id}`}
+                      checked={draft.randomize_questions}
+                      onCheckedChange={(v) =>
+                        setDraft({ ...draft, randomize_questions: v })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-foreground">สุ่มคำถามใหม่ทุกครั้ง</span>
+                    <Badge variant="outline">เปิดใช้งาน</Badge>
+                  </div>
+                )}
+                {usesQuestionAmount && (
                   <div className="ml-1 space-y-1">
                     <Label htmlFor={`qe-perattempt-${quiz.id}`} className="text-xs">
-                      จำนวนข้อต่อครั้ง (จากทั้งหมด {quiz.questions.length} ข้อ)
+                      จำนวนข้อต่อครั้ง (จากคลัง {effectivePoolSize} ข้อ)
                     </Label>
                     <Input
                       id={`qe-perattempt-${quiz.id}`}
                       type="number"
                       min={1}
-                      max={quiz.questions.length || undefined}
+                      max={effectivePoolSize || undefined}
+                      step={1}
                       value={draft.questions_per_attempt}
                       onChange={(e) =>
                         setDraft({
@@ -262,10 +428,33 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                           questions_per_attempt: e.target.value,
                         })
                       }
-                      placeholder="เช่น 5"
+                      placeholder="เว้นว่างเพื่อใช้ทุกข้อ"
                       className="w-32"
+                      aria-invalid={!!amountError}
+                      aria-describedby={`qe-perattempt-hint-${quiz.id}${
+                        amountError ? ` qe-perattempt-error-${quiz.id}` : ''
+                      }`}
                     />
+                    <p id={`qe-perattempt-hint-${quiz.id}`} className="text-xs text-muted-foreground">
+                      เว้นว่างเพื่อใช้คำถามทุกข้อในคลัง
+                    </p>
+                    {amountError && (
+                      <p
+                        id={`qe-perattempt-error-${quiz.id}`}
+                        className="text-xs text-destructive"
+                        role="alert"
+                      >
+                        {amountError}
+                      </p>
+                    )}
                   </div>
+                )}
+                {sourceError &&
+                  poolMode === 'selected' &&
+                  availableQuestions.length > 0 && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {sourceError}
+                  </p>
                 )}
               </div>
 
@@ -300,11 +489,11 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
               </div>
 
               <div className="flex gap-2 pt-1">
-                <Button size="sm" onClick={handleSaveSettings}>
+                <Button size="sm" onClick={handleSaveSettings} disabled={settingsBlocked}>
                   <Save className="mr-1 h-3.5 w-3.5" />
                   บันทึก
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+                <Button size="sm" variant="outline" onClick={handleCancelSettings}>
                   ยกเลิก
                 </Button>
               </div>
@@ -320,10 +509,18 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                 <span>
                   {quiz.show_correct_answer ? 'แสดงเฉลย' : 'ไม่แสดงเฉลย'}
                 </span>
+                {savedPoolMode !== 'own' && (
+                  <span>
+                    {savedPoolMode === 'all_lessons'
+                      ? 'คลังคำถาม: ทุกบทเรียน'
+                      : 'คลังคำถาม: เลือกรายข้อ'}
+                  </span>
+                )}
                 {quiz.randomize_questions && (
                   <span className="font-medium text-primary">
-                    สุ่ม {quiz.questions_per_attempt || 'ทั้งหมด'}/
-                    {quiz.questions.length} ข้อ
+                    {displayedQuestionCount === '—'
+                      ? `สุ่ม ${quiz.questions_per_attempt || 'ทุก'} ข้อต่อครั้ง`
+                      : `สุ่ม ${quiz.questions_per_attempt || 'ทั้งหมด'}/${displayedQuestionCount} ข้อ`}
                   </span>
                 )}
               </div>
@@ -339,7 +536,8 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
           )}
 
           {/* Questions */}
-          <div>
+          {poolMode === 'own' ? (
+            <div>
             <h4 className="mb-2 text-sm font-medium text-foreground">คำถาม</h4>
             {quiz.questions.length === 0 ? (
               <p className="py-3 text-center text-sm text-muted-foreground">
@@ -404,7 +602,18 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                 ความคิดเห็น
               </Button>
             </div>
-          </div>
+            </div>
+          ) : (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3" role="status">
+              <h4 className="text-sm font-medium text-foreground">ใช้คลังคำถามจากบทเรียน</h4>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {poolMode === 'all_lessons'
+                  ? `ระบบจะสุ่มจากคำถามทั้งหมด ${effectivePoolSize} ข้อในหลักสูตร`
+                  : `ระบบจะสุ่มจากคำถามที่เลือกไว้ ${effectivePoolSize} ข้อ`}
+                {' '}แก้ไขต้นฉบับคำถามได้ในแบบทดสอบของแต่ละบทเรียน
+              </p>
+            </div>
+          )}
         </div>
       )}
 

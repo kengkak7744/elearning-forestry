@@ -1,4 +1,5 @@
 """Quiz grading rules."""
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.quiz import QuestionType, Quiz, QuizAttempt
@@ -8,13 +9,26 @@ from app.services.quiz_delivery import (
     requires_question_set_token,
     validate_question_set_token,
 )
+from app.services.quiz_question_pool import effective_question_bank
 
 
-def _submitted_questions(quiz: Quiz, payload: AnswerSubmit, user: User):
-    if requires_question_set_token(quiz):
-        served_ids = set(validate_question_set_token(payload.question_set_token, quiz, user))
-        return [q for q in quiz.questions if q.id in served_ids]
-    return list(quiz.questions)
+def _submitted_questions(
+    quiz: Quiz,
+    payload: AnswerSubmit,
+    user: User,
+    question_bank,
+):
+    if requires_question_set_token(quiz, question_bank):
+        served_ids = set(
+            validate_question_set_token(
+                payload.question_set_token,
+                quiz,
+                user,
+                question_bank,
+            )
+        )
+        return [question for question in question_bank if question.id in served_ids]
+    return list(question_bank)
 
 
 def _as_int(value) -> int | None:
@@ -45,7 +59,10 @@ def grade_attempt(db: Session, quiz: Quiz, payload: AnswerSubmit, user: User):
     correct_count = 0
     results = {}
 
-    questions_to_score = _submitted_questions(quiz, payload, user)
+    question_bank = effective_question_bank(db, quiz)
+    if not question_bank:
+        raise HTTPException(status_code=400, detail="Quiz has no gradable questions")
+    questions_to_score = _submitted_questions(quiz, payload, user, question_bank)
 
     for q in questions_to_score:
         if q.question_type == QuestionType.OPINION:
@@ -66,7 +83,7 @@ def grade_attempt(db: Session, quiz: Quiz, payload: AnswerSubmit, user: User):
                 None,
             )
             correct_answer = correct_idx
-            if _as_int(user_answer) == correct_idx:
+            if correct_idx is not None and _as_int(user_answer) == correct_idx:
                 is_correct = True
 
         elif q.question_type == QuestionType.MULTIPLE_CHOICE:
@@ -98,6 +115,7 @@ def grade_attempt(db: Session, quiz: Quiz, payload: AnswerSubmit, user: User):
         quiz_id=quiz.id,
         score=score,
         answers=payload.answers,
+        question_ids=[question.id for question in questions_to_score],
         is_passed=is_passed,
     )
     db.add(attempt)

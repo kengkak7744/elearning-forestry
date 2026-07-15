@@ -30,19 +30,35 @@ def strip_question_answers(question: Question) -> dict:
     }
 
 
-def served_questions(quiz: Quiz) -> list[Question]:
-    ordered = sorted(quiz.questions, key=lambda q: q.order_index)
-    if quiz.randomize_questions and quiz.questions_per_attempt:
-        n = min(quiz.questions_per_attempt, len(ordered))
-        if 0 < n < len(ordered):
-            return random.sample(ordered, n)
+def _question_bank(
+    quiz: Quiz,
+    question_bank: list[Question] | None = None,
+) -> list[Question]:
+    return list(quiz.questions or []) if question_bank is None else list(question_bank)
+
+
+def served_questions(
+    quiz: Quiz,
+    question_bank: list[Question] | None = None,
+) -> list[Question]:
+    ordered = sorted(
+        _question_bank(quiz, question_bank),
+        key=lambda q: (q.order_index or 0, q.id or 0),
+    )
+    if quiz.randomize_questions and ordered:
+        requested = quiz.questions_per_attempt or len(ordered)
+        n = min(requested, len(ordered)) if requested > 0 else len(ordered)
+        return random.sample(ordered, n)
     return ordered
 
 
-def requires_question_set_token(quiz: Quiz) -> bool:
-    question_count = len(quiz.questions or [])
-    requested = quiz.questions_per_attempt or 0
-    return bool(quiz.randomize_questions and 0 < requested < question_count)
+def requires_question_set_token(
+    quiz: Quiz,
+    question_bank: list[Question] | None = None,
+) -> bool:
+    question_count = len(_question_bank(quiz, question_bank))
+    sourced = (getattr(quiz, 'question_pool_mode', None) or 'own') != 'own'
+    return bool(question_count and (sourced or quiz.randomize_questions))
 
 
 def create_question_set_token(quiz: Quiz, user: User, question_ids: list[int]) -> str:
@@ -56,7 +72,12 @@ def create_question_set_token(quiz: Quiz, user: User, question_ids: list[int]) -
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def validate_question_set_token(token: str | None, quiz: Quiz, user: User) -> list[int]:
+def validate_question_set_token(
+    token: str | None,
+    quiz: Quiz,
+    user: User,
+    question_bank: list[Question] | None = None,
+) -> list[int]:
     if not token:
         raise HTTPException(status_code=400, detail="Invalid quiz question set")
     try:
@@ -79,12 +100,15 @@ def validate_question_set_token(token: str | None, quiz: Quiz, user: User) -> li
     if len(question_ids) != len(set(question_ids)):
         raise HTTPException(status_code=400, detail="Invalid quiz question set")
 
-    bank_ids = {q.id for q in quiz.questions or []}
+    bank = _question_bank(quiz, question_bank)
+    bank_ids = {q.id for q in bank}
     if not question_ids or any(qid not in bank_ids for qid in question_ids):
         raise HTTPException(status_code=400, detail="Invalid quiz question set")
 
-    if requires_question_set_token(quiz):
-        expected = min(quiz.questions_per_attempt or 0, len(bank_ids))
+    if requires_question_set_token(quiz, bank):
+        expected = len(bank_ids)
+        if quiz.randomize_questions and quiz.questions_per_attempt:
+            expected = min(quiz.questions_per_attempt, len(bank_ids))
         if len(question_ids) != expected:
             raise HTTPException(status_code=400, detail="Invalid quiz question set")
 
@@ -97,8 +121,10 @@ def quiz_to_learner_dict(
     *,
     include_status: bool = False,
     best: dict | None = None,
+    question_bank: list[Question] | None = None,
 ) -> dict:
-    served = served_questions(quiz)
+    bank = _question_bank(quiz, question_bank)
+    served = served_questions(quiz, bank)
     question_ids = [q.id for q in served]
     base = {
         "id": quiz.id,
@@ -113,9 +139,10 @@ def quiz_to_learner_dict(
         "order_index": quiz.order_index,
         "randomize_questions": quiz.randomize_questions,
         "questions_per_attempt": quiz.questions_per_attempt,
+        "question_pool_mode": getattr(quiz, "question_pool_mode", None) or "own",
         "question_set_token": (
             create_question_set_token(quiz, user, question_ids)
-            if requires_question_set_token(quiz)
+            if requires_question_set_token(quiz, bank)
             else None
         ),
         "questions": [strip_question_answers(q) for q in served],

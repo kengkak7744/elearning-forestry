@@ -7,7 +7,7 @@ from app.core.helpers import get_or_404, require_enrollment
 from app.database import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models.user import User, UserRole
-from app.models.quiz import Quiz, Question, QuizAttempt, QuestionType
+from app.models.quiz import Quiz, Question, QuizAttempt, QuestionType, QuizPlacement
 from app.models.lesson import Lesson
 from app.models.course import Course, Module
 from app.schemas.quiz import (
@@ -17,6 +17,16 @@ from app.schemas.quiz import (
 )
 from app.services.quiz_grading import grade_attempt
 from app.services.quiz_delivery import quiz_to_learner_dict
+from app.services.quiz_question_pool import (
+    ALL_LESSONS_POOL,
+    OWN_POOL,
+    SELECTED_POOL,
+    QUESTION_POOL_MODES,
+    available_question_rows,
+    effective_question_bank,
+    normalized_pool_mode,
+    selected_questions_for_ids,
+)
 
 router = APIRouter()
 
@@ -48,6 +58,87 @@ def _course_id_for_lesson(db: Session, lesson_id: int) -> int:
     if not row:
         raise HTTPException(status_code=404, detail="ไม่พบบทเรียน")
     return row.course_id
+
+
+def _pool_mode_value(value) -> str:
+    return value.value if hasattr(value, 'value') else str(value)
+
+
+def _apply_question_pool_config(
+    db: Session,
+    quiz: Quiz,
+    *,
+    selected_question_ids: list[int] | None = None,
+    selection_was_set: bool = False,
+) -> None:
+    mode = _pool_mode_value(quiz.question_pool_mode or OWN_POOL)
+    if mode not in QUESTION_POOL_MODES:
+        raise HTTPException(status_code=400, detail='Invalid question pool mode')
+    quiz.question_pool_mode = mode
+
+    if quiz.questions_per_attempt is not None and quiz.questions_per_attempt <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail='Questions per attempt must be greater than zero',
+        )
+
+    if mode == OWN_POOL:
+        if selection_was_set:
+            if selected_question_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail='Selected questions require selected pool mode',
+                )
+            quiz.source_questions = []
+        return
+
+    if (
+        quiz.placement != QuizPlacement.FINAL
+        or quiz.course_id is None
+        or quiz.lesson_id is not None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail='Sourced question pools are only available for course final tests',
+        )
+
+    # Lesson-sourced finals always produce a fresh randomized set. A null
+    # questions_per_attempt means shuffle and serve the complete pool.
+    quiz.randomize_questions = True
+
+    if selection_was_set:
+        if mode != SELECTED_POOL:
+            if selected_question_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail='Selected questions require selected pool mode',
+                )
+            quiz.source_questions = []
+        else:
+            try:
+                quiz.source_questions = selected_questions_for_ids(
+                    db,
+                    quiz,
+                    selected_question_ids or [],
+                )
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if mode == SELECTED_POOL and not quiz.source_questions:
+        raise HTTPException(
+            status_code=400,
+            detail='Select at least one question for the final test',
+        )
+
+    pool_size = len(effective_question_bank(db, quiz))
+    if (
+        quiz.questions_per_attempt is not None
+        and quiz.questions_per_attempt > pool_size
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f'Questions per attempt must not exceed the pool size ({pool_size})',
+        )
 
 
 # === Quiz CRUD ===
@@ -207,6 +298,62 @@ def get_course_stats(
     }
 
 
+@router.get('/admin/{quiz_id}/question-pool')
+def get_final_question_pool(
+    quiz_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_quiz_editor),
+):
+    quiz = (
+        db.query(Quiz)
+        .options(joinedload(Quiz.questions), joinedload(Quiz.source_questions))
+        .filter(Quiz.id == quiz_id)
+        .first()
+    )
+    if not quiz:
+        raise HTTPException(status_code=404, detail='Quiz not found')
+    if quiz.placement != QuizPlacement.FINAL or quiz.course_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail='Question pools are only available for course final tests',
+        )
+
+    selected_ids = set(quiz.selected_question_ids)
+    effective_ids = {question.id for question in effective_question_bank(db, quiz)}
+    available = []
+    for question, source_quiz, lesson, module in available_question_rows(db, quiz):
+        available.append({
+            'id': question.id,
+            'question_text': question.question_text,
+            'question_type': question.question_type.value,
+            'choices': question.choices,
+            'correct_text': question.correct_text,
+            'explanation': question.explanation,
+            'points': question.points,
+            'order_index': question.order_index,
+            'quiz_id': source_quiz.id,
+            'quiz_title': source_quiz.title,
+            'lesson_id': lesson.id,
+            'lesson_title': lesson.title,
+            'module_id': module.id,
+            'module_title': module.title,
+            'is_selected': question.id in selected_ids,
+            'is_in_effective_pool': question.id in effective_ids,
+        })
+
+    return {
+        'quiz_id': quiz.id,
+        'question_pool_mode': normalized_pool_mode(quiz),
+        'randomize_questions': quiz.randomize_questions,
+        'questions_per_attempt': quiz.questions_per_attempt,
+        'selected_question_ids': list(quiz.selected_question_ids),
+        'available_count': len(available),
+        'effective_count': len(effective_ids),
+        'question_pool_size': len(effective_ids),
+        'available_questions': available,
+    }
+
+
 @router.get("/admin/{quiz_id}/stats")
 def get_quiz_stats(
     quiz_id: int,
@@ -236,7 +383,7 @@ def get_quiz_stats(
     pass_rate = int((pass_count / total_attempts) * 100) if total_attempts else 0
 
     question_stats = []
-    for q in sorted(quiz.questions, key=lambda x: x.order_index):
+    for q in effective_question_bank(db, quiz):
         answered_count = 0
         correct_count = 0
         choice_dist = None
@@ -383,6 +530,7 @@ def get_course_quizzes_with_status(
             current_user,
             include_status=True,
             best=best_by_quiz.get(q.id),
+            question_bank=effective_question_bank(db, q),
         )
         for q in all_quizzes
     ]
@@ -402,7 +550,11 @@ def get_course_final_quiz(
     if not quiz:
         raise HTTPException(status_code=404, detail="ยังไม่มีแบบทดสอบสุดท้าย")
     _require_course_quiz_access(db, current_user, course_id)
-    return quiz_to_learner_dict(quiz, current_user)
+    return quiz_to_learner_dict(
+        quiz,
+        current_user,
+        question_bank=effective_question_bank(db, quiz),
+    )
 
 
 @router.get("/admin/course/{course_id}/final", response_model=QuizResponse)
@@ -412,7 +564,10 @@ def get_course_final_quiz_admin(
     current_user: User = Depends(require_quiz_editor),
 ):
     """Admin/instructor only: includes answer keys for editing."""
-    quiz = db.query(Quiz).options(joinedload(Quiz.questions)).filter(
+    quiz = db.query(Quiz).options(
+        joinedload(Quiz.questions),
+        joinedload(Quiz.source_questions),
+    ).filter(
         Quiz.course_id == course_id,
         Quiz.placement == "final"
     ).first()
@@ -427,9 +582,24 @@ def create_quiz(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_quiz_editor),
 ):
-    quiz = Quiz(**payload.model_dump())
-    db.add(quiz)
-    db.commit()
+    data = payload.model_dump()
+    selected_question_ids = data.pop('selected_question_ids', None)
+    selection_was_set = selected_question_ids is not None
+    data['question_pool_mode'] = _pool_mode_value(data['question_pool_mode'])
+    quiz = Quiz(**data)
+    try:
+        db.add(quiz)
+        db.flush()
+        _apply_question_pool_config(
+            db,
+            quiz,
+            selected_question_ids=selected_question_ids,
+            selection_was_set=selection_was_set,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(quiz)
     return quiz
 
@@ -442,9 +612,25 @@ def update_quiz(
     current_user: User = Depends(require_quiz_editor),
 ):
     quiz = get_or_404(db, Quiz, quiz_id, "ไม่พบแบบทดสอบ")
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(quiz, key, value)
-    db.commit()
+    data = payload.model_dump(exclude_unset=True)
+    selection_was_set = 'selected_question_ids' in data
+    selected_question_ids = data.pop('selected_question_ids', None)
+    if 'question_pool_mode' in data:
+        data['question_pool_mode'] = _pool_mode_value(data['question_pool_mode'])
+
+    try:
+        for key, value in data.items():
+            setattr(quiz, key, value)
+        _apply_question_pool_config(
+            db,
+            quiz,
+            selected_question_ids=selected_question_ids,
+            selection_was_set=selection_was_set,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(quiz)
     return quiz
 
@@ -572,6 +758,7 @@ def submit_quiz(
         "quiz_id": attempt.quiz_id,
         "score": attempt.score,
         "answers": attempt.answers,
+        "question_ids": attempt.question_ids,
         "is_passed": attempt.is_passed,
         "attempted_at": attempt.attempted_at,
         "results": results,
