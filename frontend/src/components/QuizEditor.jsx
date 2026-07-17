@@ -83,8 +83,6 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
             selected_question_ids: Array.isArray(data.selected_question_ids)
               ? data.selected_question_ids.map(Number)
               : [],
-            randomize_questions:
-              data.question_pool_mode === 'own' ? current.randomize_questions : true,
           }))
         }
       } catch (err) {
@@ -120,7 +118,7 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
     !!questionPool && !questionPoolLoading && !questionPoolError
   const amountText = String(draft.questions_per_attempt ?? '').trim()
   const parsedAmount = amountText === '' ? null : Number(amountText)
-  const usesQuestionAmount = poolMode !== 'own' || draft.randomize_questions
+  const usesQuestionAmount = draft.randomize_questions
   const amountError =
     usesQuestionAmount &&
     parsedAmount !== null &&
@@ -174,7 +172,6 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
         payload.question_pool_mode = poolMode
         payload.selected_question_ids =
           poolMode === 'selected' ? Array.from(new Set(validSelectedQuestionIds)) : []
-        if (poolMode !== 'own') payload.randomize_questions = true
       } else {
         delete payload.question_pool_mode
         delete payload.selected_question_ids
@@ -366,8 +363,6 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
                     setDraft((current) => ({
                       ...current,
                       question_pool_mode: mode,
-                      randomize_questions:
-                        mode === 'own' ? current.randomize_questions : true,
                     }))
                   }
                   selectedQuestionIds={draft.selected_question_ids}
@@ -388,28 +383,40 @@ export default function QuizEditor({ quiz, onUpdate, onDelete, showToast }) {
               )}
 
               <div className="space-y-2 border-t border-border pt-3">
-                {poolMode === 'own' ? (
-                  <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
                     <Label
                       htmlFor={`qe-random-${quiz.id}`}
                       className="cursor-pointer text-sm font-normal"
                     >
-                      สุ่มคำถาม
+                      สุ่มคำถามใหม่ทุกครั้ง
                     </Label>
+                    <p
+                      id={`qe-random-hint-${quiz.id}`}
+                      className="mt-0.5 text-xs text-muted-foreground"
+                    >
+                      {draft.randomize_questions
+                        ? 'เปิดอยู่ — กดสวิตช์เพื่อปิดการสุ่มได้'
+                        : 'ปิดอยู่ — ผู้เรียนจะได้รับคำถามตามลำดับเดิม'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs font-medium text-foreground" aria-hidden="true">
+                      {draft.randomize_questions ? 'เปิด' : 'ปิด'}
+                    </span>
                     <Switch
                       id={`qe-random-${quiz.id}`}
                       checked={draft.randomize_questions}
-                      onCheckedChange={(v) =>
-                        setDraft({ ...draft, randomize_questions: v })
+                      onCheckedChange={(checked) =>
+                        setDraft((current) => ({
+                          ...current,
+                          randomize_questions: checked,
+                        }))
                       }
+                      aria-describedby={`qe-random-hint-${quiz.id}`}
                     />
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-foreground">สุ่มคำถามใหม่ทุกครั้ง</span>
-                    <Badge variant="outline">เปิดใช้งาน</Badge>
-                  </div>
-                )}
+                </div>
                 {usesQuestionAmount && (
                   <div className="ml-1 space-y-1">
                     <Label htmlFor={`qe-perattempt-${quiz.id}`} className="text-xs">

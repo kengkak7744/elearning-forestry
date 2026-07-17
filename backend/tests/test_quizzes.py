@@ -133,6 +133,61 @@ class TestQuizCrud:
         )
         assert res.status_code == 422
 
+    def test_bulk_create_supports_multiple_choice_and_written_grading(
+        self, admin_client, learner_client, learner_user, db
+    ):
+        course = make_course(db)
+        quiz = make_quiz(db, course=course)
+        created = admin_client.post(
+            f"/api/quizzes/{quiz.id}/questions/bulk",
+            json={
+                "questions": [
+                    {
+                        "question_text": "Select both fuels",
+                        "question_type": "multiple_choice",
+                        "choices": [
+                            {"text": "Dry leaves", "is_correct": True},
+                            {"text": "Water", "is_correct": False},
+                            {"text": "Dry branches", "is_correct": True},
+                        ],
+                    },
+                    {
+                        "question_text": "Name the three parts of the fire triangle",
+                        "question_type": "written",
+                        "choices": None,
+                        "correct_text": "fuel, heat, oxygen",
+                    },
+                ]
+            },
+        )
+
+        assert created.status_code == 200
+        multiple, written = created.json()
+        assert multiple["question_type"] == "multiple_choice"
+        assert [choice["is_correct"] for choice in multiple["choices"]] == [
+            True,
+            False,
+            True,
+        ]
+        assert written["question_type"] == "written"
+        assert written["choices"] is None
+        assert written["correct_text"] == "fuel, heat, oxygen"
+
+        enroll(db, learner_user, course)
+        graded = learner_client.post(
+            f"/api/quizzes/{quiz.id}/submit",
+            json={
+                "answers": {
+                    str(multiple["id"]): [2, 0],
+                    str(written["id"]): "  FUEL, HEAT, OXYGEN  ",
+                }
+            },
+        )
+
+        assert graded.status_code == 200
+        assert graded.json()["score"] == 100
+        assert graded.json()["is_passed"] is True
+
     def test_bulk_create_questions_learner_denied(self, learner_client, db):
         quiz = make_quiz(db, course=make_course(db))
         res = learner_client.post(

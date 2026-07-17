@@ -78,7 +78,7 @@ export default function FinalQuestionPoolSettings({
           แหล่งคำถามสำหรับแบบทดสอบสุดท้าย
         </h4>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          เลือกใช้คำถามที่สร้างในแบบทดสอบนี้ หรือสุ่มจากคำถามในบทเรียน
+          เลือกใช้คำถามที่สร้างในแบบทดสอบนี้ หรือใช้คำถามจากบทเรียน
         </p>
       </div>
 
@@ -110,13 +110,13 @@ export default function FinalQuestionPoolSettings({
           />
           <Label htmlFor={allId} className="min-h-6 flex-1 cursor-pointer font-normal">
             <span className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-              สุ่มจากทุกบทเรียน
+              คำถามจากทุกบทเรียน
               <Badge variant="secondary">
                 {loading ? 'กำลังโหลด' : `${questions.length} ข้อ`}
               </Badge>
             </span>
             <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-              สร้างชุดข้อสอบใหม่จากคลังคำถามของทุกบทเรียนในหลักสูตร
+              ใช้คลังคำถามของทุกบทเรียนในหลักสูตร
             </span>
           </Label>
         </div>

@@ -110,7 +110,7 @@ def test_all_lesson_pool_serves_secure_random_subset(
         json={
             "question_pool_mode": "all_lessons",
             "selected_question_ids": [],
-            "randomize_questions": False,
+            "randomize_questions": True,
             "questions_per_attempt": 2,
         },
     )
@@ -160,6 +160,47 @@ def test_all_lesson_pool_serves_secure_random_subset(
     assert set(submitted.json()["question_ids"]) == {
         question["id"] for question in delivered_body["questions"]
     }
+
+
+def test_sourced_pool_can_disable_randomization_and_serves_all_in_stable_order(
+    admin_client,
+    learner_client,
+    learner_user,
+    db,
+    monkeypatch,
+):
+    rows = _course_with_question_pool(db)
+    enroll(db, learner_user, rows["course"])
+
+    updated = admin_client.patch(
+        f'/api/quizzes/{rows["final"].id}',
+        json={
+            "question_pool_mode": "all_lessons",
+            "selected_question_ids": [],
+            "randomize_questions": False,
+            "questions_per_attempt": 1,
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["randomize_questions"] is False
+    assert updated.json()["questions_per_attempt"] is None
+
+    def fail_if_sampled(*_args, **_kwargs):
+        raise AssertionError("random.sample must not run while randomization is off")
+
+    monkeypatch.setattr(
+        "app.services.quiz_delivery.random.sample",
+        fail_if_sampled,
+    )
+    delivered = learner_client.get(
+        f'/api/quizzes/course/{rows["course"].id}/final'
+    )
+    assert delivered.status_code == 200
+    delivered_body = delivered.json()
+    assert [question["id"] for question in delivered_body["questions"]] == [
+        question.id for question in rows["gradable"]
+    ]
+    assert delivered_body["question_set_token"]
 
 
 def test_selected_pool_grades_first_choice_kor_and_drives_stats(
@@ -242,6 +283,7 @@ def test_pool_configuration_rejects_invalid_selection_and_amount(admin_client, d
         json={
             "question_pool_mode": "all_lessons",
             "selected_question_ids": [],
+            "randomize_questions": True,
             "questions_per_attempt": 4,
         },
     )
@@ -262,6 +304,7 @@ def test_random_all_shuffles_complete_pool(admin_client, learner_client, learner
         json={
             "question_pool_mode": "all_lessons",
             "selected_question_ids": [],
+            "randomize_questions": True,
             "questions_per_attempt": None,
         },
     )

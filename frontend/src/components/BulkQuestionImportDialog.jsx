@@ -16,12 +16,28 @@ import { Textarea } from '@/components/ui/textarea'
 import { parseThaiQuestions, toBulkQuestionPayload } from '@/utils/parseThaiQuestions'
 import { toastApiError } from '@/utils/apiError'
 
-const SAMPLE_TEXT = `14 ข้อใดเป็นผลเสียของการจัดการเชื้อเพลิงที่ไม่เหมาะสม
+const SAMPLE_TEXT = `1 ข้อใดเป็นผลเสียของการจัดการเชื้อเพลิงที่ไม่เหมาะสม
 ก. เพิ่มความปลอดภัย
 ข. เกิดไฟหลุดจากพื้นที่ควบคุม
 ค. ลดค่าใช้จ่าย
 ง. ลดความเสียหายของป่า
-เฉลย ข`
+เฉลย ข
+
+2 ข้อใดเป็นเชื้อเพลิงของไฟป่า
+ก. ใบไม้แห้ง
+ข. น้ำ
+ค. กิ่งไม้
+ง. หิน
+เฉลย ก, ค
+
+3 สามเหลี่ยมไฟมีองค์ประกอบอะไรบ้าง
+คำตอบ: เชื้อเพลิง ความร้อน และออกซิเจน`
+
+const QUESTION_TYPE_LABELS = {
+  single_choice: 'เลือกข้อเดียว',
+  multiple_choice: 'เลือกหลายข้อ',
+  written: 'เขียนตอบ',
+}
 
 export default function BulkQuestionImportDialog({
   open,
@@ -67,15 +83,28 @@ export default function BulkQuestionImportDialog({
             นำเข้าคำถามจากข้อความ
           </DialogTitle>
           <DialogDescription>
-            คำถามแบบเลือกตอบข้อเดียว พร้อมตัวเลือก ก.-ง. และบรรทัดเฉลย
+            รองรับคำถามแบบเลือกข้อเดียว เลือกหลายข้อ และเขียนตอบ
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          <div
+            id={`bulk-question-format-${quizId}`}
+            className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground"
+          >
+            <p className="font-medium text-foreground">รูปแบบคำตอบ</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              <li>เลือกข้อเดียว: ใส่บรรทัด <code>เฉลย ข</code></li>
+              <li>เลือกหลายข้อ: คั่นตัวเลือกด้วยจุลภาค เช่น <code>เฉลย ก, ค</code></li>
+              <li>เขียนตอบ: ไม่ต้องใส่ตัวเลือก และใช้ <code>คำตอบ: ข้อความคำตอบ</code></li>
+            </ul>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor={`bulk-question-text-${quizId}`}>ข้อความคำถาม</Label>
             <Textarea
               id={`bulk-question-text-${quizId}`}
+              aria-describedby={`bulk-question-format-${quizId}`}
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder={SAMPLE_TEXT}
@@ -113,7 +142,11 @@ export default function BulkQuestionImportDialog({
               {parsed.questions.length > 0 && (
                 <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                   {parsed.questions.map((question) => {
-                    const correctChoice = question.choices.find((choice) => choice.is_correct)
+                    const choices = question.choices ?? []
+                    const correctChoiceText = choices
+                      .filter((choice) => choice.is_correct)
+                      .map((choice) => choice.text)
+                      .join(', ')
                     return (
                       <div
                         key={question.sourceNumber}
@@ -124,22 +157,35 @@ export default function BulkQuestionImportDialog({
                             {question.sourceNumber}
                           </Badge>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground">
-                              {question.question_text}
-                            </p>
-                            <div className="mt-1.5 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                              {question.choices.map((choice, index) => (
-                                <span
-                                  key={`${question.sourceNumber}-${index}`}
-                                  className={choice.is_correct ? 'font-medium text-success' : ''}
-                                >
-                                  {['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'][index] ?? index + 1}. {choice.text}
-                                </span>
-                              ))}
+                            <div className="flex flex-wrap items-start gap-2">
+                              <p className="min-w-0 flex-1 text-sm font-medium text-foreground">
+                                {question.question_text}
+                              </p>
+                              <Badge variant="secondary" className="flex-shrink-0 font-normal">
+                                {QUESTION_TYPE_LABELS[question.question_type]}
+                              </Badge>
                             </div>
-                            <p className="mt-1.5 text-xs font-medium text-success">
-                              เฉลย {question.correctLabel}: {correctChoice?.text}
-                            </p>
+                            {question.question_type === 'written' ? (
+                              <p className="mt-1.5 text-xs font-medium text-success">
+                                คำตอบ: {question.correct_text}
+                              </p>
+                            ) : (
+                              <>
+                                <div className="mt-1.5 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                                  {choices.map((choice, index) => (
+                                    <span
+                                      key={`${question.sourceNumber}-${index}`}
+                                      className={choice.is_correct ? 'font-medium text-success' : ''}
+                                    >
+                                      {['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'][index] ?? index + 1}. {choice.text}
+                                    </span>
+                                  ))}
+                                </div>
+                                <p className="mt-1.5 text-xs font-medium text-success">
+                                  เฉลย {question.correctLabel}: {correctChoiceText}
+                                </p>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

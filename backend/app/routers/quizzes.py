@@ -102,9 +102,8 @@ def _apply_question_pool_config(
             detail='Sourced question pools are only available for course final tests',
         )
 
-    # Lesson-sourced finals always produce a fresh randomized set. A null
-    # questions_per_attempt means shuffle and serve the complete pool.
-    quiz.randomize_questions = True
+    if not quiz.randomize_questions:
+        quiz.questions_per_attempt = None
 
     if selection_was_set:
         if mode != SELECTED_POOL:
@@ -132,7 +131,8 @@ def _apply_question_pool_config(
 
     pool_size = len(effective_question_bank(db, quiz))
     if (
-        quiz.questions_per_attempt is not None
+        quiz.randomize_questions
+        and quiz.questions_per_attempt is not None
         and quiz.questions_per_attempt > pool_size
     ):
         raise HTTPException(

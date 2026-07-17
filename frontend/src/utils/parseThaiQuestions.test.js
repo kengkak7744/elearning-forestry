@@ -89,6 +89,7 @@ test('creates a clean bulk API payload from parsed questions', () => {
   assert.ok(payload.every((question) => question.points === 1))
   assert.ok(payload.every((question) => !('sourceNumber' in question)))
   assert.ok(payload.every((question) => !('correctLabel' in question)))
+  assert.ok(payload.every((question) => !('correctLabels' in question)))
   assert.equal(payload[0].choices[1].is_correct, true)
 })
 
@@ -115,4 +116,81 @@ test('marks Thai choice ก at index 0 as correct', () => {
   const [payload] = toBulkQuestionPayload(parsed.questions)
   assert.equal(payload.choices[0].is_correct, true)
   assert.ok(payload.choices.slice(1).every((choice) => !choice.is_correct))
+})
+
+test('parses multiple correct choices with common answer separators', () => {
+  const answerVariants = [
+    'ก, ค',
+    'ก，ค',
+    'ก、ค',
+    'ก/ค',
+    'ก; ค',
+    'ก + ค',
+    'ก และ ค',
+    'ก and ค',
+  ]
+
+  for (const answer of answerVariants) {
+    const parsed = parseThaiQuestions(`1 ข้อใดเป็นเชื้อเพลิงของไฟป่า
+ก. ใบไม้แห้ง
+ข. น้ำ
+ค. กิ่งไม้
+ง. หิน
+เฉลย ${answer}`)
+
+    assert.deepEqual(parsed.errors, [], answer)
+    assert.equal(parsed.questions.length, 1, answer)
+
+    const [question] = parsed.questions
+    assert.equal(question.question_type, 'multiple_choice', answer)
+    assert.deepEqual(question.correctLabels, ['ก', 'ค'], answer)
+    assert.deepEqual(
+      question.choices.map((choice) => choice.is_correct),
+      [true, false, true, false],
+      answer
+    )
+
+    const [payload] = toBulkQuestionPayload(parsed.questions)
+    assert.equal(payload.question_type, 'multiple_choice', answer)
+    assert.ok(!('correctLabels' in payload), answer)
+  }
+})
+
+test('parses a written-answer question using an explicit คำตอบ: line', () => {
+  const parsed = parseThaiQuestions(`3 สามเหลี่ยมไฟมีองค์ประกอบอะไรบ้าง
+โปรดตอบให้ครบทั้งสามองค์ประกอบ
+คำตอบ: เชื้อเพลิง ความร้อน และออกซิเจน`)
+
+  assert.deepEqual(parsed.errors, [])
+  assert.equal(parsed.questions.length, 1)
+  assert.deepEqual(parsed.questions[0], {
+    sourceNumber: '3',
+    question_text:
+      'สามเหลี่ยมไฟมีองค์ประกอบอะไรบ้าง โปรดตอบให้ครบทั้งสามองค์ประกอบ',
+    question_type: 'written',
+    choices: null,
+    correct_text: 'เชื้อเพลิง ความร้อน และออกซิเจน',
+    points: 1,
+  })
+
+  const [payload] = toBulkQuestionPayload(parsed.questions)
+  assert.deepEqual(payload, {
+    question_text:
+      'สามเหลี่ยมไฟมีองค์ประกอบอะไรบ้าง โปรดตอบให้ครบทั้งสามองค์ประกอบ',
+    question_type: 'written',
+    choices: null,
+    correct_text: 'เชื้อเพลิง ความร้อน และออกซิเจน',
+    points: 1,
+  })
+})
+
+test('keeps คำตอบ: as a choice answer when choices are present', () => {
+  const parsed = parseThaiQuestions(`1 ไฟต้องใช้ออกซิเจนหรือไม่
+ก. ใช่
+ข. ไม่ใช่
+คำตอบ: ก`)
+
+  assert.deepEqual(parsed.errors, [])
+  assert.equal(parsed.questions[0].question_type, 'single_choice')
+  assert.equal(parsed.questions[0].choices[0].is_correct, true)
 })
