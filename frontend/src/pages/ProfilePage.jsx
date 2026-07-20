@@ -10,6 +10,7 @@ import SecurityTab from '@/components/profile/SecurityTab'
 import MyCoursesTab from '@/components/profile/MyCoursesTab'
 import BookmarksTab from '@/components/profile/BookmarksTab'
 import CertificatesTab from '@/components/profile/CertificatesTab'
+import ProfileImagePreview from '@/components/profile/ProfileImagePreview'
 import { initials } from '@/utils/formatting'
 
 export default function ProfilePage() {
@@ -21,14 +22,19 @@ export default function ProfilePage() {
       {/* Profile header */}
       <Card className="mb-6 border-border/60">
         <CardContent className="flex items-center gap-4 p-5">
-          <Avatar className="h-14 w-14">
-            {user?.profile_image && (
-              <AvatarImage src={mediaUrl(user.profile_image)} alt={user?.full_name || ''} />
-            )}
-            <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
-              {initials(user?.full_name)}
-            </AvatarFallback>
-          </Avatar>
+          <ProfileImagePreview
+            src={user?.profile_image ? mediaUrl(user.profile_image) : undefined}
+            alt={user?.full_name || ''}
+          >
+            <Avatar className="h-14 w-14">
+              {user?.profile_image && (
+                <AvatarImage src={mediaUrl(user.profile_image)} alt={user?.full_name || ''} />
+              )}
+              <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
+                {initials(user?.full_name)}
+              </AvatarFallback>
+            </Avatar>
+          </ProfileImagePreview>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold text-foreground">
               {user?.full_name}

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { initials } from '@/utils/formatting'
+import ProfileImagePreview from './ProfileImagePreview'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB — matches backend MAX_IMAGE_SIZE
@@ -65,12 +66,14 @@ export default function ProfileAvatarCard() {
   return (
     <Card className="border-border/60">
       <CardContent className="flex flex-col items-center gap-4 p-5 sm:flex-row sm:items-center">
-        <Avatar className="h-20 w-20">
-          {src && <AvatarImage src={src} alt={user?.full_name || ''} />}
-          <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">
-            {initials(user?.full_name)}
-          </AvatarFallback>
-        </Avatar>
+        <ProfileImagePreview src={src} alt={user?.full_name || ''}>
+          <Avatar className="h-20 w-20">
+            {src && <AvatarImage src={src} alt={user?.full_name || ''} />}
+            <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">
+              {initials(user?.full_name)}
+            </AvatarFallback>
+          </Avatar>
+        </ProfileImagePreview>
 
         <div className="flex-1 text-center sm:text-left">
           <div className="text-sm font-semibold text-foreground">รูปโปรไฟล์</div>
