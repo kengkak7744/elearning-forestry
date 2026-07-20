@@ -3,12 +3,16 @@ import {
   Award,
   BookOpen,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
+  Download,
   LineChart,
   Trophy,
 } from 'lucide-react'
 import { usersApi } from '@/api/users'
+import { certificatesApi } from '@/api/certificates'
 import { ROLE_LABELS } from '@/constants/labels'
+import { useAuth } from '@/contexts/AuthContext'
 import { categoryLabel, useCategories } from '@/hooks/useCategories'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,6 +26,7 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import UserAvatar from '@/components/admin/UserAvatar'
+import UserCourseStatsDialog from '@/components/admin/UserCourseStatsDialog'
 import { toastApiError } from '@/utils/apiError'
 
 function formatDate(d) {
@@ -48,12 +53,55 @@ function StatTile({ icon: Icon, label, value, hint }) {
   )
 }
 
+function CertificateRow({ certificate, downloadable }) {
+  const card = (
+    <Card className={downloadable ? 'border-border/60 transition-colors group-hover:bg-muted/40' : 'border-border/60'}>
+      <CardContent className="flex items-center gap-3 p-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Award className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="line-clamp-1 text-sm font-medium text-foreground">
+            {certificate.course_title}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            เลขที่ {certificate.certificate_number}
+            {certificate.final_score != null &&
+              ` · คะแนน ${Math.round(certificate.final_score)}%`}
+            {certificate.issued_at && ` · ${formatDate(certificate.issued_at)}`}
+          </div>
+        </div>
+        {downloadable && (
+          <Download className="h-4 w-4 flex-shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
+        )}
+      </CardContent>
+    </Card>
+  )
+
+  if (!downloadable) return card
+
+  return (
+    <a
+      href={certificatesApi.downloadUrl(certificate.id)}
+      download={`${certificate.certificate_number}.pdf`}
+      aria-label={`ดาวน์โหลดใบรับรอง ${certificate.course_title} เลขที่ ${certificate.certificate_number}`}
+      className="group block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      {card}
+    </a>
+  )
+}
+
 export default function UserSummarySheet({ userId, open, onOpenChange }) {
+  const { user: viewer } = useAuth()
   const categories = useCategories()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState(null)
+  const canDownloadCertificates = viewer?.role === 'admin' || viewer?.role === 'instructor'
 
   useEffect(() => {
+    setSelectedCourse(null)
     if (!open || !userId) return
     setData(null)
     setLoading(true)
@@ -66,8 +114,14 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
       .finally(() => setLoading(false))
   }, [open, userId])
 
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) setSelectedCourse(null)
+    onOpenChange?.(nextOpen)
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader className="mb-4">
           <SheetTitle>ประวัติการเรียนของผู้ใช้</SheetTitle>
@@ -153,7 +207,13 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
                     const done = e.progress_percent >= 100
                     return (
                       <li key={e.course_id}>
-                        <Card className="border-border/60">
+                        <Card className="border-border/60 transition-shadow hover:shadow-md">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCourse(e)}
+                            aria-label={`ดูสถิติการเรียนหลักสูตร ${e.title} ของ ${data.user.full_name}`}
+                            className="block w-full rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
                           <CardContent className="p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -177,13 +237,16 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex-shrink-0 text-right">
-                                <div className="text-sm font-semibold tabular-nums text-foreground">
-                                  {e.progress_percent}%
+                              <div className="flex flex-shrink-0 items-start gap-1">
+                                <div className="text-right">
+                                  <div className="text-sm font-semibold tabular-nums text-foreground">
+                                    {e.progress_percent}%
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {e.completed_lessons}/{e.total_lessons} บท
+                                  </div>
                                 </div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  {e.completed_lessons}/{e.total_lessons} บท
-                                </div>
+                                <ChevronRight className="mt-0.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                               </div>
                             </div>
                             <Progress value={e.progress_percent} className="mt-2 h-1.5" />
@@ -194,6 +257,7 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
                               )}
                             </div>
                           </CardContent>
+                          </button>
                         </Card>
                       </li>
                     )
@@ -208,24 +272,10 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
                 <ul className="space-y-2">
                   {data.certificates.map((c) => (
                     <li key={c.id}>
-                      <Card className="border-border/60">
-                        <CardContent className="flex items-center gap-3 p-3">
-                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                            <Award className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="line-clamp-1 text-sm font-medium text-foreground">
-                              {c.course_title}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              เลขที่ {c.certificate_number}
-                              {c.final_score != null &&
-                                ` · คะแนน ${Math.round(c.final_score)}%`}
-                              {c.issued_at && ` · ${formatDate(c.issued_at)}`}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <CertificateRow
+                        certificate={c}
+                        downloadable={canDownloadCertificates}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -235,5 +285,13 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
         )}
       </SheetContent>
     </Sheet>
+    <UserCourseStatsDialog
+      open={!!selectedCourse}
+      userId={userId}
+      userName={data?.user?.full_name}
+      course={selectedCourse}
+      onClose={() => setSelectedCourse(null)}
+    />
+    </>
   )
 }

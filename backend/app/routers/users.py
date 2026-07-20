@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.progress import LessonProgress
 from app.models.certificate import Certificate
-from app.models.quiz import Quiz, QuizAttempt
+from app.models.quiz import Quiz, QuizAttempt, QuizPlacement
 from app.models.enrollment import Enrollment
 from app.models.course import Course, Module
 from app.models.lesson import Lesson
@@ -357,6 +357,173 @@ def user_learning_summary(
             "passed_count": passed_count,
             "average_score": average_score,
         },
+    }
+
+
+@router.get("/{user_id}/courses/{course_id}/learning-detail")
+def user_course_learning_detail(
+    user_id: int,
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Progress and per-quiz results for one user's enrolled course.
+
+    Admins may view anyone. Managers may view members of their own department,
+    matching the authorization used by the parent learning-summary endpoint.
+    """
+    user = get_or_404(db, User, user_id, "ไม่พบผู้ใช้")
+    if current_user.role != UserRole.ADMIN and not (
+        current_user.role == UserRole.MANAGER
+        and current_user.department
+        and user.department == current_user.department
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ไม่มีสิทธิ์ดูข้อมูลผู้ใช้นี้",
+        )
+
+    course = get_or_404(db, Course, course_id, "ไม่พบหลักสูตร")
+    enrollment = (
+        db.query(Enrollment)
+        .filter(
+            Enrollment.user_id == user_id,
+            Enrollment.course_id == course_id,
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ไม่พบการลงทะเบียนหลักสูตรนี้",
+        )
+
+    total_lessons = (
+        db.query(func.count(Lesson.id))
+        .join(Module, Lesson.module_id == Module.id)
+        .filter(Module.course_id == course_id)
+        .scalar()
+        or 0
+    )
+    completed_lessons = (
+        db.query(func.count(LessonProgress.id))
+        .join(Lesson, LessonProgress.lesson_id == Lesson.id)
+        .join(Module, Lesson.module_id == Module.id)
+        .filter(
+            Module.course_id == course_id,
+            LessonProgress.user_id == user_id,
+            LessonProgress.completed == True,
+        )
+        .scalar()
+        or 0
+    )
+    last_accessed_at = (
+        db.query(func.max(LessonProgress.last_accessed_at))
+        .join(Lesson, LessonProgress.lesson_id == Lesson.id)
+        .join(Module, Lesson.module_id == Module.id)
+        .filter(
+            Module.course_id == course_id,
+            LessonProgress.user_id == user_id,
+        )
+        .scalar()
+    )
+
+    lesson_quizzes = (
+        db.query(Quiz)
+        .join(Lesson, Quiz.lesson_id == Lesson.id)
+        .join(Module, Lesson.module_id == Module.id)
+        .filter(Module.course_id == course_id)
+        .order_by(Module.order_index, Lesson.order_index, Quiz.order_index, Quiz.id)
+        .all()
+    )
+    final_quiz = (
+        db.query(Quiz)
+        .filter(
+            Quiz.course_id == course_id,
+            Quiz.placement == QuizPlacement.FINAL,
+        )
+        .first()
+    )
+    quizzes = lesson_quizzes + ([final_quiz] if final_quiz else [])
+    quiz_ids = [quiz.id for quiz in quizzes]
+    attempts = (
+        db.query(QuizAttempt)
+        .filter(
+            QuizAttempt.user_id == user_id,
+            QuizAttempt.quiz_id.in_(quiz_ids),
+        )
+        .all()
+        if quiz_ids
+        else []
+    )
+    attempts_by_quiz = {}
+    for attempt in attempts:
+        attempts_by_quiz.setdefault(attempt.quiz_id, []).append(attempt)
+
+    quizzes_out = []
+    best_scores = []
+    quizzes_passed = 0
+    for quiz in quizzes:
+        quiz_attempts = attempts_by_quiz.get(quiz.id, [])
+        best_attempt = (
+            max(quiz_attempts, key=lambda attempt: attempt.score or 0)
+            if quiz_attempts
+            else None
+        )
+        best_score = int(best_attempt.score or 0) if best_attempt else None
+        is_passed = bool(best_attempt.is_passed) if best_attempt else False
+        attempted_dates = [
+            attempt.attempted_at
+            for attempt in quiz_attempts
+            if attempt.attempted_at is not None
+        ]
+        last_attempted_at = max(attempted_dates) if attempted_dates else None
+        if best_score is not None:
+            best_scores.append(best_score)
+        if is_passed:
+            quizzes_passed += 1
+        quizzes_out.append({
+            "id": quiz.id,
+            "lesson_id": quiz.lesson_id,
+            "title": quiz.title,
+            "placement": quiz.placement.value if quiz.placement else None,
+            "passing_score": quiz.passing_score,
+            "can_skip": quiz.can_skip,
+            "total_attempts": len(quiz_attempts),
+            "best_score": best_score,
+            "is_passed": is_passed,
+            "last_attempted_at": (
+                last_attempted_at.isoformat() if last_attempted_at else None
+            ),
+        })
+
+    progress_percent = (
+        int((completed_lessons / total_lessons) * 100) if total_lessons else 0
+    )
+    return {
+        "user_id": user.id,
+        "course": {"id": course.id, "title": course.title},
+        "enrollment": {
+            "enrolled_at": (
+                enrollment.enrolled_at.isoformat() if enrollment.enrolled_at else None
+            ),
+            "total_lessons": total_lessons,
+            "completed_lessons": completed_lessons,
+            "progress_percent": progress_percent,
+            "last_accessed_at": (
+                last_accessed_at.isoformat() if last_accessed_at else None
+            ),
+        },
+        "quiz_stats": {
+            "total_quizzes": len(quizzes),
+            "quizzes_taken": len(best_scores),
+            "total_attempts": len(attempts),
+            "quizzes_passed": quizzes_passed,
+            "average_score": (
+                round(sum(best_scores) / len(best_scores)) if best_scores else 0
+            ),
+        },
+        "quizzes": quizzes_out,
     }
 
 

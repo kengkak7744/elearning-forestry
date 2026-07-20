@@ -3,11 +3,16 @@ import io
 
 from tests.conftest import PASSWORD, make_user
 from tests.factories import (
+    complete_lesson,
     completed_course,
     enroll,
     make_course,
+    make_lesson,
+    make_module,
+    make_quiz,
     register_payload,
 )
+from app.models.quiz import QuizAttempt, QuizPlacement
 from app.models.user import UserRole
 
 
@@ -141,6 +146,92 @@ class TestLearningSummary:
     def test_summary_admin_only(self, learner_client, learner_user):
         res = learner_client.get(f"/api/users/{learner_user.id}/learning-summary")
         assert res.status_code == 403
+
+    def test_course_detail_progress_and_quiz_retries(
+        self, admin_client, db, learner_user
+    ):
+        course = make_course(db, title="Detailed course")
+        module = make_module(db, course)
+        lesson_one = make_lesson(db, module, title="Lesson one", order_index=0)
+        make_lesson(db, module, title="Lesson two", order_index=1)
+        enroll(db, learner_user, course)
+        complete_lesson(db, learner_user, lesson_one)
+
+        lesson_quiz = make_quiz(
+            db,
+            lesson=lesson_one,
+            title="Lesson checkpoint",
+            placement=QuizPlacement.END_OF_LESSON,
+            can_skip=False,
+        )
+        final_quiz = make_quiz(db, course=course, title="Final exam")
+        db.add_all([
+            QuizAttempt(
+                user_id=learner_user.id,
+                quiz_id=lesson_quiz.id,
+                score=45,
+                answers={},
+                is_passed=False,
+            ),
+            QuizAttempt(
+                user_id=learner_user.id,
+                quiz_id=lesson_quiz.id,
+                score=85,
+                answers={},
+                is_passed=True,
+            ),
+        ])
+        db.commit()
+
+        res = admin_client.get(
+            f"/api/users/{learner_user.id}/courses/{course.id}/learning-detail"
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["course"] == {"id": course.id, "title": "Detailed course"}
+        assert body["enrollment"]["total_lessons"] == 2
+        assert body["enrollment"]["completed_lessons"] == 1
+        assert body["enrollment"]["progress_percent"] == 50
+        assert body["quiz_stats"] == {
+            "total_quizzes": 2,
+            "quizzes_taken": 1,
+            "total_attempts": 2,
+            "quizzes_passed": 1,
+            "average_score": 85,
+        }
+
+        quizzes = {quiz["id"]: quiz for quiz in body["quizzes"]}
+        assert quizzes[lesson_quiz.id]["total_attempts"] == 2
+        assert quizzes[lesson_quiz.id]["best_score"] == 85
+        assert quizzes[lesson_quiz.id]["is_passed"] is True
+        assert quizzes[lesson_quiz.id]["last_attempted_at"] is not None
+        assert quizzes[final_quiz.id]["total_attempts"] == 0
+        assert quizzes[final_quiz.id]["best_score"] is None
+        assert quizzes[final_quiz.id]["is_passed"] is False
+
+    def test_course_detail_manager_scope_and_enrollment(
+        self, admin_client, manager_client, db, learner_user
+    ):
+        course = make_course(db)
+        enroll(db, learner_user, course)
+
+        same_department = manager_client.get(
+            f"/api/users/{learner_user.id}/courses/{course.id}/learning-detail"
+        )
+        assert same_department.status_code == 200
+
+        outsider = make_user(db, username="outside_dept", department="Other")
+        enroll(db, outsider, course)
+        denied = manager_client.get(
+            f"/api/users/{outsider.id}/courses/{course.id}/learning-detail"
+        )
+        assert denied.status_code == 403
+
+        unenrolled_course = make_course(db, title="Not enrolled")
+        missing = admin_client.get(
+            f"/api/users/{learner_user.id}/courses/{unenrolled_course.id}/learning-detail"
+        )
+        assert missing.status_code == 404
 
 
 class TestBulkImport:

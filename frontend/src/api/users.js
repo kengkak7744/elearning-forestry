@@ -41,6 +41,14 @@ export const usersApi = {
     return response.data
   },
 
+  /** Detailed progress and quiz results for one enrolled course (admin/manager). */
+  getCourseLearningDetail: async (userId, courseId) => {
+    const response = await apiClient.get(
+      `/users/${userId}/courses/${courseId}/learning-detail`
+    )
+    return response.data
+  },
+
   /** Reset a user's password (admin). */
   resetPassword: async (userId, newPassword) => {
     const response = await apiClient.post(`/users/${userId}/reset-password`, {

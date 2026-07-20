@@ -229,6 +229,14 @@ class TestDownload:
         assert res.status_code == 200
         assert res.headers["content-type"] == "application/pdf"
 
+    def test_admin_can_download_another_users_certificate(
+        self, admin_client, learner_client, db, learner_user, fake_pdf_render
+    ):
+        cert_id = self._issued_cert_id(learner_client, db, learner_user, fake_pdf_render)
+        res = admin_client.get(f"/api/certificates/{cert_id}/download")
+        assert res.status_code == 200
+        assert res.headers["content-type"] == "application/pdf"
+
     def test_other_learner_denied(self, learner_client, db, learner_user, fake_pdf_render):
         cert_id = self._issued_cert_id(learner_client, db, learner_user, fake_pdf_render)
         other = auth_client(make_user(db, username="snoop1"))
