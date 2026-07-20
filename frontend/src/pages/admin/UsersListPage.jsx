@@ -201,22 +201,24 @@ export default function UsersListPage() {
                   return (
                     <TableRow key={u.id}>
                       <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => setSummaryUserId(u.id)}
-                          aria-label={`ดูสรุปการเรียนของ ${u.full_name}`}
-                          className="group flex items-center gap-2 text-left"
-                        >
-                          <UserAvatar user={u} className="h-8 w-8" />
-                          <span className="min-w-0">
-                            <span className="block font-mono text-xs text-foreground group-hover:text-primary group-hover:underline">
-                              @{u.username}
+                        <div className="flex items-center gap-2">
+                          <UserAvatar user={u} className="h-8 w-8" preview />
+                          <button
+                            type="button"
+                            onClick={() => setSummaryUserId(u.id)}
+                            aria-label={`ดูสรุปการเรียนของ ${u.full_name}`}
+                            className="group min-w-0 text-left"
+                          >
+                            <span className="min-w-0">
+                              <span className="block font-mono text-xs text-foreground group-hover:text-primary group-hover:underline">
+                                @{u.username}
+                              </span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                {u.is_active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+                              </span>
                             </span>
-                            <span className="block text-[11px] text-muted-foreground">
-                              {u.is_active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
-                            </span>
-                          </span>
-                        </button>
+                          </button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <button
@@ -285,7 +287,7 @@ export default function UsersListPage() {
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <div className="flex min-w-0 items-start gap-3">
-                        <UserAvatar user={u} className="h-10 w-10" />
+                        <UserAvatar user={u} className="h-10 w-10" preview />
                         <button
                           type="button"
                           onClick={() => setSummaryUserId(u.id)}

@@ -86,7 +86,7 @@ export default function UserSummarySheet({ userId, open, onOpenChange }) {
           <div className="space-y-5">
             <Card className="border-border/60">
               <CardContent className="flex items-start gap-3 p-4">
-                <UserAvatar user={data.user} className="h-12 w-12" />
+                <UserAvatar user={data.user} className="h-12 w-12" preview />
                 <div className="min-w-0 space-y-1">
                   <div className="truncate text-base font-semibold text-foreground">
                     {data.user.full_name}

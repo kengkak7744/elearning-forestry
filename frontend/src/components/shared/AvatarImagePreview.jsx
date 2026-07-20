@@ -5,7 +5,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
-export default function ProfileImagePreview({ src, alt, children }) {
+export default function AvatarImagePreview({ src, alt, children }) {
   if (!src) return children
 
   const triggerLabel = alt

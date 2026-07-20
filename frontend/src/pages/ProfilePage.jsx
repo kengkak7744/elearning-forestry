@@ -10,7 +10,7 @@ import SecurityTab from '@/components/profile/SecurityTab'
 import MyCoursesTab from '@/components/profile/MyCoursesTab'
 import BookmarksTab from '@/components/profile/BookmarksTab'
 import CertificatesTab from '@/components/profile/CertificatesTab'
-import ProfileImagePreview from '@/components/profile/ProfileImagePreview'
+import AvatarImagePreview from '@/components/shared/AvatarImagePreview'
 import { initials } from '@/utils/formatting'
 
 export default function ProfilePage() {
@@ -22,7 +22,7 @@ export default function ProfilePage() {
       {/* Profile header */}
       <Card className="mb-6 border-border/60">
         <CardContent className="flex items-center gap-4 p-5">
-          <ProfileImagePreview
+          <AvatarImagePreview
             src={user?.profile_image ? mediaUrl(user.profile_image) : undefined}
             alt={user?.full_name || ''}
           >
@@ -34,7 +34,7 @@ export default function ProfilePage() {
                 {initials(user?.full_name)}
               </AvatarFallback>
             </Avatar>
-          </ProfileImagePreview>
+          </AvatarImagePreview>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold text-foreground">
               {user?.full_name}
